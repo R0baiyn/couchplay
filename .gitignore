@@ -46,3 +46,11 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Secrets et sondes locales : ne jamais versionner
+.env
+*.env
+probe/
+android/key.properties
+*.jks
+*.keystore
