@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "fr" "\0"
-            VALUE "FileDescription", "couchplay" "\0"
+            VALUE "CompanyName", "CouchPlay" "\0"
+            VALUE "FileDescription", "CouchPlay" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "couchplay" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 fr. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 CouchPlay. All rights reserved." "\0"
             VALUE "OriginalFilename", "couchplay.exe" "\0"
-            VALUE "ProductName", "couchplay" "\0"
+            VALUE "ProductName", "CouchPlay" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
