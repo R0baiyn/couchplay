@@ -60,8 +60,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
     });
+    final client = ref.read(serverClientFactoryProvider)(account);
     try {
-      await ref.read(serverClientFactoryProvider)(account).accountInfo();
+      await client.accountInfo();
       // Un nouveau compte devient actif ; une modification ne change pas l'actif.
       await ref
           .read(accountsProvider.notifier)
@@ -76,6 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       return;
     } finally {
+      client.close();
       if (mounted) setState(() => _busy = false);
     }
     if (mounted && Navigator.canPop(context)) Navigator.pop(context);
