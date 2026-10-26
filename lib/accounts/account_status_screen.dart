@@ -39,6 +39,8 @@ class AccountStatusScreen extends ConsumerWidget {
       ),
       body: Center(
         child: switch (info) {
+          // En premier : un rechargement garde l'ancienne valeur ou erreur.
+          AsyncValue(isLoading: true) => const CircularProgressIndicator(),
           AsyncData(:final value) => _Details(value),
           AsyncError(:final error) => Column(
             mainAxisSize: MainAxisSize.min,
