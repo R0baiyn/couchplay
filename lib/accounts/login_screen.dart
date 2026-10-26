@@ -58,7 +58,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await ref.read(serverClientFactoryProvider)(account).accountInfo();
-      await ref.read(accountsProvider.notifier).save(account, activate: true);
+      // Un nouveau compte devient actif ; une modification ne change pas l'actif.
+      await ref
+          .read(accountsProvider.notifier)
+          .save(account, activate: widget.account == null);
     } on ServerException catch (e) {
       if (mounted) setState(() => _error = e.message);
       return;

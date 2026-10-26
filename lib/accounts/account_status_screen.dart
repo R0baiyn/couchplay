@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server/models.dart';
+import '../settings/settings_screen.dart';
 import 'account_store.dart';
 import 'server_session.dart';
 
@@ -24,6 +25,14 @@ class AccountStatusScreen extends ConsumerWidget {
             onPressed: info.isLoading
                 ? null
                 : () => ref.invalidate(accountInfoProvider),
+          ),
+          IconButton(
+            tooltip: 'Réglages',
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            ),
           ),
         ],
       ),

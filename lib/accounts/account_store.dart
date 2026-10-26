@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../logging.dart';
 import '../server/json_read.dart';
 import 'account.dart';
+import 'account_files.dart';
 
 /// Les comptes et le compte actif, valeur immuable.
 final class AccountsState {
@@ -120,7 +121,11 @@ final class AccountsNotifier extends Notifier<AccountsState> {
   Future<void> save(Account account, {bool activate = false}) =>
       _commit(state.withAccount(account, activate: activate));
 
-  Future<void> remove(String id) => _commit(state.without(id));
+  /// Efface les identifiants du compte, puis son dossier de données.
+  Future<void> remove(String id) async {
+    await _commit(state.without(id));
+    await ref.read(accountFilesProvider).delete(id);
+  }
 
   Future<void> activate(String id) => _commit(state.withActive(id));
 
