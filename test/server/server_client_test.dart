@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_server.dart';
@@ -111,5 +112,39 @@ void main() {
         isA<InvalidResponse>(),
       );
     });
+  });
+
+  test('403 : accès refusé, pas identifiants refusés', () async {
+    await expectLater(
+      _client(FakeAdapter.replying('', status: 403)).accountInfo(),
+      throwsA(isA<AccessDenied>()),
+    );
+  });
+
+  test('les logs d\'erreur ne contiennent pas les identifiants', () async {
+    final lines = <String>[];
+    final original = debugPrint;
+    debugPrint = (message, {wrapWidth}) => lines.add('$message');
+    addTearDown(() => debugPrint = original);
+
+    for (final adapter in [
+      FakeAdapter.failing(DioExceptionType.connectionError),
+      FakeAdapter.replying('<html>', status: 200),
+      FakeAdapter.replying('', status: 500),
+    ]) {
+      await expectLater(_client(adapter).accountInfo(), throwsA(anything));
+    }
+
+    expect(lines, hasLength(3));
+    for (final line in lines) {
+      for (final secret in [
+        _user,
+        _pass,
+        Uri.encodeQueryComponent(_user),
+        Uri.encodeQueryComponent(_pass),
+      ]) {
+        expect(line, isNot(contains(secret)), reason: line);
+      }
+    }
   });
 }

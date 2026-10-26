@@ -23,6 +23,14 @@ final class CredentialsRejected extends ServerException {
   String get message => 'Identifiants refusés';
 }
 
+final class AccessDenied extends ServerException {
+  const AccessDenied();
+
+  @override
+  String get message =>
+      'Accès refusé par le serveur : essaie un autre User-Agent';
+}
+
 final class ServerUnreachable extends ServerException {
   const ServerUnreachable();
 
@@ -111,7 +119,10 @@ final class ServerClient {
     }
 
     final status = response.statusCode ?? 0;
-    if (status == 401 || status == 403) throw const CredentialsRejected();
+    // Les mauvais identifiants arrivent en général en 200 avec `auth: 0`.
+    if (status == 401) throw const CredentialsRejected();
+    // 403 : filtrage par User-Agent ou par adresse IP, pas les identifiants.
+    if (status == 403) throw const AccessDenied();
     if (status != 200) {
       _log('GET $uri', 'HTTP $status');
       throw InvalidResponse('HTTP $status');
@@ -123,6 +134,9 @@ final class ServerClient {
       throw const InvalidResponse('JSON invalide');
     }
   }
+
+  /// Libère les connexions. Le client n'est plus utilisable ensuite.
+  void close() => _dio.close(force: true);
 
   void _log(String message, Object error) =>
       log(message, error: error, secrets: [username, password]);
