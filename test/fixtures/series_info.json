@@ -1,0 +1,243 @@
+{
+ "seasons": [
+  {
+   "air_date": "2013-02-25",
+   "episode_count": 31,
+   "id": 53335,
+   "name": "Épisodes spéciaux",
+   "overview": "",
+   "season_number": 0,
+   "vote_average": 0,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/xdFqomE16ZFMr53XK04l5UcxQLc.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/xdFqomE16ZFMr53XK04l5UcxQLc.jpg"
+  },
+  {
+   "air_date": "2013-03-03",
+   "episode_count": 9,
+   "id": 53334,
+   "name": "Saison 1",
+   "overview": "Scandinavie, à la fin du VIII siècle. Ragnar Lodbrok, un jeune guerrier viking, est avide d’aventures et de nouvelles conquêtes. Lassé des pillages sur les terres de l’Est, il se met en tête d’explorer l’Ouest par la mer. Malgré la réprobation de son chef, Haraldson, il se fie aux signes et à la volonté des dieux et construit une nouvelle génération de vaisseaux, plus légers et plus rapides. Mais alors qu’il conduit des raids toujours plus audacieux loin de chez lui, Ragnar est menacé de traîtrise sur ses propres terres. Pour protéger sa liberté, sa famille et sa vie, il devra lutter contre bien des ennemis.",
+   "season_number": 1,
+   "vote_average": 7.6,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/zeNhkvx92fT2qQGBTwiP08rCaTI.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/zeNhkvx92fT2qQGBTwiP08rCaTI.jpg"
+  },
+  {
+   "air_date": "2014-02-27",
+   "episode_count": 10,
+   "id": 53336,
+   "name": "Saison 2",
+   "overview": "L’ascension de Ragnar Lothbrok, à présent allié au roi Horik, n’est pas sans risque. Il aspire plus que jamais à conquérir les riches terres de l’Ouest, mais ce désir insatiable de suprématie aura un prix. Entre jeux de guerre, de pouvoir, d'amour et de foi, Ragnar devra faire des choix stratégiques et savoir rester fort s'il veut protéger sa famille, ses amis ainsi que sa patrie.",
+   "season_number": 2,
+   "vote_average": 8.1,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/lJ2askdAuepHMXbHssz30vdnM9B.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/lJ2askdAuepHMXbHssz30vdnM9B.jpg"
+  },
+  {
+   "air_date": "2015-02-19",
+   "episode_count": 10,
+   "id": 64422,
+   "name": "Saison 3",
+   "overview": "Après avoir accosté au Wessex, Ragnar Lothbrok, désormais roi charismatique respecté et craint de tous, est de retour et compte bien obtenir ce qui lui revient de droit : des terres où les siens pourront cultiver et prospérer. Mais le roi Viking rêve toujours de plus de conquêtes et de nouveaux horizons et sa soif insatiable de découvertes le conduira jusqu’à Paris, ville réputée pour être imprenable.",
+   "season_number": 3,
+   "vote_average": 7.9,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/eTcrXMeBi7VFrNsbekq7iPfS0QW.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/eTcrXMeBi7VFrNsbekq7iPfS0QW.jpg"
+  },
+  {
+   "air_date": "2016-02-18",
+   "episode_count": 20,
+   "id": 72979,
+   "name": "Saison 4",
+   "overview": "Ragnar Lothbrok a triomphé de ses ennemis mais rentre à Kattegat gravement blessé. Alors qu’il pourrait mourir, son épouse, la reine Aslaug, et son fils, Bjorn, se positionnent en tant que successeurs. Pendant ce temps, Lagertha continue de se livrer à une bataille de pouvoir contre Kalf et Rollo trahit son héritage Viking en restant en France. De son côté, Floki paye le prix de ses actions brutales à l’encontre du prêtre catholique Athelsan.",
+   "season_number": 4,
+   "vote_average": 7.7,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/fzH65QciUlDDxcjpBAE5wzbS6lW.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/fzH65QciUlDDxcjpBAE5wzbS6lW.jpg"
+  },
+  {
+   "air_date": "2017-11-29",
+   "episode_count": 20,
+   "id": 88459,
+   "name": "Saison 5",
+   "overview": "Alors que Lagertha et Björn fuient les soldats d'Ivar avec l'évêque Headmund, le règne tyrannique d'Ivar sur la Scandinavie se fait de plus en plus dur.",
+   "season_number": 5,
+   "vote_average": 7.1,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/epPuLFrKEikmKEqwP67jkGN0VxX.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/epPuLFrKEikmKEqwP67jkGN0VxX.jpg"
+  },
+  {
+   "air_date": "2019-12-04",
+   "episode_count": 20,
+   "id": 133827,
+   "name": "Saison 6",
+   "overview": "La guerre est déclarée entre les frères ennemis afin de régner sur la Norvège. Alors que Björn a du mal à assumer la succession de son père, il est malgré tout prêt à tout pour défendre son territoire. Ivar, de son côté, a soif de vengeance et ne compte pas céder le trône aussi facilement...",
+   "season_number": 6,
+   "vote_average": 7.2,
+   "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/aQzy1zw2Ez2P2xzzmdv0F9fiLVW.jpg",
+   "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/aQzy1zw2Ez2P2xzzmdv0F9fiLVW.jpg"
+  }
+ ],
+ "info": {
+  "name": "Vikings",
+  "cover": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/xmcOeS0BKCBg5MwM3dfMrSUqyNh.jpg",
+  "plot": "Les exploits d'un groupe de vikings de la fin du 8ème siècle jusqu'au milieu du 11ème, mené par Ragnar Lodbrok, l'un des plus populaires héros viking de tous les temps, qui a régné quelques temps sur le Danemark et la Suède…",
+  "cast": "Alex Høgh Andersen, Jordan Patrick Smith, Marco Ilsø, Peter Franzén, Georgia Hirst",
+  "director": "",
+  "genre": "Action & Adventure, Drame, War & Politics",
+  "releaseDate": "2013-03-03",
+  "last_modified": "1637770791",
+  "rating": "8",
+  "rating_5based": 4,
+  "backdrop_path": [
+   "https://image.tmdb.org/t/p/w1280/13kblIK8DnxMurcRDkeyy2sGR7v.jpg"
+  ],
+  "youtube_trailer": "",
+  "episode_run_time": "0",
+  "category_id": "1793"
+ },
+ "episodes": {
+  "1": [
+   {
+    "id": "6912",
+    "episode_num": 1,
+    "title": "Vikings - S01E01 - Cap à l'Ouest",
+    "container_extension": "mkv",
+    "info": {
+     "tmdb_id": 892432,
+     "releasedate": "2013-03-03",
+     "plot": "Au VIIIe siècle en Scandinavie, frustré par le manque d'ambition du chef local Haraldson, Ragnar Lothbrok, jeune et charismatique guerrier viking, décide de construire en secret un nouveau type de navire qui lui permettra de traverser la mer en direction des civilisations prospères de l'Ouest...",
+     "duration_secs": 0,
+     "duration": "00:00:00",
+     "movie_image": "https://image.tmdb.org/t/p/w300/7cuiE0fvDXnCyVbQ5EXHtIz2sAr.jpg",
+     "video": [],
+     "audio": [],
+     "bitrate": 0,
+     "rating": 7.738,
+     "season": 1
+    },
+    "custom_sid": "",
+    "added": "1497911095",
+    "season": 1,
+    "direct_source": ""
+   },
+   {
+    "id": "6913",
+    "episode_num": 2,
+    "title": "Vikings - S01E02 - L'Expédition",
+    "container_extension": "mkv",
+    "info": {
+     "tmdb_id": 892434,
+     "releasedate": "2013-03-10",
+     "plot": "Ragnar entreprend un long voyage en Angleterre, contre l'avis d'Haraldson, convaincu que rien n'existe à l'Ouest. Sur place, l'équipe pille un monastère.",
+     "duration_secs": 0,
+     "duration": "00:00:00",
+     "movie_image": "https://image.tmdb.org/t/p/w300/5IN9TOLnqt9dpIC3h6xnmGNqZuz.jpg",
+     "video": [],
+     "audio": [],
+     "bitrate": 0,
+     "rating": 7.187,
+     "season": 1
+    },
+    "custom_sid": "",
+    "added": "1497911095",
+    "season": 1,
+    "direct_source": ""
+   },
+   {
+    "id": "6914",
+    "episode_num": 3,
+    "title": "Vikings - S01E03 - La Pêche miraculeuse",
+    "container_extension": "mkv",
+    "info": {
+     "tmdb_id": 892433,
+     "releasedate": "2013-03-17",
+     "plot": "Après leur premier raid, Ragnar et son clan regagnent joyeusement leurs terres, parés de richesses et entourés d'esclaves. Ragnar prend à son service le frère Athelstan, rescapé du monastère. Face à un tel succès, le comte n'a pas d'autre choix que d'autoriser un second voyage vers le Nouveau Monde...",
+     "duration_secs": 0,
+     "duration": "00:00:00",
+     "movie_image": "https://image.tmdb.org/t/p/w300/srvPbivGYPH0hpFA9rqsmDXnO2Z.jpg",
+     "video": [],
+     "audio": [],
+     "bitrate": 0,
+     "rating": 7.634,
+     "season": 1
+    },
+    "custom_sid": "",
+    "added": "1497911096",
+    "season": 1,
+    "direct_source": ""
+   }
+  ],
+  "2": [
+   {
+    "id": "6921",
+    "episode_num": 1,
+    "title": "Vikings - S02E01 - Le Sang des frères",
+    "container_extension": "mkv",
+    "info": {
+     "tmdb_id": 970845,
+     "releasedate": "2014-02-27",
+     "plot": "Ragnar et les forces du roi Horik s'apprêtent à affronter Jarl Borg, rejoint par Rollo. L'un des deux frères devra s'incliner à l'issue de cette bataille. Dans le même temps, la princesse Aslaug se dirige vers Kattegat avec une nouvelle qui risque de placer Ragnar dans une situation fort délicate...",
+     "duration_secs": 0,
+     "duration": "00:00:00",
+     "movie_image": "https://image.tmdb.org/t/p/w300/new6dK6yNOcXysMvm8KDp7pKqod.jpg",
+     "video": [],
+     "audio": [],
+     "bitrate": 0,
+     "rating": 8.156,
+     "season": 2
+    },
+    "custom_sid": "",
+    "added": "1497911330",
+    "season": 2,
+    "direct_source": ""
+   },
+   {
+    "id": "6922",
+    "episode_num": 2,
+    "title": "Vikings - S02E02 - Fragile alliance",
+    "container_extension": "mkv",
+    "info": {
+     "tmdb_id": 972579,
+     "releasedate": "2014-03-06",
+     "plot": "Quatre années de paix se sont écoulées sous le règne de Ragnar, désormais marié à la princesse Aslaug. Désireux de conquérir de nouveaux espaces, le viking annonce à son peuple qu'un raid va avoir lieu, vers l'ouest. Une alliance inattendue se forme et la flotte met le cap sur l'Angleterre...",
+     "duration_secs": 0,
+     "duration": "00:00:00",
+     "movie_image": "https://image.tmdb.org/t/p/w300/2DWsKFy51lt1gYlcn2zy4DlqCGV.jpg",
+     "video": [],
+     "audio": [],
+     "bitrate": 0,
+     "rating": 7.798,
+     "season": 2
+    },
+    "custom_sid": "",
+    "added": "1497911330",
+    "season": 2,
+    "direct_source": ""
+   },
+   {
+    "id": "6923",
+    "episode_num": 3,
+    "title": "Vikings - S02E03 - Trahison",
+    "container_extension": "mkv",
+    "info": {
+     "tmdb_id": 972833,
+     "releasedate": "2014-03-13",
+     "plot": "Dans le Wessex, le raid viking est en cours. Les hommes de Ragnar s'attaquent à une église et tuent ses occupants. Le roi Ecbert doit faire face, sur ses terres, à un ennemi inhabituel. Pendant que Ragnar se démène pour dominer l'Ouest, Jarl Borg élabore sa propre stratégie pour le futur de Kattegat...",
+     "duration_secs": 0,
+     "duration": "00:00:00",
+     "movie_image": "https://image.tmdb.org/t/p/w300/a7v9k61yKmqRnRvr20cw4lzckJq.jpg",
+     "video": [],
+     "audio": [],
+     "bitrate": 0,
+     "rating": 8.202,
+     "season": 2
+    },
+    "custom_sid": "",
+    "added": "1497911331",
+    "season": 2,
+    "direct_source": ""
+   }
+  ]
+ }
+}
