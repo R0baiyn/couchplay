@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server/models.dart';
+import '../server/server_client.dart';
 import '../settings/settings_screen.dart';
 import 'account_store.dart';
 import 'server_session.dart';
@@ -43,7 +44,10 @@ class AccountStatusScreen extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             spacing: 16,
             children: [
-              Text('$error', textAlign: TextAlign.center),
+              Text(
+                error is ServerException ? error.message : 'Erreur inattendue',
+                textAlign: TextAlign.center,
+              ),
               FilledButton(
                 autofocus: true,
                 onPressed: () => ref.invalidate(accountInfoProvider),
