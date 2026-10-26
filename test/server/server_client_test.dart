@@ -1,37 +1,10 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Répond à la place du réseau et garde la dernière requête.
-final class _FakeAdapter implements HttpClientAdapter {
-  _FakeAdapter(this._respond);
-
-  final Future<ResponseBody> Function(RequestOptions options) _respond;
-  RequestOptions? last;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    last = options;
-    return _respond(options);
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-_FakeAdapter _replying(String body, {int status = 200}) =>
-    _FakeAdapter((_) async => ResponseBody.fromString(body, status));
-
-_FakeAdapter _failing(DioExceptionType type) => _FakeAdapter(
-  (options) async => throw DioException(requestOptions: options, type: type),
-);
+import '../support/fake_server.dart';
 
 // Avec & et # : ils doivent être encodés dans l'URL.
 const _user = 'jean dupont';
@@ -48,7 +21,7 @@ ServerClient _client(HttpClientAdapter adapter) => ServerClient(
 void main() {
   test('lit l\'état du compte depuis la fixture', () async {
     final body = File('test/fixtures/account.json').readAsStringSync();
-    final info = await _client(_replying(body)).accountInfo();
+    final info = await _client(FakeAdapter.replying(body)).accountInfo();
 
     expect(info.status, 'Active');
     expect(info.isActive, isTrue);
@@ -60,7 +33,9 @@ void main() {
   });
 
   test('encode les identifiants et envoie le User-Agent', () async {
-    final adapter = _replying('{"user_info":{"auth":1,"status":"Active"}}');
+    final adapter = FakeAdapter.replying(
+      '{"user_info":{"auth":1,"status":"Active"}}',
+    );
     await _client(adapter).accountInfo();
 
     final request = adapter.last!;
@@ -71,7 +46,7 @@ void main() {
 
   test('un abonnement sans date d\'expiration n\'expire pas', () async {
     final info = await _client(
-      _replying(
+      FakeAdapter.replying(
         '{"user_info":{"auth":"1","status":"Expired","exp_date":null}}',
       ),
     ).accountInfo();
@@ -92,44 +67,47 @@ void main() {
 
     test('auth à 0 : identifiants refusés', () async {
       expect(
-        await errorOf(_replying('{"user_info":{"auth":0}}')),
+        await errorOf(FakeAdapter.replying('{"user_info":{"auth":0}}')),
         isA<CredentialsRejected>(),
       );
     });
 
     test('liste vide ou HTTP 401 : identifiants refusés', () async {
-      expect(await errorOf(_replying('[]')), isA<CredentialsRejected>());
       expect(
-        await errorOf(_replying('', status: 401)),
+        await errorOf(FakeAdapter.replying('[]')),
+        isA<CredentialsRejected>(),
+      );
+      expect(
+        await errorOf(FakeAdapter.replying('', status: 401)),
         isA<CredentialsRejected>(),
       );
     });
 
     test('panne réseau : serveur injoignable', () async {
       expect(
-        await errorOf(_failing(DioExceptionType.connectionError)),
+        await errorOf(FakeAdapter.failing(DioExceptionType.connectionError)),
         isA<ServerUnreachable>(),
       );
     });
 
     test('timeout : le serveur ne répond pas', () async {
       expect(
-        await errorOf(_failing(DioExceptionType.connectionTimeout)),
+        await errorOf(FakeAdapter.failing(DioExceptionType.connectionTimeout)),
         isA<ServerTimeout>(),
       );
       expect(
-        await errorOf(_failing(DioExceptionType.receiveTimeout)),
+        await errorOf(FakeAdapter.failing(DioExceptionType.receiveTimeout)),
         isA<ServerTimeout>(),
       );
     });
 
     test('page HTML ou HTTP 500 : réponse illisible', () async {
       expect(
-        await errorOf(_replying('<html>maintenance</html>')),
+        await errorOf(FakeAdapter.replying('<html>maintenance</html>')),
         isA<InvalidResponse>(),
       );
       expect(
-        await errorOf(_replying('{}', status: 500)),
+        await errorOf(FakeAdapter.replying('{}', status: 500)),
         isA<InvalidResponse>(),
       );
     });
