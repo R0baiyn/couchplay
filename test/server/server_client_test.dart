@@ -73,6 +73,28 @@ void main() {
       );
     });
 
+    // Réponse réelle du serveur de l'étape 1 à de faux identifiants.
+    test('auth à 0 avec un HTTP 404 : identifiants refusés', () async {
+      expect(
+        await errorOf(
+          FakeAdapter.replying('{"user_info":{"auth":0}}', status: 404),
+        ),
+        isA<CredentialsRejected>(),
+      );
+    });
+
+    test('HTTP 429 du pare-feu : trop de tentatives', () async {
+      expect(
+        await errorOf(
+          FakeAdapter.replying(
+            '{"ok":false,"code":429,"reason":"missing_username"}',
+            status: 429,
+          ),
+        ),
+        isA<TooManyRequests>(),
+      );
+    });
+
     test('liste vide ou HTTP 401 : identifiants refusés', () async {
       expect(
         await errorOf(FakeAdapter.replying('[]')),

@@ -38,6 +38,14 @@ final class ServerUnreachable extends ServerException {
   String get message => 'Serveur injoignable';
 }
 
+final class TooManyRequests extends ServerException {
+  const TooManyRequests();
+
+  @override
+  String get message =>
+      'Trop de tentatives : le serveur bloque, réessaie dans quelques minutes';
+}
+
 final class ServerTimeout extends ServerException {
   const ServerTimeout();
 
@@ -89,7 +97,7 @@ final class ServerClient {
   /// Vérifie les identifiants et renvoie l'état de l'abonnement.
   Future<AccountInfo> accountInfo() async {
     final userInfo = asMap(asMap(await _get())['user_info']);
-    // Mauvais identifiants : `auth: 0`, ou parfois une liste vide.
+    // `auth: 0` est traité par _get ; reste le cas d'une liste vide.
     if (asInt(userInfo['auth']) != 1) throw const CredentialsRejected();
     return AccountInfo.fromJson(userInfo);
   }
@@ -119,19 +127,36 @@ final class ServerClient {
     }
 
     final status = response.statusCode ?? 0;
-    // Les mauvais identifiants arrivent en général en 200 avec `auth: 0`.
-    if (status == 401) throw const CredentialsRejected();
-    // 403 : filtrage par User-Agent ou par adresse IP, pas les identifiants.
-    if (status == 403) throw const AccessDenied();
-    if (status != 200) {
-      _log('GET $uri', 'HTTP $status');
-      throw InvalidResponse('HTTP $status');
+    final body = _tryDecode(response.data);
+    // Mauvais identifiants : `auth: 0`, avec un code 200 ou une erreur selon
+    // le serveur (404 chez certains). Le contenu prime sur le code.
+    final userInfo = body is Map ? body['user_info'] : null;
+    if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
+      throw const CredentialsRejected();
     }
+    switch (status) {
+      case 200 when body != null:
+        return body;
+      case 401:
+        throw const CredentialsRejected();
+      // Filtrage par User-Agent ou par adresse IP, pas les identifiants.
+      case 403:
+        throw const AccessDenied();
+      // Pare-feu du serveur après trop de requêtes ou d'essais ratés.
+      case 429:
+        throw const TooManyRequests();
+      default:
+        final details = status == 200 ? 'JSON invalide' : 'HTTP $status';
+        _log('GET $uri', details);
+        throw InvalidResponse(details);
+    }
+  }
+
+  static Object? _tryDecode(String? text) {
     try {
-      return jsonDecode(response.data ?? '');
+      return jsonDecode(text ?? '');
     } on FormatException {
-      _log('GET $uri', 'JSON invalide');
-      throw const InvalidResponse('JSON invalide');
+      return null;
     }
   }
 
