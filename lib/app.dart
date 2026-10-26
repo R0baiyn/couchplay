@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'accounts/account_status_screen.dart';
+import 'accounts/account_store.dart';
+import 'accounts/login_screen.dart';
 import 'settings/settings.dart';
 
 class CouchPlayApp extends ConsumerWidget {
@@ -28,5 +31,19 @@ class CouchPlayApp extends ConsumerWidget {
       themeMode: themeMode,
       home: home,
     );
+  }
+}
+
+/// Écran de départ : la connexion tant qu'aucun compte n'existe, sinon
+/// l'accueil du compte actif.
+class HomeGate extends ConsumerWidget {
+  const HomeGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasAccount = ref.watch(
+      activeAccountProvider.select((a) => a != null),
+    );
+    return hasAccount ? const AccountStatusScreen() : const LoginScreen();
   }
 }
