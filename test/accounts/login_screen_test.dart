@@ -119,6 +119,6 @@ void main() {
 
     // Relu depuis le stockage, comme au lancement suivant.
     final reopened = await tester.runAsync(AccountStore.open);
-    expect(reopened!.initial.active, active);
+    expect(reopened!.current.active, active);
   });
 }

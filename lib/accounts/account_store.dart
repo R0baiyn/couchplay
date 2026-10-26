@@ -77,35 +77,38 @@ final class AccountsState {
 /// Un seul enregistrement contient tous les comptes et le compte actif : une
 /// écriture les change ensemble, sans état intermédiaire incohérent.
 final class AccountStore {
-  AccountStore._(this._storage, this.initial);
+  AccountStore._(this._storage, this._current);
 
   static const _key = 'accounts';
 
   final FlutterSecureStorage _storage;
 
-  /// État lu à l'ouverture, avant le premier rendu.
-  final AccountsState initial;
+  AccountsState _current;
+
+  /// Dernier état enregistré (ou lu à l'ouverture, avant le premier rendu).
+  AccountsState get current => _current;
 
   static Future<AccountStore> open([
     FlutterSecureStorage storage = const FlutterSecureStorage(),
   ]) async {
-    final raw = await storage.read(key: _key);
     var state = const AccountsState();
-    if (raw != null) {
-      try {
-        state = AccountsState.fromJson(jsonDecode(raw));
-      } on Exception catch (e) {
-        // JSON corrompu, ou déchiffrement impossible (profil copié sur une
-        // autre machine) : on repart sans compte plutôt que de planter.
-        // Le contenu n'est jamais loggé : il porte les mots de passe.
-        log('Comptes illisibles, ignorés', error: e.runtimeType);
-      }
+    try {
+      final raw = await storage.read(key: _key);
+      if (raw != null) state = AccountsState.fromJson(jsonDecode(raw));
+    } on Exception catch (e) {
+      // JSON corrompu, ou déchiffrement impossible (profil copié sur une
+      // autre machine) : on repart sans compte plutôt que de planter. La
+      // prochaine écriture remplace l'enregistrement illisible.
+      // Le contenu n'est jamais loggé : il porte les mots de passe.
+      log('Comptes illisibles, ignorés', error: e.runtimeType);
     }
     return AccountStore._(storage, state);
   }
 
-  Future<void> save(AccountsState state) =>
-      _storage.write(key: _key, value: jsonEncode(state.toJson()));
+  Future<void> save(AccountsState state) async {
+    await _storage.write(key: _key, value: jsonEncode(state.toJson()));
+    _current = state;
+  }
 }
 
 /// Ouvert dans `main()` avant le premier rendu, puis injecté via un override.
@@ -119,14 +122,14 @@ final accountsProvider = NotifierProvider<AccountsNotifier, AccountsState>(
 
 final class AccountsNotifier extends Notifier<AccountsState> {
   @override
-  AccountsState build() => ref.watch(accountStoreProvider).initial;
+  AccountsState build() => ref.watch(accountStoreProvider).current;
 
   Future<void> save(Account account, {bool activate = false}) =>
-      _commit(state.withAccount(account, activate: activate));
+      _commit((s) => s.withAccount(account, activate: activate));
 
   /// Efface les identifiants du compte, puis son dossier de données.
   Future<void> remove(String id) async {
-    await _commit(state.without(id));
+    await _commit((s) => s.without(id));
     try {
       await ref.read(accountFilesProvider).delete(id);
     } on FileSystemException catch (e) {
@@ -136,12 +139,24 @@ final class AccountsNotifier extends Notifier<AccountsState> {
     }
   }
 
-  Future<void> activate(String id) => _commit(state.withActive(id));
+  Future<void> activate(String id) => _commit((s) => s.withActive(id));
 
-  // Écrit d'abord : en cas d'échec, l'écran garde l'état réellement enregistré.
-  Future<void> _commit(AccountsState next) async {
-    await ref.read(accountStoreProvider).save(next);
-    state = next;
+  Future<void> _pending = Future.value();
+
+  /// Les écritures passent l'une après l'autre, chacune partant de l'état
+  /// laissé par la précédente : un clic pendant une suppression ne fait pas
+  /// revenir le compte supprimé.
+  ///
+  /// Écrit d'abord : en cas d'échec, l'écran garde l'état réellement enregistré.
+  Future<void> _commit(AccountsState Function(AccountsState) change) {
+    final run = _pending.then((_) async {
+      final next = change(state);
+      await ref.read(accountStoreProvider).save(next);
+      state = next;
+    });
+    // Un échec est remonté à l'appelant, sans bloquer les écritures suivantes.
+    _pending = run.then<void>((_) {}, onError: (_) {});
+    return run;
   }
 }
 

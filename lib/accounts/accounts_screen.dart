@@ -39,11 +39,33 @@ class AccountsScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
-    await ref.read(accountsProvider.notifier).remove(account.id);
+    if (confirmed != true || !context.mounted) return;
+    if (!await _write(
+      context,
+      ref.read(accountsProvider.notifier).remove(account.id),
+    )) {
+      return;
+    }
     // Plus aucun compte : retour à l'écran de connexion, à la racine.
     if (context.mounted && ref.read(accountsProvider).accounts.isEmpty) {
       Navigator.popUntil(context, (route) => route.isFirst);
+    }
+  }
+
+  /// Attend [write] ; en cas d'échec du stockage, le dit au lieu de se taire.
+  static Future<bool> _write(BuildContext context, Future<void> write) async {
+    try {
+      await write;
+      return true;
+    } on Exception {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d\'enregistrer le changement'),
+          ),
+        );
+      }
+      return false;
     }
   }
 
@@ -70,8 +92,10 @@ class AccountsScreen extends ConsumerWidget {
               title: Text(account.name),
               subtitle: Text(account.host),
               selected: account.id == state.activeId,
-              onTap: () =>
-                  ref.read(accountsProvider.notifier).activate(account.id),
+              onTap: () => _write(
+                context,
+                ref.read(accountsProvider.notifier).activate(account.id),
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

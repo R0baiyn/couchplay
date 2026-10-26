@@ -98,7 +98,7 @@ void main() {
 
     expect(container.read(activeAccountProvider)!.id, 'b');
     final reopened = await tester.runAsync(AccountStore.open);
-    expect(reopened!.initial.activeId, 'b');
+    expect(reopened!.current.activeId, 'b');
   });
 
   testWidgets('supprimer l\'actif efface son dossier et active l\'autre', (
