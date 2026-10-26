@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -18,14 +19,17 @@ Future<void> main() async {
     AccountStore.open(),
     getApplicationSupportDirectory(),
   ).wait;
+  final files = AccountFiles(Directory('${support.path}/accounts'));
+  // En tâche de fond : ne retarde pas le premier rendu.
+  unawaited(
+    files.removeOrphans({for (final a in accounts.current.accounts) a.id}),
+  );
   runApp(
     ProviderScope(
       overrides: [
         settingsStoreProvider.overrideWithValue(settings),
         accountStoreProvider.overrideWithValue(accounts),
-        accountFilesProvider.overrideWithValue(
-          AccountFiles(Directory('${support.path}/accounts')),
-        ),
+        accountFilesProvider.overrideWithValue(files),
       ],
       child: const CouchPlayApp(home: HomeGate()),
     ),

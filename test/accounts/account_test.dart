@@ -57,6 +57,11 @@ void main() {
 
     test('ignore une entrée incomplète, complète les champs facultatifs', () {
       expect(Account.fromJson({'id': 'abc', 'host': 'http://s.com'}), isNull);
+      expect(
+        Account.fromJson({...account.toJson(), 'id': '../autre'}),
+        isNull,
+        reason: 'un id qui sortirait du dossier accounts est rejeté',
+      );
       final minimal = Account.fromJson({
         'id': 7,
         'host': 'http://s.com',

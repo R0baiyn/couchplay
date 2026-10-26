@@ -27,7 +27,11 @@ final class Account {
     final host = asString(map['host']);
     final username = asString(map['username']);
     final password = asString(map['password']);
-    if (id == null || host == null || username == null || password == null) {
+    if (id == null ||
+        !isValidAccountId(id) ||
+        host == null ||
+        username == null ||
+        password == null) {
       return null;
     }
     return Account(
@@ -86,6 +90,12 @@ final class Account {
   @override
   String toString() => 'Account($id, $name)';
 }
+
+/// Un id nomme le dossier des données du compte, effacé avec lui : lettres,
+/// chiffres, `_` et `-` seulement, jamais de séparateur ni de remontée.
+bool isValidAccountId(String id) => _idPattern.hasMatch(id);
+
+final _idPattern = RegExp(r'^[A-Za-z0-9_-]+$');
 
 /// Message d'erreur pour un hôte saisi, ou `null` s'il est valide.
 ///
