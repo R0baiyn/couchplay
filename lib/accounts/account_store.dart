@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -93,7 +94,9 @@ final class AccountStore {
     if (raw != null) {
       try {
         state = AccountsState.fromJson(jsonDecode(raw));
-      } on FormatException catch (e) {
+      } on Exception catch (e) {
+        // JSON corrompu, ou déchiffrement impossible (profil copié sur une
+        // autre machine) : on repart sans compte plutôt que de planter.
         // Le contenu n'est jamais loggé : il porte les mots de passe.
         log('Comptes illisibles, ignorés', error: e.runtimeType);
       }
@@ -124,7 +127,13 @@ final class AccountsNotifier extends Notifier<AccountsState> {
   /// Efface les identifiants du compte, puis son dossier de données.
   Future<void> remove(String id) async {
     await _commit(state.without(id));
-    await ref.read(accountFilesProvider).delete(id);
+    try {
+      await ref.read(accountFilesProvider).delete(id);
+    } on FileSystemException catch (e) {
+      // Fichier verrouillé par Windows : il restera des données locales,
+      // mais le compte est bien supprimé.
+      log('Dossier du compte non effacé', error: e.osError?.errorCode);
+    }
   }
 
   Future<void> activate(String id) => _commit(state.withActive(id));
