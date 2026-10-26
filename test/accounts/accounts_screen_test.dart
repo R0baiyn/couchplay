@@ -171,6 +171,30 @@ void main() {
     expect(find.byType(AccountsScreen), findsOneWidget);
   });
 
+  testWidgets('modifier sans retaper le mot de passe le conserve', (
+    tester,
+  ) async {
+    final container = await pumpAccounts(tester, [_account('a')]);
+
+    await tester.tap(find.byTooltip('Modifier'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(3))
+          .controller!
+          .text,
+      isEmpty,
+      reason: 'le mot de passe enregistré n\'est jamais affiché',
+    );
+    await tester.enterText(find.byType(TextFormField).at(0), 'Chambre');
+    await tester.tap(find.text('Enregistrer'));
+    await settle(tester);
+
+    final a = container.read(accountsProvider).accounts.single;
+    expect(a.name, 'Chambre');
+    expect(a.password, 'mdp');
+  });
+
   test('un id de compte ne peut pas sortir du dossier accounts', () {
     for (final id in ['..', '../x', r'a\b', 'a/b', '']) {
       expect(() => files.of(id), throwsArgumentError, reason: id);

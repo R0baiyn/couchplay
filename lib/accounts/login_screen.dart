@@ -22,7 +22,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final _name = TextEditingController(text: widget.account?.name);
   late final _host = TextEditingController(text: widget.account?.host);
   late final _username = TextEditingController(text: widget.account?.username);
-  late final _password = TextEditingController(text: widget.account?.password);
+  // Jamais prérempli : n'importe qui avec la télécommande pourrait le lire.
+  final _password = TextEditingController();
   late final _userAgent = TextEditingController(
     text: widget.account?.userAgent ?? defaultUserAgent,
   );
@@ -46,7 +47,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       name: _name.text.trim().isEmpty ? host : _name.text.trim(),
       host: host,
       username: _username.text.trim(),
-      password: _password.text,
+      // Vide en modification : le mot de passe enregistré est conservé.
+      password: _password.text.isEmpty && widget.account != null
+          ? widget.account!.password
+          : _password.text,
       userAgent: _userAgent.text.trim().isEmpty
           ? defaultUserAgent
           : _userAgent.text.trim(),
@@ -94,94 +98,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             constraints: const BoxConstraints(maxWidth: 480),
             child: Form(
               key: _form,
-              child: AutofillGroup(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 16,
-                  children: [
-                    TextFormField(
-                      controller: _name,
-                      autofocus: !editing,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom du compte',
-                        hintText: 'Par exemple « Salon »',
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 16,
+                children: [
+                  TextFormField(
+                    controller: _name,
+                    autofocus: !editing,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Nom du compte',
+                      hintText: 'Par exemple « Salon »',
                     ),
-                    TextFormField(
-                      controller: _host,
-                      keyboardType: TextInputType.url,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      validator: (value) => hostError(value ?? ''),
-                      decoration: const InputDecoration(
-                        labelText: 'Adresse du serveur',
-                        hintText: 'http://serveur.com:8080',
-                      ),
+                  ),
+                  TextFormField(
+                    controller: _host,
+                    keyboardType: TextInputType.url,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    validator: (value) => hostError(value ?? ''),
+                    decoration: const InputDecoration(
+                      labelText: 'Adresse du serveur',
+                      hintText: 'http://serveur.com:8080',
                     ),
-                    TextFormField(
-                      controller: _username,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      autofillHints: const [AutofillHints.username],
-                      validator: _required,
-                      decoration: const InputDecoration(
-                        labelText: 'Utilisateur',
-                      ),
-                    ),
-                    TextFormField(
-                      controller: _password,
-                      obscureText: _hidePassword,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      autofillHints: const [AutofillHints.password],
-                      validator: (value) =>
-                          (value ?? '').isEmpty ? 'Champ requis' : null,
-                      decoration: InputDecoration(
-                        labelText: 'Mot de passe',
-                        suffixIcon: IconButton(
-                          tooltip: _hidePassword
-                              ? 'Afficher le mot de passe'
-                              : 'Masquer le mot de passe',
-                          icon: Icon(
-                            _hidePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () =>
-                              setState(() => _hidePassword = !_hidePassword),
+                  ),
+                  TextFormField(
+                    controller: _username,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    // Ni saisie automatique ni suggestions : les identifiants
+                    // ne vivent que dans le stockage sécurisé de l'app.
+                    enableSuggestions: false,
+                    validator: _required,
+                    decoration: const InputDecoration(labelText: 'Utilisateur'),
+                  ),
+                  TextFormField(
+                    controller: _password,
+                    obscureText: _hidePassword,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    validator: (value) => (value ?? '').isEmpty && !editing
+                        ? 'Champ requis'
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: 'Mot de passe',
+                      helperText: editing
+                          ? 'Laisser vide pour garder le mot de passe actuel'
+                          : null,
+                      suffixIcon: IconButton(
+                        tooltip: _hidePassword
+                            ? 'Afficher le mot de passe'
+                            : 'Masquer le mot de passe',
+                        icon: Icon(
+                          _hidePassword
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                         ),
+                        onPressed: () =>
+                            setState(() => _hidePassword = !_hidePassword),
                       ),
                     ),
-                    TextFormField(
-                      controller: _userAgent,
-                      textInputAction: TextInputAction.done,
-                      autocorrect: false,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(
-                        labelText: 'User-Agent',
-                        helperText: 'À changer seulement si le serveur refuse',
+                  ),
+                  TextFormField(
+                    controller: _userAgent,
+                    textInputAction: TextInputAction.done,
+                    autocorrect: false,
+                    onFieldSubmitted: (_) => _submit(),
+                    decoration: const InputDecoration(
+                      labelText: 'User-Agent',
+                      helperText: 'À changer seulement si le serveur refuse',
+                    ),
+                  ),
+                  if (_error case final error?)
+                    Text(
+                      error,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
                     ),
-                    if (_error case final error?)
-                      Text(
-                        error,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy
-                          ? const SizedBox.square(
-                              dimension: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(editing ? 'Enregistrer' : 'Se connecter'),
-                    ),
-                  ],
-                ),
+                  FilledButton(
+                    onPressed: _busy ? null : _submit,
+                    child: _busy
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(editing ? 'Enregistrer' : 'Se connecter'),
+                  ),
+                ],
               ),
             ),
           ),
