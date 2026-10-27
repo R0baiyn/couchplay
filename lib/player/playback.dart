@@ -99,45 +99,29 @@ final class Playback {
   /// Ouvre [request] ; lève [PlaybackFailed] si le flux ne démarre pas
   /// après les nouvelles tentatives (refus du serveur, réseau coupé…).
   /// Rien ne reste alors en cours de chargement.
-  Future<void> open(PlayRequest request) {
+  Future<void> open(PlayRequest request) async {
     final generation = ++_generation;
     _abandonStart();
-    return _inTurn(() async {
-      // Remplacée ou arrêtée avant son tour : rien à ouvrir.
-      if (generation != _generation) return;
-      await player.stop();
-      await _tracks(request);
-      final media = Media(
-        request.url.toString(),
-        httpHeaders: {'User-Agent': request.userAgent},
-        start: request.start,
-      );
-      try {
-        await withRetries(() async {
-          // Une ouverture plus récente, ou un arrêt, a pris la main.
-          if (generation != _generation) return;
-          await _start(media, request.secrets);
-        });
-      } on Exception {
+    await player.stop();
+    await _tracks(request);
+    final media = Media(
+      request.url.toString(),
+      httpHeaders: {'User-Agent': request.userAgent},
+      start: request.start,
+    );
+    try {
+      await withRetries(() async {
+        // Une ouverture plus récente, ou un arrêt, a pris la main.
         if (generation != _generation) return;
-        // mpv peut encore être en train de se connecter : on coupe, pour ne
-        // pas garder l'unique connexion derrière le message d'erreur.
-        await player.stop();
-        throw const PlaybackFailed();
-      }
-    });
-  }
-
-  Future<void> _turn = Future.value();
-
-  /// Ouvertures et arrêts passent un par un. Un arrêt demandé pendant une
-  /// ouverture (retour pendant le chargement) s'applique donc après elle :
-  /// sinon mpv finirait d'ouvrir le fichier après l'arrêt, et le son
-  /// continuerait derrière l'écran fermé.
-  Future<void> _inTurn(Future<void> Function() action) {
-    final done = _turn.then((_) => action());
-    _turn = done.then<void>((_) {}, onError: (_) {});
-    return done;
+        await _start(media, request.secrets);
+      });
+    } on Exception {
+      if (generation != _generation) return;
+      // mpv peut encore être en train de se connecter : on coupe, pour ne
+      // pas garder l'unique connexion derrière le message d'erreur.
+      await player.stop();
+      throw const PlaybackFailed();
+    }
   }
 
   /// Par défaut, piste audio française si elle existe et sous-titres
@@ -226,7 +210,7 @@ final class Playback {
     if (ticket != null && ticket != _generation) return Future.value();
     _generation++;
     _abandonStart();
-    return _inTurn(player.stop);
+    return player.stop();
   }
 
   Future<void> dispose() => player.dispose();

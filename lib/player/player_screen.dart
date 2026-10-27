@@ -103,8 +103,10 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final Playback _playback = ref.read(playbackProvider);
-  // Gardé ici : `ref` n'est plus utilisable dans dispose.
-  late final LibraryNotifier _library = ref.read(libraryProvider.notifier);
+
+  /// Lu dans initState, pas à la première sauvegarde : `ref` n'est plus
+  /// utilisable dans dispose, et une erreur là y sauterait l'arrêt du flux.
+  late final LibraryNotifier _library;
   late final AppLifecycleListener _lifecycle;
   StreamSubscription<bool>? _completed;
   StreamSubscription<bool>? _playing;
@@ -142,6 +144,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _library = ref.read(libraryProvider.notifier);
     if (_mobile) _setFullscreen(true);
     _lifecycle = AppLifecycleListener(onHide: _onHide);
     _completed = _playback.player.stream.completed.listen(_onCompleted);
@@ -174,11 +177,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (_opening || _error != null) return;
     final state = _playback.player.state;
     if (state.position <= Duration.zero) return;
-    unawaited(
-      _library.saveProgress(
-        _item,
-        position: state.position,
-        duration: state.duration,
+    final item = _item;
+    final position = state.position;
+    final duration = state.duration;
+    // Écrit juste après : appelé depuis dispose, modifier la bibliothèque
+    // pendant le démontage de l'écran est interdit.
+    scheduleMicrotask(
+      () => unawaited(
+        _library.saveProgress(item, position: position, duration: duration),
       ),
     );
   }
