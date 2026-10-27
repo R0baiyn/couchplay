@@ -119,7 +119,7 @@ Future<T> _decode<T>(String text, T Function(String) parse) async {
   try {
     return await Isolate.run(() => parse(text));
   } on FormatException {
-    log('Catalogue', error: 'JSON invalide');
+    log('Catalogue', error: 'JSON invalide : ${_preview(text)}');
     throw const InvalidResponse('JSON invalide');
   }
 }
@@ -138,7 +138,7 @@ Future<T> _decodeAndStore<T>(
       return (value, path == null || writeText(path, text));
     });
   } on FormatException {
-    log('Catalogue', error: 'JSON invalide');
+    log('Catalogue', error: 'JSON invalide : ${_preview(text)}');
     throw const InvalidResponse('JSON invalide');
   }
   if (!result.$2) log('Cache du catalogue non écrit');
@@ -155,4 +155,12 @@ Future<T?> _readCached<T>(String path, T Function(String) parse) async {
   } on FormatException {
     return null;
   }
+}
+
+/// Début d'une réponse illisible, pour les logs : une ligne, 120 caractères,
+/// URL masquées (une page d'erreur peut recopier l'adresse demandée).
+String _preview(String text) {
+  final line = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  final cut = line.length > 120 ? '${line.substring(0, 120)}…' : line;
+  return line.isEmpty ? '(réponse vide, ${text.length} octets)' : redact(cut);
 }
