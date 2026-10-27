@@ -13,6 +13,7 @@ import '../catalog/catalog_providers.dart';
 import '../catalog/poster_grid.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
+import '../server/cloudflare_dns.dart';
 import '../server/models.dart';
 import 'playback.dart';
 import 'player_controls.dart';
@@ -61,24 +62,29 @@ Future<void> openPlayer(
   );
 }
 
-/// Flux d'un contenu sur le compte actif, ou `null` sans compte.
-PlayRequest? _requestFor(
+/// Flux d'un contenu sur le compte actif, ou `null` sans compte. Le nom du
+/// serveur est résolu par Cloudflare, comme pour le reste de l'app.
+Future<PlayRequest?> _requestFor(
   WidgetRef ref,
   PlayItem item, {
   String? audioLanguage,
   String? subtitleLanguage,
   Duration? start,
-}) {
+}) async {
   final account = ref.read(activeAccountProvider);
   final client = ref.read(serverClientProvider);
   if (account == null || client == null) return null;
-  return PlayRequest(
-    title: item.title,
-    url: client.streamUri(
+  final (url, headers) = await resolveForPlayer(
+    client.streamUri(
       item.isEpisode ? ContentKind.series : ContentKind.movies,
       item.id,
       item.extension,
     ),
+  );
+  return PlayRequest(
+    title: item.title,
+    url: url,
+    headers: headers,
     userAgent: account.userAgent,
     secrets: [account.username, account.password],
     audioLanguage: audioLanguage,
@@ -295,13 +301,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _opening = true;
       _error = null;
     });
-    final request = _requestFor(
-      ref,
-      _item,
-      audioLanguage: _audioLanguage,
-      subtitleLanguage: _subtitleLanguage,
-      start: _resumeAt,
-    );
+    final PlayRequest? request;
+    try {
+      request = await _requestFor(
+        ref,
+        _item,
+        audioLanguage: _audioLanguage,
+        subtitleLanguage: _subtitleLanguage,
+        start: _resumeAt,
+      );
+    } on SocketException {
+      if (mounted) {
+        setState(() {
+          _opening = false;
+          _error = 'Serveur introuvable : Cloudflare ne connaît pas son nom.';
+        });
+      }
+      return;
+    }
+    // Écran fermé pendant la résolution : rien à ouvrir.
+    if (!mounted) return;
     if (request == null) {
       _exit();
       return;

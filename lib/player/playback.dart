@@ -13,6 +13,7 @@ final class PlayRequest {
     required this.url,
     required this.userAgent,
     this.secrets = const [],
+    this.headers = const {},
     this.audioLanguage,
     this.subtitleLanguage,
     this.start,
@@ -23,6 +24,10 @@ final class PlayRequest {
   /// Porte les identifiants dans son chemin : jamais loggée sans masquage.
   final Uri url;
   final String userAgent;
+
+  /// En-têtes HTTP en plus du User-Agent (Host quand l'URL porte l'adresse
+  /// IP résolue par Cloudflare).
+  final Map<String, String> headers;
 
   /// Identifiants du compte, masqués dans tout message du lecteur.
   final List<String> secrets;
@@ -106,7 +111,7 @@ final class Playback {
     await _tracks(request);
     final media = Media(
       request.url.toString(),
-      httpHeaders: {'User-Agent': request.userAgent},
+      httpHeaders: {'User-Agent': request.userAgent, ...request.headers},
       start: request.start,
     );
     try {

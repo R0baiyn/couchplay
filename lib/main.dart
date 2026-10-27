@@ -9,10 +9,13 @@ import 'package:path_provider/path_provider.dart';
 import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
 import 'app.dart';
+import 'server/cloudflare_dns.dart';
 import 'settings/settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Toutes les connexions HTTP de l'app résolvent les noms par Cloudflare.
+  HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
   final (settings, accounts, support) = await (
     SettingsStore.open(),
