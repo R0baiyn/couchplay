@@ -7,12 +7,14 @@ import 'package:media_kit/media_kit.dart';
 
 /// Contrôles du lecteur, par-dessus la vidéo.
 ///
-/// - Souris : clic = pause, double-clic = plein écran ; les contrôles et le
-///   curseur se masquent après 3 s sans mouvement.
+/// - Souris : clic = pause, double-clic = plein écran (sur l'image, pas sur
+///   les boutons) ; contrôles et curseur se masquent après 3 s sans
+///   mouvement, sauf en pause ou quand la souris est sur les barres.
 /// - Toucher : un toucher affiche ou masque les contrôles, un double toucher
 ///   à gauche ou à droite recule ou avance de 10 s.
 /// - Clavier : Espace (pause), ← → (±10 s), ↑ ↓ (volume), F (plein écran),
-///   Échap (quitte le plein écran, puis le lecteur), Tab pour les boutons.
+///   Échap (quitte le plein écran, puis le lecteur). Tab passe aux boutons ;
+///   là, les flèches passent d'un bouton à l'autre (télécommande).
 class PlayerControls extends StatefulWidget {
   const PlayerControls({
     super.key,
@@ -31,7 +33,9 @@ class PlayerControls extends StatefulWidget {
   /// `true` : l'image remplit l'écran, quitte à être rognée.
   final bool fill;
   final VoidCallback onToggleFill;
-  final bool fullscreen;
+
+  /// `null` : pas de bouton plein écran (mobile, toujours en plein écran).
+  final bool? fullscreen;
   final VoidCallback onToggleFullscreen;
   final VoidCallback onExit;
 
@@ -44,6 +48,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   static const _step = Duration(seconds: 10);
 
   var _visible = true;
+  var _overBars = false;
   Timer? _hideTimer;
 
   Player get _player => widget.player;
@@ -64,9 +69,17 @@ class _PlayerControlsState extends State<PlayerControls> {
   void _show() {
     _hideTimer?.cancel();
     if (!_visible) setState(() => _visible = true);
-    _hideTimer = Timer(_hideAfter, () {
-      if (mounted) setState(() => _visible = false);
-    });
+    _hideTimer = Timer(_hideAfter, _autoHide);
+  }
+
+  // Pas de masquage en pause ni sous la souris : on relance l'attente.
+  void _autoHide() {
+    if (!mounted) return;
+    if (!_player.state.playing || _overBars) {
+      _hideTimer = Timer(_hideAfter, _autoHide);
+      return;
+    }
+    setState(() => _visible = false);
   }
 
   void _hide() {
@@ -92,29 +105,37 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
+    // Toute touche réaffiche les contrôles : Tab ne doit pas activer un
+    // bouton invisible.
+    _show();
     final key = event.logicalKey;
-    // Répétition (touche maintenue) : seulement pour avancer, reculer et le
-    // volume ; un appui maintenu sur Espace ne doit pas alterner sans fin.
     final repeat = event is KeyRepeatEvent;
-    if (key == LogicalKeyboardKey.arrowLeft) {
+    // Sur un bouton (Tab), flèches et Espace gardent leur rôle habituel :
+    // passer d'un bouton à l'autre, activer le bouton.
+    final onVideo = node.hasPrimaryFocus;
+
+    if (onVideo && key == LogicalKeyboardKey.arrowLeft) {
       _seekBy(-_step);
-    } else if (key == LogicalKeyboardKey.arrowRight) {
+    } else if (onVideo && key == LogicalKeyboardKey.arrowRight) {
       _seekBy(_step);
-    } else if (key == LogicalKeyboardKey.arrowUp) {
+    } else if (onVideo && key == LogicalKeyboardKey.arrowUp) {
       _volumeBy(5);
-    } else if (key == LogicalKeyboardKey.arrowDown) {
+    } else if (onVideo && key == LogicalKeyboardKey.arrowDown) {
       _volumeBy(-5);
-    } else if (repeat) {
-      return KeyEventResult.ignored;
-    } else if (key == LogicalKeyboardKey.space ||
+    } else if ((onVideo && key == LogicalKeyboardKey.space) ||
         key == LogicalKeyboardKey.mediaPlayPause) {
-      _player.playOrPause();
-      _show();
+      // Maintenue, la touche n'alterne pas sans fin.
+      if (!repeat) _player.playOrPause();
     } else if (key == LogicalKeyboardKey.keyF) {
-      widget.onToggleFullscreen();
+      if (!repeat && widget.fullscreen != null) widget.onToggleFullscreen();
     } else if (key == LogicalKeyboardKey.escape ||
         key == LogicalKeyboardKey.goBack) {
-      widget.fullscreen ? widget.onToggleFullscreen() : widget.onExit();
+      // Maintenue, Échap ne quitte pas le lecteur dans la foulée.
+      if (!repeat) {
+        widget.fullscreen ?? false
+            ? widget.onToggleFullscreen()
+            : widget.onExit();
+      }
     } else {
       return KeyEventResult.ignored;
     }
@@ -132,7 +153,7 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   void _onDoubleTapDown(TapDownDetails details) {
     if (details.kind == PointerDeviceKind.mouse) {
-      widget.onToggleFullscreen();
+      if (widget.fullscreen != null) widget.onToggleFullscreen();
       return;
     }
     final width = context.size?.width ?? 0;
@@ -147,26 +168,34 @@ class _PlayerControlsState extends State<PlayerControls> {
       child: MouseRegion(
         cursor: _visible ? MouseCursor.defer : SystemMouseCursors.none,
         onHover: (_) => _show(),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: _onTapUp,
-          onDoubleTapDown: _onDoubleTapDown,
-          // Requis pour que onDoubleTapDown soit appelé.
-          onDoubleTap: () {},
-          child: AnimatedOpacity(
-            opacity: _visible ? 1 : 0,
-            duration: const Duration(milliseconds: 200),
-            child: IgnorePointer(
-              ignoring: !_visible,
-              child: Theme(
-                data: ThemeData(
-                  brightness: Brightness.dark,
-                  colorSchemeSeed: Colors.deepPurple,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Gestes de l'image, sous les barres : les boutons et curseurs
+            // reçoivent leurs clics directement, sans délai ni double-clic
+            // détourné.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: _onTapUp,
+              onDoubleTapDown: _onDoubleTapDown,
+              // Requis pour que onDoubleTapDown soit appelé.
+              onDoubleTap: () {},
+            ),
+            AnimatedOpacity(
+              opacity: _visible ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_visible,
+                child: Theme(
+                  data: ThemeData(
+                    brightness: Brightness.dark,
+                    colorSchemeSeed: Colors.deepPurple,
+                  ),
+                  child: _bars(context),
                 ),
-                child: _bars(context),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -174,56 +203,66 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   Widget _bars(BuildContext context) {
     const shade = [Colors.black87, Colors.transparent];
+    Widget bar(Widget child) => MouseRegion(
+      onEnter: (_) => _overBars = true,
+      onExit: (_) => _overBars = false,
+      child: child,
+    );
     return Column(
       children: [
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: shade,
+        bar(
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: shade,
+              ),
             ),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'Retour',
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: widget.onExit,
-                ),
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Retour',
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: widget.onExit,
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+        // Laisse passer clics et touchers vers les gestes de l'image.
         const Spacer(),
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: shade,
+        bar(
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: shade,
+              ),
             ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ProgressBar(player: _player, onSeek: _show),
-                  _buttons(),
-                ],
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ProgressBar(player: _player, onSeek: _show),
+                    _buttons(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -233,6 +272,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   }
 
   Widget _buttons() {
+    final fullscreen = widget.fullscreen;
     return FocusTraversalGroup(
       child: Row(
         children: [
@@ -272,15 +312,12 @@ class _PlayerControlsState extends State<PlayerControls> {
               _show();
             },
           ),
-          IconButton(
-            tooltip: widget.fullscreen
-                ? 'Quitter le plein écran'
-                : 'Plein écran',
-            icon: Icon(
-              widget.fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+          if (fullscreen != null)
+            IconButton(
+              tooltip: fullscreen ? 'Quitter le plein écran' : 'Plein écran',
+              icon: Icon(fullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
+              onPressed: widget.onToggleFullscreen,
             ),
-            onPressed: widget.onToggleFullscreen,
-          ),
         ],
       ),
     );
@@ -299,48 +336,64 @@ class _ProgressBar extends StatefulWidget {
 }
 
 class _ProgressBarState extends State<_ProgressBar> {
-  // Position tenue par le doigt ou la souris pendant un glisser : la vidéo
-  // ne cherche qu'au relâchement.
-  double? _dragging;
+  // Une valeur par seconde au lieu d'une par image décodée : la barre ne
+  // se reconstruit qu'une fois par seconde. Créés une fois, pour ne pas se
+  // réabonner à chaque reconstruction des contrôles.
+  late final Stream<int> _seconds = widget.player.stream.position
+      .map((p) => p.inSeconds)
+      .distinct();
+  late final Stream<int> _total = widget.player.stream.duration
+      .map((d) => d.inSeconds)
+      .distinct();
+
+  // Position tenue pendant un glisser, puis jusqu'à ce que la vidéo l'ait
+  // rejointe : le curseur ne revient pas en arrière un instant.
+  double? _held;
+  Timer? _release;
+
+  @override
+  void dispose() {
+    _release?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final player = widget.player;
-    return StreamBuilder<Duration>(
-      stream: player.stream.duration,
-      initialData: player.state.duration,
-      builder: (context, duration) {
-        final total = duration.data ?? Duration.zero;
-        return StreamBuilder<Duration>(
-          stream: player.stream.position,
-          initialData: player.state.position,
+    return StreamBuilder<int>(
+      stream: _total,
+      initialData: player.state.duration.inSeconds,
+      builder: (context, total) {
+        final max = (total.data ?? 0).toDouble();
+        return StreamBuilder<int>(
+          stream: _seconds,
+          initialData: player.state.position.inSeconds,
           builder: (context, position) {
-            final max = total.inMilliseconds.toDouble();
             final current =
-                _dragging ??
-                (position.data ?? Duration.zero).inMilliseconds
-                    .clamp(0, total.inMilliseconds)
-                    .toDouble();
+                _held ?? (position.data ?? 0).clamp(0, max).toDouble();
             return Row(
               children: [
-                Text(formatTime(Duration(milliseconds: current.round()))),
+                Text(formatTime(Duration(seconds: current.round()))),
                 Expanded(
                   child: Slider(
-                    value: max > 0 ? current : 0,
+                    value: max > 0 ? current.clamp(0, max) : 0,
                     max: max > 0 ? max : 1,
                     onChanged: max > 0
                         ? (value) {
-                            setState(() => _dragging = value);
+                            _release?.cancel();
+                            setState(() => _held = value);
                             widget.onSeek();
                           }
                         : null,
                     onChangeEnd: (value) {
-                      player.seek(Duration(milliseconds: value.round()));
-                      setState(() => _dragging = null);
+                      player.seek(Duration(seconds: value.round()));
+                      _release = Timer(const Duration(milliseconds: 800), () {
+                        if (mounted) setState(() => _held = null);
+                      });
                     },
                   ),
                 ),
-                Text(formatTime(total)),
+                Text(formatTime(Duration(seconds: max.round()))),
               ],
             );
           },
@@ -350,14 +403,23 @@ class _ProgressBarState extends State<_ProgressBar> {
   }
 }
 
-class _VolumeButton extends StatelessWidget {
+class _VolumeButton extends StatefulWidget {
   const _VolumeButton({required this.player, required this.onChanged});
 
   final Player player;
   final VoidCallback onChanged;
 
   @override
+  State<_VolumeButton> createState() => _VolumeButtonState();
+}
+
+class _VolumeButtonState extends State<_VolumeButton> {
+  // Volume rendu quand on remet le son.
+  double _beforeMute = 100;
+
+  @override
   Widget build(BuildContext context) {
+    final player = widget.player;
     return StreamBuilder<double>(
       stream: player.stream.volume,
       initialData: player.state.volume,
@@ -370,8 +432,9 @@ class _VolumeButton extends StatelessWidget {
               tooltip: volume == 0 ? 'Remettre le son' : 'Couper le son',
               icon: Icon(volume == 0 ? Icons.volume_off : Icons.volume_up),
               onPressed: () {
-                player.setVolume(volume == 0 ? 100 : 0);
-                onChanged();
+                if (volume > 0) _beforeMute = volume;
+                player.setVolume(volume == 0 ? _beforeMute : 0);
+                widget.onChanged();
               },
             ),
             SizedBox(
@@ -381,7 +444,7 @@ class _VolumeButton extends StatelessWidget {
                 max: 100,
                 onChanged: (value) {
                   player.setVolume(value);
-                  onChanged();
+                  widget.onChanged();
                 },
               ),
             ),
@@ -418,6 +481,12 @@ class _TracksMenu extends StatelessWidget {
           ];
           final selectedAudio = current.data?.audio.id;
           final selectedSubtitle = current.data?.subtitle.id;
+          // À l'ouverture, media_kit dit « auto » : les sous-titres sont
+          // alors désactivés (voir Playback), et l'audio suit la langue.
+          final subtitlesOff =
+              selectedSubtitle == null ||
+              selectedSubtitle == 'no' ||
+              selectedSubtitle == 'auto';
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -452,14 +521,13 @@ class _TracksMenu extends StatelessWidget {
                 itemBuilder: (_) => [
                   CheckedPopupMenuItem(
                     value: SubtitleTrack.no(),
-                    checked:
-                        selectedSubtitle == null || selectedSubtitle == 'no',
+                    checked: subtitlesOff,
                     child: const Text('Désactivés'),
                   ),
                   for (final (index, track) in subtitles.indexed)
                     CheckedPopupMenuItem(
                       value: track,
-                      checked: track.id == selectedSubtitle,
+                      checked: !subtitlesOff && track.id == selectedSubtitle,
                       child: Text(
                         trackLabel(
                           index: index,

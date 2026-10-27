@@ -71,15 +71,25 @@ final class Playback {
   final Player player;
   late final VideoController controller;
 
-  /// Délai maximal pour que le flux démarre (en-têtes reçus, durée connue).
-  static const startTimeout = Duration(seconds: 20);
+  /// Délai maximal pour que le flux démarre (en-têtes reçus, lecture
+  /// commencée). Trois essais au pire : moins d'une minute avant le message.
+  static const startTimeout = Duration(seconds: 15);
 
   var _generation = 0;
+  Completer<void>? _starting;
+
+  /// Ticket de l'ouverture en cours, à lire juste après l'appel à [open] :
+  /// [stop] avec un ticket périmé ne fait rien. Ainsi l'arrêt tardif d'un
+  /// écran qu'on quitte (fin de son animation) ne coupe pas le film suivant,
+  /// déjà lancé.
+  int get ticket => _generation;
 
   /// Ouvre [request] ; lève [PlaybackFailed] si le flux ne démarre pas
   /// après les nouvelles tentatives (refus du serveur, réseau coupé…).
+  /// Rien ne reste alors en cours de chargement.
   Future<void> open(PlayRequest request) async {
     final generation = ++_generation;
+    _abandonStart();
     await player.stop();
     await _defaultTracks();
     final media = Media(
@@ -88,12 +98,16 @@ final class Playback {
     );
     try {
       await withRetries(() async {
-        // Une ouverture plus récente a pris la main : on abandonne celle-ci.
+        // Une ouverture plus récente, ou un arrêt, a pris la main.
         if (generation != _generation) return;
         await _start(media, request.secrets);
       });
     } on Exception {
-      if (generation == _generation) throw const PlaybackFailed();
+      if (generation != _generation) return;
+      // mpv peut encore être en train de se connecter : on coupe, pour ne
+      // pas garder l'unique connexion derrière le message d'erreur.
+      await player.stop();
+      throw const PlaybackFailed();
     }
   }
 
@@ -109,33 +123,73 @@ final class Playback {
   }
 
   Future<void> _start(Media media, List<String> secrets) async {
-    final done = Completer<void>();
+    final done = _starting = Completer<void>();
+    // Écouté dès maintenant : une erreur arrivée pendant `open` ne doit pas
+    // rester une erreur non écoutée.
+    final started = done.future.timeout(startTimeout);
+    // Un abandon (arrêt, autre ouverture) peut survenir avant le `await` :
+    // cette écoute évite qu'il soit signalé comme erreur non traitée.
+    unawaited(started.then<void>((_) {}, onError: (_) {}));
+    var opened = false;
+    void fail(String reason) {
+      log('Lecture', error: reason, secrets: secrets);
+      if (!done.isCompleted) done.completeError(const PlaybackFailed());
+    }
+
     final subscriptions = [
-      player.stream.duration.listen((duration) {
-        if (duration > Duration.zero && !done.isCompleted) done.complete();
+      // Démarré : durée connue, ou position qui avance (fichier sans durée).
+      player.stream.duration.listen((d) {
+        if (opened && d > Duration.zero && !done.isCompleted) done.complete();
       }),
+      player.stream.position.listen((p) {
+        if (opened && p > Duration.zero && !done.isCompleted) done.complete();
+      }),
+      // Les erreurs d'avant `open` viennent du média précédent : ignorées.
+      // Le message de mpv recopie souvent l'URL : loggé masqué.
       player.stream.error.listen((error) {
-        // Le message de mpv recopie souvent l'URL, identifiants compris.
-        log('Lecture', error: error, secrets: secrets);
-        if (!done.isCompleted) done.completeError(const PlaybackFailed());
+        if (opened) fail(error);
+      }),
+      // Un refus http (403, 404…) n'arrive parfois que dans le journal.
+      player.stream.log.listen((entry) {
+        final failure =
+            entry.level == 'error' &&
+            (entry.prefix == 'stream' ||
+                entry.prefix == 'ffmpeg' ||
+                entry.prefix == 'demux');
+        if (opened && failure) fail('${entry.prefix}: ${entry.text}');
       }),
     ];
     try {
       await player.open(media);
-      await done.future.timeout(startTimeout);
+      opened = true;
+      await started;
     } on TimeoutException {
       log('Lecture', error: 'le flux ne démarre pas');
       throw const PlaybackFailed();
     } finally {
+      if (identical(_starting, done)) _starting = null;
       for (final subscription in subscriptions) {
         await subscription.cancel();
       }
     }
   }
 
-  /// Arrête le flux : plus aucun trafic réseau.
-  Future<void> stop() {
+  /// Un démarrage en attente n'attend pas son délai complet s'il est
+  /// remplacé : il se termine aussitôt.
+  void _abandonStart() {
+    final starting = _starting;
+    if (starting != null && !starting.isCompleted) {
+      starting.completeError(const PlaybackFailed());
+    }
+    _starting = null;
+  }
+
+  /// Arrête le flux : plus aucun trafic réseau. Avec [ticket] (voir
+  /// [ticket]), ne fait rien si une autre ouverture a eu lieu depuis.
+  Future<void> stop([int? ticket]) {
+    if (ticket != null && ticket != _generation) return Future.value();
     _generation++;
+    _abandonStart();
     return player.stop();
   }
 

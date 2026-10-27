@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -20,6 +21,8 @@ Future<void> openPlayer(
   required String extension,
   required String title,
 }) {
+  // Un double clic sur « Lecture » ne doit pas empiler deux lecteurs.
+  if (ModalRoute.of(context)?.isCurrent == false) return Future.value();
   final account = ref.read(activeAccountProvider);
   final client = ref.read(serverClientProvider);
   if (account == null || client == null) return Future.value();
@@ -48,12 +51,15 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final Playback _playback = ref.read(playbackProvider);
   late final AppLifecycleListener _lifecycle;
+  StreamSubscription<bool>? _completed;
 
   // Sur mobile, le lecteur est toujours en plein écran paysage.
   static final _mobile = Platform.isAndroid || Platform.isIOS;
 
+  /// Ticket de notre ouverture : l'arrêt de cet écran ne coupe que notre flux.
+  int? _ticket;
   var _opening = true;
-  PlaybackFailed? _error;
+  String? _error;
   var _fill = false;
   var _fullscreen = false;
 
@@ -61,25 +67,59 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     if (_mobile) _setFullscreen(true);
-    // Sur mobile, passer l'app en arrière-plan quitte le lecteur : le flux
-    // s'arrête au lieu d'occuper l'unique connexion de l'abonnement.
-    _lifecycle = AppLifecycleListener(
-      onHide: () {
-        if (_mobile && mounted) Navigator.maybePop(context);
-      },
-    );
+    _lifecycle = AppLifecycleListener(onHide: _onHide);
+    _completed = _playback.player.stream.completed.listen(_onCompleted);
     _open();
   }
+
+  /// Sur mobile, passer l'app en arrière-plan arrête le flux tout de suite
+  /// (l'animation de sortie ne tourne pas en arrière-plan, donc on n'attend
+  /// pas la fermeture de l'écran), puis quitte le lecteur, menu ouvert ou non.
+  void _onHide() {
+    if (!_mobile || !mounted) return;
+    unawaited(_playback.stop(_ticket));
+    final route = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
+    if (route != null && route.isActive) {
+      navigator.popUntil((r) => r == route);
+      navigator.pop();
+    }
+  }
+
+  /// Fin du fichier bien avant la fin du film : le serveur a coupé (autre
+  /// appareil, réseau). On le dit au lieu de laisser une image figée.
+  void _onCompleted(bool completed) {
+    final state = _playback.player.state;
+    final cutShort =
+        state.duration > Duration.zero &&
+        state.position < state.duration - const Duration(seconds: 30);
+    if (completed && cutShort && !_opening && mounted) {
+      _resumeAt = state.position;
+      setState(
+        () => _error =
+            'La lecture s\'est interrompue : le serveur a coupé la connexion.',
+      );
+    }
+  }
+
+  /// Position où reprendre après une coupure.
+  Duration? _resumeAt;
 
   Future<void> _open() async {
     setState(() {
       _opening = true;
       _error = null;
     });
+    final opening = _playback.open(widget.request);
+    _ticket = _playback.ticket;
     try {
-      await _playback.open(widget.request);
+      await opening;
+      if (_resumeAt case final position?) {
+        await _playback.player.seek(position);
+        _resumeAt = null;
+      }
     } on PlaybackFailed catch (e) {
-      if (mounted) setState(() => _error = e);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _opening = false);
     }
@@ -95,13 +135,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     _lifecycle.dispose();
-    unawaited(_playback.stop());
+    unawaited(_completed?.cancel());
+    unawaited(_playback.stop(_ticket));
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final error = _error;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -111,18 +153,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             controller: _playback.controller,
             controls: NoVideoControls,
             fit: _fill ? BoxFit.cover : BoxFit.contain,
-            // Le lecteur gère lui-même l'arrière-plan (voir initState).
+            // Le lecteur gère lui-même l'arrière-plan (voir _onHide).
             pauseUponEnteringBackgroundMode: false,
           ),
-          if (_error case final error?)
-            _ErrorPanel(message: error.message, onRetry: _open, onExit: _exit)
+          if (error != null)
+            // Échap : quitte d'abord le plein écran, comme dans les contrôles.
+            CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    _fullscreen && !_mobile ? _setFullscreen(false) : _exit(),
+              },
+              child: _ErrorPanel(message: error, onRetry: _open, onExit: _exit),
+            )
           else ...[
             PlayerControls(
               player: _playback.player,
               title: widget.request.title,
               fill: _fill,
               onToggleFill: () => setState(() => _fill = !_fill),
-              fullscreen: _fullscreen && !_mobile,
+              // Sur mobile, toujours en plein écran : pas de bouton.
+              fullscreen: _mobile ? null : _fullscreen,
               onToggleFullscreen: () {
                 if (!_mobile) _setFullscreen(!_fullscreen);
               },
