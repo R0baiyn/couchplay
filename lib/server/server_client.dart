@@ -60,7 +60,9 @@ final class InvalidResponse extends ServerException {
   final String details;
 
   @override
-  String get message => 'Réponse du serveur illisible';
+  // Le code http aide à comprendre un refus inattendu (404, 500…) ; il ne
+  // contient jamais d'identifiant.
+  String get message => 'Réponse du serveur illisible ($details)';
 }
 
 /// Appels à l'API du serveur pour un compte.
