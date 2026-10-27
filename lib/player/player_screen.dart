@@ -174,6 +174,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// pendant le chargement ou après un échec (position à 0) ne doit pas
   /// effacer la position enregistrée. À appeler avant tout arrêt du flux.
   void _save() {
+    // Un autre lecteur a déjà pris le flux (écran en train de se fermer) :
+    // sa position n'est pas la nôtre.
+    if (_ticket != _playback.ticket) return;
     if (_opening || _error != null) return;
     final state = _playback.player.state;
     if (state.position <= Duration.zero) return;
@@ -211,7 +214,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final cutShort =
         state.duration > Duration.zero &&
         state.position < state.duration - const Duration(seconds: 30);
-    if (!completed || _opening || !mounted) return;
+    if (!mounted) return;
+    // Retour en arrière pendant le compte à rebours : on regarde encore.
+    if (!completed) {
+      if (_next != null) _cancelNext();
+      return;
+    }
+    if (_opening) return;
     _save();
     if (cutShort) {
       _resumeAt = state.position;
@@ -374,13 +383,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             if (next != null)
               Align(
                 alignment: Alignment.bottomRight,
-                child: _NextEpisodePanel(
-                  title: next.item.title,
-                  image: next.image ?? next.item.poster,
-                  secondsLeft: _secondsLeft,
-                  playNowFocus: _playNowFocus,
-                  onPlayNow: _playNext,
-                  onCancel: _cancelNext,
+                // Le focus est sur l'encart, hors des contrôles : Échap doit
+                // quand même quitter (plein écran d'abord sur ordinateur).
+                child: CallbackShortcuts(
+                  bindings: {
+                    const SingleActivator(LogicalKeyboardKey.escape): () =>
+                        _fullscreen && !_mobile
+                        ? _setFullscreen(false)
+                        : _exit(),
+                  },
+                  child: _NextEpisodePanel(
+                    title: next.item.title,
+                    image: next.image ?? next.item.poster,
+                    secondsLeft: _secondsLeft,
+                    playNowFocus: _playNowFocus,
+                    onPlayNow: _playNext,
+                    onCancel: _cancelNext,
+                  ),
                 ),
               ),
           ],

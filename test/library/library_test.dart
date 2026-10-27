@@ -183,6 +183,24 @@ void main() {
       expect(file.existsSync(), isFalse);
     });
 
+    test('verrouillé (antivirus, synchronisation) : jamais écrasé', () async {
+      file.writeAsStringSync('{"version":1,"favorites":{"movie:1":{}}}');
+      final original = file.readAsStringSync();
+      final lock = file.openSync(mode: FileMode.append)
+        ..lockSync(FileLock.exclusive);
+      final store = LibraryStore(file);
+      expect(store.load().favorites, isEmpty);
+      await store.save(const Library());
+      lock
+        ..unlockSync()
+        ..closeSync();
+      // Selon le système, le fichier a pu être mis de côté ou rester en
+      // place ; dans les deux cas, son contenu est intact.
+      final bak = File('${file.path}.bak');
+      final kept = bak.existsSync() ? bak : file;
+      expect(kept.readAsStringSync(), original);
+    }, skip: !Platform.isWindows);
+
     test('mal encodé : mis de côté aussi, jamais écrasé', () async {
       // UTF-16 avec BOM, comme un fichier réenregistré par un éditeur.
       const bytes = [0xFF, 0xFE, 0x7B, 0x00];

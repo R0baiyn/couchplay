@@ -34,6 +34,9 @@ final class LibraryStore {
       try {
         file.renameSync('${file.path}.bak');
       } on FileSystemException catch (e) {
+        // Fichier verrouillé (antivirus, synchronisation) : on n'écrit plus
+        // rien jusqu'au prochain lancement, plutôt que de l'écraser.
+        _readOnly = true;
         log('Bibliothèque non mise de côté', error: e.osError?.errorCode);
       }
       return const Library();
@@ -41,10 +44,12 @@ final class LibraryStore {
   }
 
   Future<void>? _pending;
+  var _readOnly = false;
 
   /// Écrit [library] de façon atomique (fichier temporaire renommé), une
   /// écriture après l'autre. Un échec est loggé : l'état reste en mémoire.
   Future<void> save(Library library) {
+    if (_readOnly) return Future.value();
     final text = const JsonEncoder.withIndent(' ').convert(library.toJson());
     return _pending = (_pending ?? Future.value()).then((_) async {
       final temp = File('${file.path}.tmp');

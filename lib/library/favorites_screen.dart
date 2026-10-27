@@ -20,9 +20,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final favorites = ref.watch(
-      libraryProvider.select((l) => l.favoritesByDate),
-    );
+    // Les favoris seuls : la progression enregistrée pendant la lecture ne
+    // reconstruit pas la grille.
+    ref.watch(libraryProvider.select((l) => l.favorites));
+    final favorites = ref.read(libraryProvider).favoritesByDate;
     final items = [
       for (final favorite in favorites)
         if (_kind == null || favorite.item.kind == _kind) favorite.item,
