@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server/models.dart';
 import 'catalog_providers.dart';
+import 'catalog_settings.dart';
 import 'movie_screen.dart';
 import 'poster_grid.dart';
 import 'series_screen.dart';

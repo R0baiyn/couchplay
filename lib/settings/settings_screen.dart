@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../accounts/account_status_screen.dart';
 import '../accounts/accounts_screen.dart';
+import '../catalog/catalog_settings_screen.dart';
 import 'settings.dart';
 
 /// Réglages de l'app.
@@ -42,6 +43,18 @@ class SettingsScreen extends ConsumerWidget {
               context,
               MaterialPageRoute<void>(
                 builder: (_) => const AccountStatusScreen(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.filter_list),
+            title: const Text('Catalogue'),
+            subtitle: const Text('Pays affichés, contenu adulte, catégories'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const CatalogSettingsScreen(),
               ),
             ),
           ),

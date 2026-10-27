@@ -49,10 +49,11 @@ void main() {
   testWidgets('le thème se choisit au clavier', (tester) async {
     final container = await pumpSettings(tester);
 
-    // Comptes a le focus ; Tab passe à Abonnement, puis entre dans le
-    // groupe du thème, où les flèches passent d'un choix à l'autre.
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    // Comptes a le focus ; Tab passe à Abonnement, Catalogue, puis entre
+    // dans le groupe du thème, où les flèches passent d'un choix à l'autre.
+    for (var i = 0; i < 3; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    }
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
 

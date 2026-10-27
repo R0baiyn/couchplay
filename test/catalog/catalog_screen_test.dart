@@ -235,4 +235,29 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('cocher un pays dans les réglages l\'affiche aussitôt', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(find.text('AR · ARABE أفلام عربية'), findsNothing);
+
+    await tester.tap(find.text('Réglages'));
+    await settle(tester);
+    await tester.tap(find.text('Catalogue'));
+    await settle(tester);
+    await tester.tap(find.text('Arabe'));
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    await tester.tap(find.text('Films').first);
+    await settle(tester);
+
+    await tester.scrollUntilVisible(
+      find.text('AR · ARABE أفلام عربية'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('AR · ARABE أفلام عربية'), findsOneWidget);
+  });
 }

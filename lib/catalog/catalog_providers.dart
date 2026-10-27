@@ -6,7 +6,6 @@ import '../accounts/server_session.dart';
 import '../server/models.dart';
 import 'catalog_cache.dart';
 import 'catalog_repository.dart';
-import 'category_filter.dart';
 
 /// Catalogue du compte actif ; change avec le compte ou ses accès.
 final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
@@ -20,11 +19,6 @@ final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
     CatalogCache(ref.watch(accountFilesProvider).of(id)),
   );
 });
-
-/// Filtre des catégories du compte actif.
-final catalogFilterProvider = Provider<CatalogFilter>(
-  (ref) => const CatalogFilter(),
-);
 
 // Pas de nouvelle tentative automatique (Riverpod 3 en fait par défaut) :
 // l'écran propose « Réessayer », et le mode hors ligne prend le relais.
