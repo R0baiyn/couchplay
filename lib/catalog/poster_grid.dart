@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../library/library_store.dart';
+import '../server/models.dart';
 import 'versions.dart';
 
 /// Grille d'affiches, en sliver : elle défile avec l'en-tête de l'écran.
@@ -56,11 +59,46 @@ class SliverPosterGrid extends StatelessWidget {
     // Dernière rangée incomplète : des cases vides gardent la même largeur.
     if (index >= entries.length) return const SizedBox.shrink();
     final entry = entries[index];
-    return PosterTile(
+    return _EntryTile(
       // Un film et une série peuvent avoir le même id (grille des favoris).
       key: ValueKey((entry.kind, entry.item.id)),
+      entry: entry,
+      onOpen: onOpen,
+    );
+  }
+}
+
+/// Affiche d'une grille, marquée si l'une de ses versions est dans « Ma
+/// liste » ou, pour un film, a été vue. Ne se reconstruit que si ces deux
+/// marques changent, pas à chaque position enregistrée pendant la lecture.
+class _EntryTile extends ConsumerWidget {
+  const _EntryTile({super.key, required this.entry, required this.onOpen});
+
+  final CatalogEntry entry;
+  final ValueChanged<CatalogEntry> onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final movie = entry.kind == ContentKind.movies;
+    final prefix = movie ? 'movie' : 'series';
+    final (favorite, watched) = ref.watch(
+      libraryProvider.select(
+        (library) => (
+          entry.versions.any(
+            (v) => library.favorites.containsKey('$prefix:${v.id}'),
+          ),
+          movie &&
+              entry.versions.any(
+                (v) => library.progress['movie:${v.id}']?.watched ?? false,
+              ),
+        ),
+      ),
+    );
+    return PosterTile(
       title: entry.title,
       imageUrl: entry.poster,
+      favorite: favorite,
+      watched: watched,
       onTap: () => onOpen(entry),
     );
   }
@@ -76,6 +114,8 @@ class PosterTile extends StatefulWidget {
     required this.onTap,
     this.progress,
     this.onMenu,
+    this.favorite = false,
+    this.watched = false,
   });
 
   final String title;
@@ -87,6 +127,10 @@ class PosterTile extends StatefulWidget {
 
   /// Appui long ou clic droit : les actions secondaires.
   final VoidCallback? onMenu;
+
+  /// Pastilles en haut à droite : dans « Ma liste », déjà vu.
+  final bool favorite;
+  final bool watched;
 
   @override
   State<PosterTile> createState() => _PosterTileState();
@@ -123,15 +167,29 @@ class _PosterTileState extends State<PosterTile> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(5),
-                child: progress == null
+                child: progress == null && !widget.favorite && !widget.watched
                     ? PosterImage(url: widget.imageUrl, deferred: true)
                     : Stack(
                         fit: StackFit.expand,
                         children: [
                           PosterImage(url: widget.imageUrl, deferred: true),
-                          Align(
-                            alignment: Alignment.bottomCenter,
-                            child: LinearProgressIndicator(value: progress),
+                          if (progress != null)
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: LinearProgressIndicator(value: progress),
+                            ),
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Row(
+                              spacing: 4,
+                              children: [
+                                if (widget.watched)
+                                  const _Badge(Icons.check, 'Déjà vu'),
+                                if (widget.favorite)
+                                  const _Badge(Icons.favorite, 'Dans ma liste'),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -148,6 +206,28 @@ class _PosterTileState extends State<PosterTile> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Pastille ronde et sombre : lisible sur n'importe quelle affiche.
+class _Badge extends StatelessWidget {
+  const _Badge(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.black54,
+        shape: BoxShape.circle,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Icon(icon, size: 14, color: Colors.white, semanticLabel: label),
       ),
     );
   }
