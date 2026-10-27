@@ -44,18 +44,36 @@ final class PlayRequest {
 
 /// Le flux n'a pas pu démarrer, nouvelles tentatives comprises.
 final class PlaybackFailed implements Exception {
-  const PlaybackFailed();
+  const PlaybackFailed({this.unreadable = false});
 
-  String get message =>
-      'Le serveur refuse la connexion : un autre appareil utilise peut-être '
-      'ton abonnement.';
+  /// D'après une erreur de mpv : fichier reçu mais illisible (format ou
+  /// codec non pris en charge), sinon refus ou coupure du serveur.
+  factory PlaybackFailed.fromMpv(String reason) =>
+      PlaybackFailed(unreadable: _unreadable.hasMatch(reason));
+
+  static final _unreadable = RegExp(
+    r'codec|decoder|unsupported|unrecognized|recognize file format|'
+    r'no video or audio streams',
+    caseSensitive: false,
+  );
+
+  /// Le serveur a bien envoyé le fichier, mais cet appareil ne sait pas le
+  /// lire : réessayer n'y change rien.
+  final bool unreadable;
+
+  String get message => unreadable
+      ? 'Cette vidéo ne peut pas être lue sur cet appareil : son format '
+            'n\'est pas pris en charge.'
+      : 'Le serveur refuse la connexion : un autre appareil utilise '
+            'peut-être ton abonnement.';
 
   @override
   String toString() => message;
 }
 
 /// Lance [attempt] ; en cas d'échec, réessaie après [delay], au plus
-/// [retries] fois. La dernière erreur remonte.
+/// [retries] fois. La dernière erreur remonte, et tout de suite une vidéo
+/// illisible : réessayer n'y changerait rien.
 Future<T> withRetries<T>(
   Future<T> Function() attempt, {
   int retries = 2,
@@ -65,8 +83,8 @@ Future<T> withRetries<T>(
   for (var tried = 0; ; tried++) {
     try {
       return await attempt();
-    } on Exception {
-      if (tried >= retries) rethrow;
+    } on Exception catch (e) {
+      if (tried >= retries || (e is PlaybackFailed && e.unreadable)) rethrow;
       await sleep(delay);
     }
   }
@@ -120,12 +138,12 @@ final class Playback {
         if (generation != _generation) return;
         await _start(media, request.secrets);
       });
-    } on Exception {
+    } on Exception catch (e) {
       if (generation != _generation) return;
       // mpv peut encore être en train de se connecter : on coupe, pour ne
       // pas garder l'unique connexion derrière le message d'erreur.
       await player.stop();
-      throw const PlaybackFailed();
+      throw e is PlaybackFailed ? e : const PlaybackFailed();
     }
   }
 
@@ -158,7 +176,9 @@ final class Playback {
     var opened = false;
     void fail(String reason) {
       log('Lecture', error: reason, secrets: secrets);
-      if (!done.isCompleted) done.completeError(const PlaybackFailed());
+      if (!done.isCompleted) {
+        done.completeError(PlaybackFailed.fromMpv(reason));
+      }
     }
 
     final subscriptions = [

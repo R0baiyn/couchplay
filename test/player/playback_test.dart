@@ -50,6 +50,30 @@ void main() {
     );
   });
 
+  test('vidéo illisible : autre message, pas de nouvel essai', () async {
+    // Message réel de mpv sur Android pour une vidéo en 4:4:4.
+    final unreadable = PlaybackFailed.fromMpv('Could not open codec.');
+    expect(unreadable.unreadable, isTrue);
+    expect(unreadable.message, contains('ne peut pas être lue'));
+    for (final refused in [
+      'stream: HTTP error 403 Forbidden',
+      'ffmpeg: tcp: Connection refused',
+      'demux: Failed to open http://***/movie/***/***/1.mkv',
+    ]) {
+      expect(PlaybackFailed.fromMpv(refused).unreadable, isFalse, reason: refused);
+    }
+
+    var calls = 0;
+    await expectLater(
+      withRetries(() async {
+        calls++;
+        throw unreadable;
+      }, sleep: (_) async {}),
+      throwsA(same(unreadable)),
+    );
+    expect(calls, 1);
+  });
+
   group('trackLabel', () {
     test('langue traduite, titre et codec', () {
       expect(
