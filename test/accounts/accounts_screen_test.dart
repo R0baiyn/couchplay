@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account.dart';
@@ -6,6 +7,8 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/accounts_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
+import 'package:couchplay/search/search_index.dart';
+
 import 'package:couchplay/server/server_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,6 +55,11 @@ void main() {
         overrides: [
           accountStoreProvider.overrideWithValue(store!),
           accountFilesProvider.overrideWithValue(files),
+          // Sans objet ici : l'index de recherche, chargé en arrière-plan
+          // derrière l'accueil, laisserait des requêtes en vol.
+          searchIndexProvider.overrideWith(
+            (ref) => Completer<SearchIndex>().future,
+          ),
           serverClientFactoryProvider.overrideWithValue(
             (account) => ServerClient(
               host: account.host,

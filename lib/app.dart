@@ -6,6 +6,8 @@ import 'accounts/account_store.dart';
 import 'accounts/login_screen.dart';
 import 'catalog/catalog_screen.dart';
 import 'library/home_screen.dart';
+import 'search/search_index.dart';
+import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'settings/settings.dart';
 
@@ -67,21 +69,29 @@ class HomeGate extends ConsumerWidget {
   }
 }
 
-/// Onglets Accueil, Films et Séries (les réglages sont en haut à droite) :
-/// barre en bas sur écran étroit, rail sur le côté sur grand écran (règle 9).
-class HomeShell extends StatefulWidget {
+/// Onglets Accueil, Films, Séries et Recherche (les réglages sont en haut à
+/// droite) : barre en bas sur écran étroit, rail sur le côté sur grand écran
+/// (règle 9).
+///
+/// Une fois l'accueil affiché, l'index de recherche se charge en arrière-plan
+/// et reste chargé tant que cet écran existe. Ctrl+F ou / place le curseur
+/// dans le champ de l'onglet : « Filtrer » des films et des séries, sinon la
+/// recherche.
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell> {
   static const _tabs = [
     (Icons.home_outlined, Icons.home, 'Accueil'),
     (Icons.movie_outlined, Icons.movie, 'Films'),
     (Icons.tv_outlined, Icons.tv, 'Séries'),
+    (Icons.search_outlined, Icons.search, 'Recherche'),
   ];
+  static const _searchTab = 3;
 
   var _index = 0;
 
@@ -89,15 +99,82 @@ class _HomeShellState extends State<HomeShell> {
   // les films ni les séries tant qu'on ne les ouvre pas. Ensuite, il garde son état.
   final _visited = {0};
 
-  void _select(int index) => setState(() {
-    _index = index;
-    _visited.add(index);
+  /// Champ de chaque onglet qui en a un, pour Ctrl+F.
+  final _fields = {1: FocusNode(), 2: FocusNode(), _searchTab: FocusNode()};
+
+  ProviderSubscription<Object?>? _searchIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    // Au niveau du clavier, pas d'un Focus : la touche marche aussi quand
+    // rien n'a encore le focus (au lancement).
+    HardwareKeyboard.instance.addHandler(_onKey);
+    // Après la première image : l'accueil s'affiche avant que le gros
+    // chargement commence.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _searchIndex = ref.listenManual(searchIndexProvider, (_, _) {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    _searchIndex?.close();
+    for (final node in _fields.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _select(int index) {
+    setState(() {
+      _index = index;
+      _visited.add(index);
+    });
+    // La recherche s'ouvre prête à taper.
+    if (index == _searchTab) _focusField();
+  }
+
+  /// Après la reconstruction : un onglet tout juste créé n'a pas encore
+  /// attaché son champ.
+  void _focusField() => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) _fields[_index]?.requestFocus();
   });
+
+  /// `true` : touche prise, elle ne va pas plus loin.
+  bool _onKey(KeyEvent event) {
+    // Seulement quand l'accueil est devant : pas sous le lecteur, une fiche,
+    // un dialogue ou le panneau des catégories.
+    if (event is! KeyDownEvent ||
+        !(ModalRoute.of(context)?.isCurrent ?? false)) {
+      return false;
+    }
+    final ctrlF =
+        event.logicalKey == LogicalKeyboardKey.keyF &&
+        HardwareKeyboard.instance.isControlPressed;
+    // « / » s'écrit normalement dans un champ de texte.
+    final slash =
+        event.character == '/' &&
+        FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<EditableText>() ==
+            null;
+    if (!ctrlF && !slash) return false;
+    if (_fields.containsKey(_index)) {
+      _focusField();
+    } else {
+      _select(_searchTab);
+    }
+    return true;
+  }
 
   Widget _tab(int index) => switch (index) {
     0 => const HomeScreen(),
-    1 => const CatalogScreen(kind: ContentKind.movies),
-    _ => const CatalogScreen(kind: ContentKind.series),
+    1 => CatalogScreen(kind: ContentKind.movies, filterFocus: _fields[1]),
+    2 => CatalogScreen(kind: ContentKind.series, filterFocus: _fields[2]),
+    _ => SearchScreen(focusNode: _fields[_searchTab]),
   };
 
   @override
