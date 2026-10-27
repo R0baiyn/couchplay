@@ -104,6 +104,9 @@ final class LibraryNotifier extends Notifier<Library> {
           ),
   );
 
+  Future<void> removeFavorites(Iterable<String> keys) =>
+      _set(keys.fold(state, (library, key) => library.withoutFavorite(key)));
+
   /// Enregistre où on en est. Un contenu déjà vu le reste, même si on
   /// revient en arrière ; il ne redevient « non vu » qu'à la main.
   Future<void> saveProgress(
