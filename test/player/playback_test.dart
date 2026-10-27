@@ -60,7 +60,11 @@ void main() {
       'ffmpeg: tcp: Connection refused',
       'demux: Failed to open http://***/movie/***/***/1.mkv',
     ]) {
-      expect(PlaybackFailed.fromMpv(refused).unreadable, isFalse, reason: refused);
+      expect(
+        PlaybackFailed.fromMpv(refused).unreadable,
+        isFalse,
+        reason: refused,
+      );
     }
 
     var calls = 0;
