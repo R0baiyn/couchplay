@@ -6,6 +6,21 @@ import '../accounts/accounts_screen.dart';
 import '../catalog/catalog_settings_screen.dart';
 import 'settings.dart';
 
+/// Roue des réglages, en haut à droite des onglets.
+class SettingsButton extends StatelessWidget {
+  const SettingsButton({super.key});
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'Réglages',
+    icon: const Icon(Icons.settings),
+    onPressed: () => Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+    ),
+  );
+}
+
 /// Réglages de l'app.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

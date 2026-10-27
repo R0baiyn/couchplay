@@ -10,6 +10,17 @@ import 'poster_grid.dart';
 import 'series_screen.dart';
 import 'status_views.dart';
 
+/// Ouvre la fiche d'un film ou d'une série.
+void openDetails(BuildContext context, CatalogItem item) => Navigator.push(
+  context,
+  MaterialPageRoute<void>(
+    builder: (_) => switch (item.kind) {
+      ContentKind.movies => MovieScreen(item: item),
+      ContentKind.series => SeriesScreen(item: item),
+    },
+  ),
+);
+
 /// Onglet Films ou Séries : catégories visibles, puis la grille de celle
 /// choisie. Catégories en panneau latéral sur grand écran ; sur téléphone,
 /// un bouton dans un en-tête qui se replie au défilement ouvre leur liste.
@@ -53,15 +64,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     }
   }
 
-  void _open(CatalogItem item) => Navigator.push(
-    context,
-    MaterialPageRoute<void>(
-      builder: (_) => switch (item.kind) {
-        ContentKind.movies => MovieScreen(item: item),
-        ContentKind.series => SeriesScreen(item: item),
-      },
-    ),
-  );
+  void _open(CatalogItem item) => openDetails(context, item);
 
   /// Liste complète des catégories sur écran étroit : un panneau du bas qui
   /// défile, reste au-dessus des boutons du téléphone, et se ferme sans rien
@@ -110,14 +113,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           ? null
           : () => _refresh(selected?.id),
     ),
-    IconButton(
-      tooltip: 'Réglages',
-      icon: const Icon(Icons.settings),
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-      ),
-    ),
+    const SettingsButton(),
   ];
 
   @override

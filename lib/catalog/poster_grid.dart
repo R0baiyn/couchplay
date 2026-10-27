@@ -57,7 +57,8 @@ class SliverPosterGrid extends StatelessWidget {
     if (index >= items.length) return const SizedBox.shrink();
     final item = items[index];
     return PosterTile(
-      key: ValueKey(item.id),
+      // Un film et une série peuvent avoir le même id (grille des favoris).
+      key: ValueKey((item.kind, item.id)),
       title: item.name,
       imageUrl: item.poster,
       onTap: () => onOpen(item),

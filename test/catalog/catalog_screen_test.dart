@@ -8,6 +8,7 @@ import 'package:couchplay/app.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
+import 'package:couchplay/library/favorites_screen.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/settings/settings.dart';
 import 'package:dio/dio.dart';
@@ -46,6 +47,7 @@ void main() {
   Future<void> pumpApp(
     WidgetTester tester, {
     Size size = const Size(1280, 800),
+    bool openMovies = true,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -95,6 +97,11 @@ void main() {
       ),
     );
     await settle(tester);
+    // L'app s'ouvre sur l'accueil.
+    if (openMovies) {
+      await tester.tap(find.text('Films'));
+      await settle(tester);
+    }
   }
 
   testWidgets('Films : catégories françaises, grille, puis fiche', (
@@ -121,6 +128,52 @@ void main() {
     await settle(tester);
     expect(find.byType(MovieScreen), findsNothing);
     expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+  });
+
+  testWidgets("un favori ajouté sur une fiche apparaît sur l'accueil", (
+    tester,
+  ) async {
+    await pumpApp(tester, openMovies: false);
+    expect(find.textContaining('Ma liste est vide'), findsOneWidget);
+
+    await tester.tap(find.text('Films'));
+    await settle(tester);
+    await tester.tap(find.text('Libre (2024) HD VF'));
+    await settle(tester);
+    await tester.tap(find.byTooltip('Ajouter à ma liste'));
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+
+    // Retour sur l'accueil, sans redémarrer.
+    await tester.tap(find.text('Accueil'));
+    await settle(tester);
+    expect(find.textContaining('Ma liste est vide'), findsNothing);
+    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+
+    // « Tout voir » : grille filtrable.
+    await tester.tap(find.text('Tout voir'));
+    await settle(tester);
+    expect(find.byType(FavoritesScreen), findsOneWidget);
+    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+    await tester.tap(find.text('Séries'));
+    await settle(tester);
+    expect(find.text('Libre (2024) HD VF'), findsNothing);
+    expect(find.text('Rien dans ma liste ici.'), findsOneWidget);
+    await tester.tap(find.text('Films'));
+    await settle(tester);
+    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+
+    // La fiche s'ouvre depuis la grille ; retirer le favori le fait
+    // disparaître au retour.
+    await tester.tap(find.text('Libre (2024) HD VF'));
+    await settle(tester);
+    expect(find.byType(MovieScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Retirer de ma liste'));
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.text('Libre (2024) HD VF'), findsNothing);
   });
 
   testWidgets('Séries : catégories, fiche, saisons et épisodes', (

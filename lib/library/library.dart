@@ -1,4 +1,5 @@
 import '../server/json_read.dart';
+import '../server/models.dart';
 
 /// Ce qu'on regarde : un film ou un épisode, avec de quoi l'afficher et le
 /// relancer sans recharger le catalogue.
@@ -65,6 +66,14 @@ final class Favorite {
 
   bool get isSeries => key.startsWith('series:');
   String get id => key.substring(key.indexOf(':') + 1);
+
+  /// De quoi ouvrir sa fiche ; elle recharge le reste depuis le serveur.
+  CatalogItem get item => CatalogItem(
+    kind: isSeries ? ContentKind.series : ContentKind.movies,
+    id: id,
+    name: name,
+    poster: poster,
+  );
 
   static Favorite? fromJson(String key, Object? json) {
     final map = asMap(json);

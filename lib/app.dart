@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'accounts/account_store.dart';
 import 'accounts/login_screen.dart';
 import 'catalog/catalog_screen.dart';
+import 'library/home_screen.dart';
 import 'server/models.dart';
 import 'settings/settings.dart';
 
@@ -66,8 +67,8 @@ class HomeGate extends ConsumerWidget {
   }
 }
 
-/// Onglets Films et Séries (les réglages sont en haut à droite) : barre en bas sur écran étroit,
-/// rail sur le côté sur grand écran (règle 9).
+/// Onglets Accueil, Films et Séries (les réglages sont en haut à droite) :
+/// barre en bas sur écran étroit, rail sur le côté sur grand écran (règle 9).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -77,6 +78,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   static const _tabs = [
+    (Icons.home_outlined, Icons.home, 'Accueil'),
     (Icons.movie_outlined, Icons.movie, 'Films'),
     (Icons.tv_outlined, Icons.tv, 'Séries'),
   ];
@@ -84,7 +86,7 @@ class _HomeShellState extends State<HomeShell> {
   var _index = 0;
 
   // Un onglet n'est construit qu'à sa première visite : pas de requête pour
-  // les séries tant qu'on ne les ouvre pas. Ensuite, il garde son état.
+  // les films ni les séries tant qu'on ne les ouvre pas. Ensuite, il garde son état.
   final _visited = {0};
 
   void _select(int index) => setState(() {
@@ -93,7 +95,8 @@ class _HomeShellState extends State<HomeShell> {
   });
 
   Widget _tab(int index) => switch (index) {
-    0 => const CatalogScreen(kind: ContentKind.movies),
+    0 => const HomeScreen(),
+    1 => const CatalogScreen(kind: ContentKind.movies),
     _ => const CatalogScreen(kind: ContentKind.series),
   };
 
