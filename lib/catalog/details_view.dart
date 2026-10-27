@@ -7,9 +7,12 @@ import 'poster_grid.dart';
 /// titre et informations. Côte à côte sur grand écran, empilés sur mobile.
 /// Les champs absents ne sont pas affichés.
 class DetailsHeader extends StatelessWidget {
-  const DetailsHeader({super.key, required this.details});
+  const DetailsHeader({super.key, required this.details, this.action});
 
   final Details details;
+
+  /// Bouton principal (« Lecture »), sous le titre : visible sans défiler.
+  final Widget? action;
 
   static String _duration(Duration d) {
     final minutes = d.inMinutes;
@@ -35,6 +38,8 @@ class DetailsHeader extends StatelessWidget {
         if (facts.isNotEmpty) Text(facts, style: theme.textTheme.titleSmall),
         if (d.genre case final genre?)
           Text(genre, style: theme.textTheme.bodyMedium),
+        if (action case final action?)
+          Padding(padding: const EdgeInsets.only(top: 8), child: action),
         if (d.plot case final plot?)
           Padding(
             padding: const EdgeInsets.only(top: 8),

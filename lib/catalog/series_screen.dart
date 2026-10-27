@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../player/player_screen.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'details_view.dart';
@@ -76,8 +77,25 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             sliver: SliverList.builder(
               itemCount: season.episodes.length,
-              itemBuilder: (context, index) =>
-                  _EpisodeTile(episode: season.episodes[index]),
+              itemBuilder: (context, index) {
+                final episode = season.episodes[index];
+                final extension = episode.extension;
+                return _EpisodeTile(
+                  episode: episode,
+                  onPlay: extension == null
+                      ? null
+                      : () => openPlayer(
+                          context,
+                          ref,
+                          kind: ContentKind.series,
+                          id: episode.id,
+                          extension: extension,
+                          title:
+                              '${widget.item.name} · ${season.name} · '
+                              'Épisode ${episode.number}',
+                        ),
+                );
+              },
             ),
           ),
         ],
@@ -87,9 +105,12 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
 }
 
 class _EpisodeTile extends StatelessWidget {
-  const _EpisodeTile({required this.episode});
+  const _EpisodeTile({required this.episode, required this.onPlay});
 
   final Episode episode;
+
+  /// `null` si le fichier de l'épisode est inconnu.
+  final VoidCallback? onPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -99,9 +120,7 @@ class _EpisodeTile extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        // Lecture à la tâche 4.2 ; en attendant, la case reste focalisable
-        // pour parcourir la liste au clavier.
-        onTap: () {},
+        onTap: onPlay,
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Row(
