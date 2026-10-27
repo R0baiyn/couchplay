@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_store.dart';
+import '../search/search_index.dart';
+
 import '../server/models.dart';
 import 'versions.dart';
 
@@ -71,6 +73,11 @@ class SliverPosterGrid extends StatelessWidget {
 /// Affiche d'une grille, marquée si l'une de ses versions est dans « Ma
 /// liste » ou, pour un film, a été vue. Ne se reconstruit que si ces deux
 /// marques changent, pas à chaque position enregistrée pendant la lecture.
+///
+/// Versions de l'index si possible : un film se répartit souvent entre
+/// plusieurs catégories (« Films 4K », « FR · FILMS HD », son genre), et sa
+/// fiche, qui les propose toutes, peut mettre en favori une version absente
+/// de la catégorie affichée.
 class _EntryTile extends ConsumerWidget {
   const _EntryTile({super.key, required this.entry, required this.onOpen});
 
@@ -81,14 +88,21 @@ class _EntryTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final movie = entry.kind == ContentKind.movies;
     final prefix = movie ? 'movie' : 'series';
+    final versions =
+        (movie
+            ? ref.watch(
+                searchIndexProvider.select(
+                  (i) => i.value?.movies.entryOf(entry.item.id)?.versions,
+                ),
+              )
+            : null) ??
+        entry.versions;
     final (favorite, watched) = ref.watch(
       libraryProvider.select(
         (library) => (
-          entry.versions.any(
-            (v) => library.favorites.containsKey('$prefix:${v.id}'),
-          ),
+          versions.any((v) => library.favorites.containsKey('$prefix:${v.id}')),
           movie &&
-              entry.versions.any(
+              versions.any(
                 (v) => library.progress['movie:${v.id}']?.watched ?? false,
               ),
         ),
