@@ -88,4 +88,33 @@ void main() {
       },
     );
   });
+
+  group('étiquettes comme dans les noms réels', () {
+    test('casse libre pour celles qui ne sont pas des mots', () {
+      expect(ItemName.parse('Marche avec les loups (Fhd VF)').label, 'FHD VF');
+      expect(
+        ItemName.parse('Marche avec les loups (Fhd VF)').display,
+        'Marche avec les loups',
+      );
+      expect(ItemName.parse('Film 4k MULTI').label, '4K MULTI');
+      expect(ItemName.parse('Film MULTi').language, 'MULTI');
+    });
+
+    test('version originale, même en minuscules', () {
+      final name = ItemName.parse('Parasite Vostfr');
+      expect(name.language, 'VOSTFR');
+      expect(name.frenchAudio, isFalse);
+      expect(name.text, 'parasite');
+      expect(ItemName.parse('Dilwale (2015) SUBT AR').frenchAudio, isFalse);
+    });
+
+    test('mots ordinaires gardés : « Multi- », « vo »', () {
+      expect(ItemName.parse('Multi-Facial').text, 'multi facial');
+      expect(ItemName.parse('Le vo du vent').label, isNull);
+    });
+
+    test('séparateur laissé en tête par une étiquette retirée', () {
+      expect(ItemName.parse('FR - 4K - Dune (2021)').display, 'Dune (2021)');
+    });
+  });
 }

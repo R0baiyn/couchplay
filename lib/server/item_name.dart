@@ -18,20 +18,23 @@ final class ItemName {
     var title = match == null ? name : name.substring(match.end);
     String? quality;
     String? language;
-    title = title.replaceAllMapped(_label, (m) {
-      final token = m[0]!;
+    String take(Match m) {
+      final token = m[0]!.toUpperCase();
       if (_qualityRanks.containsKey(token)) {
         quality ??= token;
       } else {
         language ??= token;
       }
       return ' ';
-    });
+    }
+
     title = title
+        .replaceAllMapped(_label, take)
+        .replaceAllMapped(_upperLabel, take)
         .replaceAll(_emptyBrackets, ' ')
         .replaceAll(_spaces, ' ')
         .trim()
-        .replaceAll(_trailingSeparator, '');
+        .replaceAll(_edgeSeparators, '');
     final year = int.tryParse(_year.firstMatch(title)?[1] ?? '');
     return ItemName(
       display: title.isEmpty ? name.trim() : title,
@@ -52,10 +55,10 @@ final class ItemName {
   /// n'a pas d'année.
   final int? year;
 
-  /// Étiquette de qualité telle qu'écrite : `4K`, `FHD`, `HD`, `SD`…
+  /// Étiquette de qualité, en majuscules : `4K`, `FHD`, `HD`, `SD`…
   final String? quality;
 
-  /// Étiquette de langue telle qu'écrite : `VF`, `MULTI`, `VOSTFR`…
+  /// Étiquette de langue, en majuscules : `VF`, `MULTI`, `VOSTFR`…
   final String? language;
 
   /// « HD VF », « 4K », « MULTI » ; `null` si le nom ne dit rien.
@@ -115,35 +118,41 @@ final _country = RegExp(
 );
 const _countries = 'FR|EN|UK|US|ES|IT|DE|PT|NL|AR|TR|DZ|MA|TN|BE|CA|CH|VOST';
 
-// Étiquettes, en majuscules et en mots entiers : `HD` ne se trouve pas dans
-// `FHD`, ni « vo » dans un titre en minuscules.
+// Étiquettes, en mots entiers : `HD` ne se trouve pas dans `FHD`. Celles
+// qui ne sont pas des mots s'écrivent de toutes les façons (« Fhd »,
+// « 4k », « Vostfr », vues dans les noms réels) ; celles qui pourraient en
+// être (« vo », « Multi-… ») seulement en majuscules.
 final _label = RegExp(
-  r'(?<![A-Za-z0-9])(?:4K|UHD|2160[pP]|HDR|FHD|1080[pP]|HD|720[pP]|SD|'
-  r'MULTI|TRUEFRENCH|FRENCH|VFF|VFQ|VFI|VOF|VF|VOSTFR|VOST|VO)'
-  r'(?![A-Za-z0-9])',
+  r'(?<![A-Za-z0-9])(?:4K|UHD|2160P|FHD|1080P|720P|TRUEFRENCH|VFF|VFQ|VFI|'
+  r'VOF|VOSTFR|VOST|SUBT)(?![A-Za-z0-9])',
+  caseSensitive: false,
+);
+final _upperLabel = RegExp(
+  r'(?<![A-Za-z0-9])(?:HDR|HD|SD|MULTI|MULTi|FRENCH|VF|VO)(?![A-Za-z0-9])',
 );
 
+/// Clés en majuscules : l'étiquette lue est passée en majuscules.
 const _qualityRanks = {
   '4K': 40,
   'UHD': 40,
-  '2160p': 40,
   '2160P': 40,
   'HDR': 40,
   'FHD': 30,
-  '1080p': 30,
   '1080P': 30,
   'HD': 20,
-  '720p': 20,
   '720P': 20,
   'SD': 10,
 };
 
-const _originalLanguages = {'VO', 'VOST', 'VOSTFR'};
+/// Langue d'origine, sous-titrée ou non (`SUBT` : sous-titres arabes).
+const _originalLanguages = {'VO', 'VOST', 'VOSTFR', 'SUBT'};
 
 final _year = RegExp(r'\((\d{4})\)');
 final _emptyBrackets = RegExp(r'\(\s*\)|\[\s*\]');
 final _spaces = RegExp(r'\s+');
-final _trailingSeparator = RegExp(r'\s*[-·|:]+$');
+// Séparateurs laissés en tête ou en fin par les étiquettes retirées :
+// « FR - 4K - Dune » donne « Dune ».
+final _edgeSeparators = RegExp(r'^[\s\-·|:]+|[\s\-·|:]+$');
 
 // Ponctuation hors ASCII, vue dans les noms réels : espace insécable,
 // apostrophes et guillemets typographiques, tirets, point médian, points
