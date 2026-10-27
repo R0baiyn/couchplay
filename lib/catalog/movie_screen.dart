@@ -56,6 +56,14 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
     final details = ref.watch(provider);
     if (details.value case final value?) _shown = value;
     final shown = details.value ?? (details.isLoading ? _shown : null);
+    final picker = versions.length > 1
+        ? _VersionPicker(
+            versions: versions,
+            selected: selected,
+            onSelect: (id) => setState(() => _chosenId = id),
+          )
+        : null;
+    final poster = selected.poster ?? widget.entry.poster;
 
     return Scaffold(
       appBar: AppBar(
@@ -68,7 +76,7 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                 if (v != selected) 'movie:${v.id}',
             ],
             name: selected.name,
-            poster: selected.poster,
+            poster: poster,
           ),
         ],
       ),
@@ -80,27 +88,32 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 16,
               children: [
-                if (versions.length > 1)
-                  _VersionPicker(
-                    versions: versions,
-                    selected: selected,
-                    onSelect: (id) => setState(() => _chosenId = id),
-                  ),
+                ?picker,
                 _PlayButton(
                   item: selected,
                   // Celle de la liste : la fiche affichée peut encore être
                   // celle d'une autre version.
                   extension: selected.extension ?? details.value?.extension,
-                  poster: selected.poster ?? widget.entry.poster,
+                  poster: poster,
                 ),
               ],
             ),
           ),
         ),
-        AsyncError(:final error) => ErrorView(
-          error: error,
-          onRetry: () => ref.invalidate(provider),
+        // Une version introuvable chez le serveur ne bloque pas les autres.
+        AsyncError(:final error) => Column(
+          children: [
+            if (picker != null)
+              Padding(padding: const EdgeInsets.all(24), child: picker),
+            Expanded(
+              child: ErrorView(
+                error: error,
+                onRetry: () => ref.invalidate(provider),
+              ),
+            ),
+          ],
         ),
+
         _ => const Center(child: CircularProgressIndicator()),
       },
     );
