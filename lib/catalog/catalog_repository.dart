@@ -72,6 +72,16 @@ final class CatalogRepository {
     parseSeriesDetails,
   );
 
+  /// Fiche d'une série depuis le cache (moins de [maxAge]), sinon le
+  /// serveur : pour l'accueil, qui ne doit pas interroger le serveur pour
+  /// chaque série suivie à chaque lancement.
+  Future<SeriesDetails> cachedSeries(String id) async => (await _load(
+    'series_info_$id',
+    () => _client.fetch('get_series_info', {'series_id': id}),
+    parseSeriesDetails,
+    refresh: false,
+  )).value;
+
   /// [parse] doit être une fonction de premier niveau : elle part dans un
   /// isolate, et une fermeture déclarée ici emporterait le dépôt, son client
   /// http et ses connexions, impossibles à y envoyer.

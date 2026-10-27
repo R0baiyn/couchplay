@@ -43,7 +43,16 @@ void main() {
         _progress(_movie, position: 30).resumeAt,
         const Duration(seconds: 30),
       );
-      expect(_progress(_movie, position: 600, watched: true).resumeAt, isNull);
+      expect(
+        _progress(_movie, position: 2850, watched: true).resumeAt,
+        isNull,
+        reason: 'vu et arrêté à la fin',
+      );
+      expect(
+        _progress(_movie, position: 600, watched: true).resumeAt,
+        const Duration(seconds: 600),
+        reason: 'vu, puis revu en partie : on peut reprendre',
+      );
       expect(
         _progress(_movie, position: 2700, duration: 3000).resumeAt,
         isNull,
@@ -104,7 +113,34 @@ void main() {
       // E5 abandonné il y a longtemps, puis E8 vu jusqu'au bout : E8 reste,
       // l'accueil propose E9.
       library = library.withProgress(
-        _progress(_episode('e8', 1, 8), watched: true, minutesLater: 4),
+        _progress(
+          _episode('e8', 1, 8),
+          position: 2850,
+          watched: true,
+          minutesLater: 4,
+        ),
+      );
+      expect(library.continueWatching.first.finished, isTrue);
+
+      // E9 lancé puis coupé tout de suite, même déjà vu autrefois : il
+      // reste, à reprendre, et n'est pas compté comme fini.
+      library = library.withProgress(
+        _progress(
+          _episode('e9', 1, 9),
+          position: 2,
+          watched: true,
+          minutesLater: 5,
+        ),
+      );
+      expect(library.continueWatching.first.item.key, 'episode:e9');
+      expect(library.continueWatching.first.finished, isFalse);
+      library = library.withProgress(
+        _progress(
+          _episode('e9', 1, 9),
+          position: 2850,
+          watched: true,
+          minutesLater: 4,
+        ),
       );
       expect(library.continueWatching.map((p) => p.item.key), [
         'episode:e8',
@@ -112,15 +148,21 @@ void main() {
       ]);
     });
 
-    test('exclut les contenus vus, retirés ou à peine commencés', () {
-      final library = const Library()
-          .withProgress(_progress(_movie, watched: true))
-          .withProgress(_progress(_episode('a', 1, 1), hidden: true))
-          .withProgress(
-            _progress(_episode('x', 1, 1, series: '9'), position: 10),
-          );
-      expect(library.continueWatching, isEmpty);
-    });
+    test(
+      'exclut les films finis ou à peine commencés, les séries retirées',
+      () {
+        final library = const Library()
+            .withProgress(_progress(_movie, position: 2850, watched: true))
+            .withProgress(_progress(_episode('a', 1, 1), hidden: true))
+            .withProgress(
+              _progress(
+                const PlayItem.movie(id: '2', extension: 'mkv', name: 'Court'),
+                position: 10,
+              ),
+            );
+        expect(library.continueWatching, isEmpty);
+      },
+    );
   });
 
   group('library.json', () {

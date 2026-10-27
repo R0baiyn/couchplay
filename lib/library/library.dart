@@ -126,9 +126,14 @@ final class Progress {
       duration > Duration.zero &&
       position.inMilliseconds >= duration.inMilliseconds * watchedRatio;
 
+  /// Vu et arrêté à la fin. Un contenu vu puis revu en partie ne l'est
+  /// plus : la coche « vu » reste, mais on peut le reprendre.
+  bool get finished =>
+      watched && (duration <= Duration.zero || reachesEnd(position, duration));
+
   /// Position où proposer de reprendre, ou `null`.
   Duration? get resumeAt =>
-      !watched && position >= minResume && !reachesEnd(position, duration)
+      !finished && position >= minResume && !reachesEnd(position, duration)
       ? position
       : null;
 
@@ -264,9 +269,10 @@ final class Library {
 
   /// « Continuer à regarder », du plus récent au plus ancien : les films
   /// commencés (30 s ou plus) et pas finis, et une entrée par série, son
-  /// épisode regardé en dernier quel que soit son numéro. Si cet épisode est
-  /// fini, l'entrée reste (vue) : l'accueil propose alors l'épisode suivant.
-  /// Retirée, la série n'y est plus, sans ressortir un épisode plus ancien.
+  /// épisode regardé en dernier quel que soit son numéro, même à peine
+  /// commencé. Si cet épisode est fini ([Progress.finished]), l'accueil
+  /// propose l'épisode suivant. Retirée, la série n'y est plus, sans
+  /// ressortir un épisode plus ancien.
   List<Progress> get continueWatching {
     final latest = <String, Progress>{};
     for (final entry in progress.values) {
@@ -280,9 +286,8 @@ final class Library {
     return [
       for (final entry in latest.values)
         if (!entry.hidden &&
-            (entry.watched
-                ? entry.item.isEpisode
-                : entry.position >= Progress.minResume))
+            (entry.item.isEpisode ||
+                (!entry.finished && entry.position >= Progress.minResume)))
           entry,
     ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }

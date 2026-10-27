@@ -45,7 +45,7 @@ class HomeScreen extends ConsumerWidget {
             _PosterRow(
               children: [
                 for (final entry in started)
-                  entry.watched
+                  entry.finished
                       ? _UpNext(
                           key: ValueKey(entry.item.key),
                           finished: entry,
@@ -61,7 +61,8 @@ class HomeScreen extends ConsumerWidget {
                             context,
                             ref,
                             entry.item,
-                            resume: entry.position,
+                            // À peine commencé : depuis le début.
+                            resume: entry.resumeAt ?? Duration.zero,
                           ),
                           onMenu: () => _confirmHide(context, ref, entry),
                         ),
@@ -166,9 +167,8 @@ Widget _tile({
 /// à lancer depuis le début. Rien tant que la fiche de la série n'est pas
 /// chargée, ni à la fin de la série.
 ///
-/// `ponytail:` une requête au serveur par série ainsi terminée, à chaque
-/// lancement de l'app ; à mettre en cache si les séries suivies se
-/// multiplient.
+/// La fiche vient du cache du catalogue (un jour) : au plus une requête au
+/// serveur par série et par jour, pas une à chaque lancement.
 class _UpNext extends ConsumerWidget {
   const _UpNext({super.key, required this.finished, required this.onMenu});
 
@@ -178,7 +178,7 @@ class _UpNext extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final series = ref
-        .watch(seriesDetailsProvider(finished.item.seriesId!))
+        .watch(cachedSeriesDetailsProvider(finished.item.seriesId!))
         .value;
     final next = series == null ? null : nextEpisode(series, finished.item);
     if (next == null) return const SizedBox.shrink();

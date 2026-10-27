@@ -139,9 +139,11 @@ final class LibraryNotifier extends Notifier<Library> {
       state.withProgress(
         Progress(
           item: item,
-          // Non vu : on repart du début.
+          // Vu : à la fin, s'il y en a une ; non vu : on repart du début.
           position: watched
-              ? (previous?.position ?? Duration.zero)
+              ? (previous != null && previous.duration > Duration.zero
+                    ? previous.duration
+                    : (previous?.position ?? Duration.zero))
               : Duration.zero,
           duration: previous?.duration ?? Duration.zero,
           watched: watched,

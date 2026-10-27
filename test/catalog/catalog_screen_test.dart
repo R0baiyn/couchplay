@@ -364,9 +364,14 @@ void main() {
         }),
       );
     await pumpApp(tester, openMovies: false);
+    // La tuile arrive avec la fiche de la série, sans roue de chargement.
+    final next = find.text('Vikings · S1E3');
+    for (var i = 0; i < 20 && next.evaluate().isEmpty; i++) {
+      await settle(tester);
+    }
 
     expect(find.text('Continuer à regarder'), findsOneWidget);
-    expect(find.text('Vikings · S1E3'), findsOneWidget);
+    expect(next, findsOneWidget);
     expect(find.text('Vikings · S1E2'), findsNothing);
   });
 

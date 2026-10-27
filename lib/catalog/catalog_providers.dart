@@ -104,6 +104,13 @@ final movieDetailsProvider = FutureProvider.autoDispose
       retry: _noRetry,
     );
 
+/// Fiche d'une série, gardée un jour en cache : pour l'accueil.
+final cachedSeriesDetailsProvider = FutureProvider.autoDispose
+    .family<SeriesDetails, String>(
+      (ref, id) => ref.watch(catalogRepositoryProvider).cachedSeries(id),
+      retry: _noRetry,
+    );
+
 final seriesDetailsProvider = FutureProvider.autoDispose
     .family<SeriesDetails, String>(
       (ref, id) => ref.watch(catalogRepositoryProvider).series(id),
