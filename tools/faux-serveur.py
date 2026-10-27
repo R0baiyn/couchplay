@@ -1,6 +1,7 @@
 """Faux serveur de catalogue, pour essayer l'app sans solliciter le vrai.
 
-Lancement : python -I tools/faux-serveur.py [--port 8080] [--donnees DIR] [--video FICHIER]
+Lancement : python -I tools/faux-serveur.py [--port 8080] [--donnees DIR]
+            [--video FICHIER] [--video-hd FICHIER]
 
 Dans l'app : hôte http://localhost:8080 (PC) ou http://<IP du PC>:8080
 (téléphone), mot de passe quelconque. Le nom d'utilisateur choisit le
@@ -15,7 +16,11 @@ comportement :
   autre    fonctionnement normal
 
 Le catalogue vient de probe/ (vraies réponses enregistrées, hors git) ou, à
-défaut, de test/fixtures/. Tous les films et épisodes jouent la même vidéo.
+défaut, de test/fixtures/. Les listes respectent category_id, comme le vrai
+serveur. Les films dont le nom porte SD ou HD jouent la vidéo --video-hd
+(probe/mire-720p.mkv par défaut), les autres films et tous les épisodes la
+vidéo --video : la résolution affichée par le lecteur montre quelle version
+est lue.
 """
 
 import argparse
@@ -36,7 +41,8 @@ FICHIERS = {
     'get_series': 'series.json',
 }
 HTML = b'<html><body><h1>503 Service Unavailable</h1></body></html>'
-FLUX = re.compile(r'^/(movie|series)/([^/]+)/([^/]+)/[^/]+$')
+FLUX = re.compile(r'^/(movie|series)/([^/]+)/([^/]+)/([^/.]+)[^/]*$')
+QUALITE_HD = re.compile(r'\b(SD|HD)\b')
 PLAGE = re.compile(r'^bytes=(\d*)-(\d*)$')
 
 flux_ouverts: dict[str, int] = {}
@@ -79,6 +85,10 @@ def infos_compte(utilisateur: str, mot_de_passe: str) -> dict:
 class Requete(BaseHTTPRequestHandler):
     donnees: Path
     video: Path | None
+    video_hd: Path | None
+    # Listes chargées une fois : action -> entrées, et nom de chaque film.
+    listes: dict[str, list] = {}
+    noms_films: dict[str, str] = {}
 
     def do_GET(self):
         url = urlsplit(self.path)
@@ -101,7 +111,7 @@ class Requete(BaseHTTPRequestHandler):
             return self.repondre(200, HTML, 'text/html')
 
         if flux:
-            return self.envoyer_video(utilisateur)
+            return self.envoyer_video(utilisateur, flux.group(1), flux.group(4))
         return self.api(params, utilisateur)
 
     def api(self, params: dict, utilisateur: str):
@@ -118,6 +128,14 @@ class Requete(BaseHTTPRequestHandler):
             fichier = self.donnees / f'{nom}_{cle}.json'
             if not cle.isdigit() or not fichier.is_file():
                 fichier = self.donnees / f'{nom}.json'
+        elif action in self.listes:
+            entrees = self.listes[action]
+            categorie = params.get('category_id')
+            if categorie is not None:
+                entrees = [
+                    e for e in entrees if str(e.get('category_id')) == categorie
+                ]
+            return self.repondre(200, json.dumps(entrees).encode())
         elif action in FICHIERS:
             fichier = self.donnees / FICHIERS[action]
         else:
@@ -125,8 +143,12 @@ class Requete(BaseHTTPRequestHandler):
             return self.repondre(200, b'[]')
         self.repondre(200, fichier.read_bytes())
 
-    def envoyer_video(self, utilisateur: str):
-        if self.video is None:
+    def envoyer_video(self, utilisateur: str, type_flux: str, ident: str):
+        video = self.video
+        nom = self.noms_films.get(ident, '') if type_flux == 'movie' else ''
+        if self.video_hd is not None and QUALITE_HD.search(nom):
+            video = self.video_hd
+        if video is None:
             return self.repondre(404, b'')
         with verrou:
             actifs = flux_ouverts.get(utilisateur, 0)
@@ -136,15 +158,15 @@ class Requete(BaseHTTPRequestHandler):
         if refuse:
             return self.repondre(403, b'')
         try:
-            self.envoyer_plage()
+            self.envoyer_plage(video)
         except ConnectionError:
             pass  # Le lecteur a fermé ou sauté ailleurs dans la vidéo.
         finally:
             with verrou:
                 flux_ouverts[utilisateur] -= 1
 
-    def envoyer_plage(self):
-        taille = self.video.stat().st_size
+    def envoyer_plage(self, video: Path):
+        taille = video.stat().st_size
         debut, fin = 0, taille - 1
         plage = PLAGE.match(self.headers.get('Range', ''))
         if plage and plage.group(1):
@@ -160,14 +182,14 @@ class Requete(BaseHTTPRequestHandler):
             return self.end_headers()
 
         self.send_response(206 if plage else 200)
-        type_mime = mimetypes.guess_type(self.video.name)[0]
+        type_mime = mimetypes.guess_type(video.name)[0]
         self.send_header('Content-Type', type_mime or 'video/x-matroska')
         self.send_header('Accept-Ranges', 'bytes')
         self.send_header('Content-Length', str(fin - debut + 1))
         if plage:
             self.send_header('Content-Range', f'bytes {debut}-{fin}/{taille}')
         self.end_headers()
-        with self.video.open('rb') as f:
+        with video.open('rb') as f:
             f.seek(debut)
             reste = fin - debut + 1
             while reste > 0:
@@ -201,12 +223,28 @@ def principal():
         type=Path,
         default=sondes / 'mire.mkv' if (sondes / 'mire.mkv').is_file() else None,
     )
+    arguments.add_argument(
+        '--video-hd',
+        type=Path,
+        default=sondes / 'mire-720p.mkv'
+        if (sondes / 'mire-720p.mkv').is_file()
+        else None,
+    )
     a = arguments.parse_args()
     Requete.donnees = a.donnees
     Requete.video = a.video
+    Requete.video_hd = a.video_hd
+    for action in ('get_vod_streams', 'get_series'):
+        fichier = a.donnees / FICHIERS[action]
+        Requete.listes[action] = json.loads(fichier.read_text(encoding='utf-8'))
+    Requete.noms_films = {
+        str(f.get('stream_id')): str(f.get('name') or '')
+        for f in Requete.listes['get_vod_streams']
+    }
     serveur = ThreadingHTTPServer(('0.0.0.0', a.port), Requete)
     print(f'Catalogue : {a.donnees}')
     print(f'Vidéo : {a.video or "aucune, les flux répondent 404"}')
+    print(f'Vidéo des films SD et HD : {a.video_hd or "la même"}')
     print(f'Écoute sur http://localhost:{a.port} (Ctrl+C pour arrêter)')
     try:
         serveur.serve_forever()
