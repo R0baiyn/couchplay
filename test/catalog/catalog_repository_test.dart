@@ -143,7 +143,7 @@ void main() {
       File('test/fixtures/series.json').readAsStringSync(),
     );
     final loaded = await repository().items(ContentKind.series, '1793');
-    expect(loaded.value.first.name, 'Vikings');
+    expect(loaded.value.first.item.name, 'Vikings');
     expect(
       server.last!.uri.queryParameters,
       containsPair('action', 'get_series'),
@@ -205,7 +205,7 @@ void main() {
     );
 
     final loaded = await repository.items(ContentKind.movies, '148');
-    expect(loaded.value.first.name, 'Libre (2024) HD VF');
+    expect(loaded.value.first.title, 'Libre (2024)');
     final again = await repository.items(ContentKind.movies, '148');
     expect(again.savedAt, isNotNull, reason: 'relu depuis le cache');
   });

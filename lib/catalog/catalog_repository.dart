@@ -4,6 +4,7 @@ import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
 import 'catalog_cache.dart';
+import 'versions.dart';
 
 /// Résultat d'un chargement du catalogue.
 final class Loaded<T> {
@@ -47,7 +48,8 @@ final class CatalogRepository {
     refresh: refresh,
   );
 
-  Future<Loaded<List<CatalogItem>>> items(
+  /// Affiches d'une catégorie, versions d'un même film regroupées.
+  Future<Loaded<List<CatalogEntry>>> items(
     ContentKind kind,
     String categoryId, {
     bool refresh = false,
@@ -59,6 +61,16 @@ final class CatalogRepository {
       ContentKind.series => _parseSeries,
     },
     refresh: refresh,
+  );
+
+  /// Tous les films ou toutes les séries en une requête, pour la recherche,
+  /// gardés aussi longtemps que les catégories. [parse] en fait l'index dans
+  /// l'isolate de décodage (mêmes contraintes que pour `_load`).
+  Future<Loaded<T>> all<T>(ContentKind kind, T Function(String) parse) => _load(
+    '${kind.name}_all',
+    () => _client.fetch(kind.listAction),
+    parse,
+    refresh: false,
   );
 
   /// Fiches gardées une heure : repasser sur une fiche ne rappelle pas le
@@ -91,9 +103,10 @@ final class CatalogRepository {
     refresh: false,
   )).value;
 
-  /// [parse] doit être une fonction de premier niveau : elle part dans un
-  /// isolate, et une fermeture déclarée ici emporterait le dépôt, son client
-  /// http et ses connexions, impossibles à y envoyer.
+  /// [parse] doit être une fonction de premier niveau, ou une fermeture
+  /// créée par l'une d'elles : elle part dans un isolate, et une fermeture
+  /// déclarée ici emporterait le dépôt, son client http et ses connexions,
+  /// impossibles à y envoyer.
   Future<Loaded<T>> _load<T>(
     String name,
     Future<String> Function() fetch,
@@ -127,11 +140,11 @@ final class CatalogRepository {
   }
 }
 
-List<CatalogItem> _parseMovies(String text) =>
-    parseCatalogItems(text, ContentKind.movies);
+List<CatalogEntry> _parseMovies(String text) =>
+    entriesOf(parseCatalogItems(text, ContentKind.movies));
 
-List<CatalogItem> _parseSeries(String text) =>
-    parseCatalogItems(text, ContentKind.series);
+List<CatalogEntry> _parseSeries(String text) =>
+    entriesOf(parseCatalogItems(text, ContentKind.series));
 
 // Fonctions de premier niveau : ce qu'elles envoient à l'isolate se limite
 // à leurs paramètres.

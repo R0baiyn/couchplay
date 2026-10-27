@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
+import '../catalog/versions.dart';
 import '../server/models.dart';
 import 'library_store.dart';
 
@@ -24,9 +25,10 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
     // reconstruit pas la grille.
     ref.watch(libraryProvider.select((l) => l.favorites));
     final favorites = ref.read(libraryProvider).favoritesByDate;
-    final items = [
+    final entries = [
       for (final favorite in favorites)
-        if (_kind == null || favorite.item.kind == _kind) favorite.item,
+        if (_kind == null || favorite.item.kind == _kind)
+          CatalogEntry([favorite.item]),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('Ma liste')),
@@ -53,7 +55,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               ),
             ),
           ),
-          if (items.isEmpty)
+          if (entries.isEmpty)
             const SliverFillRemaining(
               hasScrollBody: false,
               child: Center(child: Text('Rien dans ma liste ici.')),
@@ -62,8 +64,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             SliverPadding(
               padding: const EdgeInsets.all(16),
               sliver: SliverPosterGrid(
-                items: items,
-                onOpen: (item) => openDetails(context, item),
+                entries: entries,
+                onOpen: (entry) => openDetails(context, entry),
               ),
             ),
         ],

@@ -63,8 +63,8 @@ final class CatalogItem {
     this.categoryId,
     this.tmdbId,
     this.extension,
-    ItemName? parsedName,
-  }) : _parsedName = parsedName;
+    this._parsedName,
+  });
 
   final ContentKind kind;
   final String id;

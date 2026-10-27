@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../catalog/catalog_providers.dart';
 import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
+import '../catalog/versions.dart';
 import '../player/player_screen.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
@@ -97,9 +98,11 @@ class HomeScreen extends ConsumerWidget {
                 for (final favorite in favorites)
                   _tile(
                     key: ValueKey(favorite.key),
-                    title: favorite.name,
+                    title: favorite.item.parsedName.display,
+
                     imageUrl: favorite.poster,
-                    onTap: () => openDetails(context, favorite.item),
+                    onTap: () =>
+                        openDetails(context, CatalogEntry([favorite.item])),
                   ),
               ],
             ),

@@ -8,6 +8,7 @@ import '../accounts/server_session.dart';
 import '../server/models.dart';
 import 'catalog_cache.dart';
 import 'catalog_repository.dart';
+import 'versions.dart';
 
 /// Catalogue du compte actif ; change avec le compte ou ses accès.
 final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
@@ -35,12 +36,12 @@ final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
 
 // Pas de nouvelle tentative automatique (Riverpod 3 en fait par défaut) :
 // l'écran propose « Réessayer », et le mode hors ligne prend le relais.
-Duration? _noRetry(int _, Object _) => null;
+Duration? noRetry(int _, Object _) => null;
 
 final categoriesProvider = AsyncNotifierProvider.autoDispose
     .family<CategoriesNotifier, Loaded<List<Category>>, ContentKind>(
       CategoriesNotifier.new,
-      retry: _noRetry,
+      retry: noRetry,
     );
 
 final class CategoriesNotifier extends AsyncNotifier<Loaded<List<Category>>> {
@@ -63,18 +64,18 @@ final class CategoriesNotifier extends AsyncNotifier<Loaded<List<Category>>> {
 
 /// Films ou séries d'une catégorie.
 final itemsProvider = AsyncNotifierProvider.autoDispose
-    .family<ItemsNotifier, Loaded<List<CatalogItem>>, (ContentKind, String)>(
+    .family<ItemsNotifier, Loaded<List<CatalogEntry>>, (ContentKind, String)>(
       ItemsNotifier.new,
-      retry: _noRetry,
+      retry: noRetry,
     );
 
-final class ItemsNotifier extends AsyncNotifier<Loaded<List<CatalogItem>>> {
+final class ItemsNotifier extends AsyncNotifier<Loaded<List<CatalogEntry>>> {
   ItemsNotifier(this.key);
 
   final (ContentKind, String) key;
 
   @override
-  Future<Loaded<List<CatalogItem>>> build() =>
+  Future<Loaded<List<CatalogEntry>>> build() =>
       ref.watch(catalogRepositoryProvider).items(key.$1, key.$2);
 
   Future<void> refresh() => _refreshWith(
@@ -101,18 +102,18 @@ Future<void> _refreshWith<T>(
 final movieDetailsProvider = FutureProvider.autoDispose
     .family<MovieDetails, String>(
       (ref, id) => ref.watch(catalogRepositoryProvider).movie(id),
-      retry: _noRetry,
+      retry: noRetry,
     );
 
 /// Fiche d'une série, gardée un jour en cache : pour l'accueil.
 final cachedSeriesDetailsProvider = FutureProvider.autoDispose
     .family<SeriesDetails, String>(
       (ref, id) => ref.watch(catalogRepositoryProvider).cachedSeries(id),
-      retry: _noRetry,
+      retry: noRetry,
     );
 
 final seriesDetailsProvider = FutureProvider.autoDispose
     .family<SeriesDetails, String>(
       (ref, id) => ref.watch(catalogRepositoryProvider).series(id),
-      retry: _noRetry,
+      retry: noRetry,
     );

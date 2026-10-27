@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../server/models.dart';
+import 'versions.dart';
 
 /// Grille d'affiches, en sliver : elle défile avec l'en-tête de l'écran.
 ///
@@ -13,12 +13,12 @@ import '../server/models.dart';
 class SliverPosterGrid extends StatelessWidget {
   const SliverPosterGrid({
     super.key,
-    required this.items,
+    required this.entries,
     required this.onOpen,
   });
 
-  final List<CatalogItem> items;
-  final ValueChanged<CatalogItem> onOpen;
+  final List<CatalogEntry> entries;
+  final ValueChanged<CatalogEntry> onOpen;
 
   static const maxTileWidth = 170.0;
   static const spacing = 12.0;
@@ -33,7 +33,7 @@ class SliverPosterGrid extends StatelessWidget {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         final columns = columnsFor(constraints.crossAxisExtent);
-        final rows = (items.length / columns).ceil();
+        final rows = (entries.length / columns).ceil();
         return SliverList.builder(
           itemCount: rows,
           itemBuilder: (context, row) => Padding(
@@ -54,14 +54,14 @@ class SliverPosterGrid extends StatelessWidget {
 
   Widget _tile(int index) {
     // Dernière rangée incomplète : des cases vides gardent la même largeur.
-    if (index >= items.length) return const SizedBox.shrink();
-    final item = items[index];
+    if (index >= entries.length) return const SizedBox.shrink();
+    final entry = entries[index];
     return PosterTile(
       // Un film et une série peuvent avoir le même id (grille des favoris).
-      key: ValueKey((item.kind, item.id)),
-      title: item.name,
-      imageUrl: item.poster,
-      onTap: () => onOpen(item),
+      key: ValueKey((entry.kind, entry.item.id)),
+      title: entry.title,
+      imageUrl: entry.poster,
+      onTap: () => onOpen(entry),
     );
   }
 }

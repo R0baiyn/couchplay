@@ -9,14 +9,15 @@ import 'movie_screen.dart';
 import 'poster_grid.dart';
 import 'series_screen.dart';
 import 'status_views.dart';
+import 'versions.dart';
 
 /// Ouvre la fiche d'un film ou d'une série.
-void openDetails(BuildContext context, CatalogItem item) => Navigator.push(
+void openDetails(BuildContext context, CatalogEntry entry) => Navigator.push(
   context,
   MaterialPageRoute<void>(
-    builder: (_) => switch (item.kind) {
-      ContentKind.movies => MovieScreen(item: item),
-      ContentKind.series => SeriesScreen(item: item),
+    builder: (_) => switch (entry.kind) {
+      ContentKind.movies => MovieScreen(entry: entry),
+      ContentKind.series => SeriesScreen(item: entry.item),
     },
   ),
 );
@@ -64,7 +65,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     }
   }
 
-  void _open(CatalogItem item) => openDetails(context, item);
+  void _open(CatalogEntry entry) => openDetails(context, entry);
 
   /// Liste complète des catégories sur écran étroit : un panneau du bas qui
   /// défile, reste au-dessus des boutons du téléphone, et se ferme sans rien
@@ -293,7 +294,7 @@ class _CategoryItems extends ConsumerWidget {
 
   final ContentKind kind;
   final String categoryId;
-  final ValueChanged<CatalogItem> onOpen;
+  final ValueChanged<CatalogEntry> onOpen;
 
   /// En-tête qui défile avec la grille (écran étroit).
   final Widget? header;
@@ -318,7 +319,7 @@ class _CategoryItems extends ConsumerWidget {
           SliverToBoxAdapter(child: OfflineBanner(savedAt: value.savedAt)),
         SliverPadding(
           padding: const EdgeInsets.all(16),
-          sliver: SliverPosterGrid(items: value.value, onOpen: onOpen),
+          sliver: SliverPosterGrid(entries: value.value, onOpen: onOpen),
         ),
       ],
       _ => const <Widget>[],
