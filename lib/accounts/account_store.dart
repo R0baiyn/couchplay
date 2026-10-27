@@ -124,9 +124,11 @@ final class AccountsNotifier extends Notifier<AccountsState> {
   @override
   AccountsState build() => ref.watch(accountStoreProvider).current;
 
+  /// Le dossier du compte est créé avant l'enregistrement : dès que le
+  /// compte devient actif, le catalogue démarre et a besoin de son cache.
   Future<void> save(Account account, {bool activate = false}) async {
-    await _commit((s) => s.withAccount(account, activate: activate));
     await ref.read(accountFilesProvider).create(account.id);
+    await _commit((s) => s.withAccount(account, activate: activate));
   }
 
   /// Efface les identifiants du compte, puis son dossier de données.

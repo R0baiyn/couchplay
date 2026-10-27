@@ -49,6 +49,8 @@ final class AccountFiles {
       for (final id in accountIds) {
         await of(id).create(recursive: true);
       }
+      // Premier lancement, sans compte : rien à ranger.
+      if (!await root.exists()) return;
       await for (final entry in root.list()) {
         final name = entry.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
         if (entry is Directory && !accountIds.contains(name)) {
