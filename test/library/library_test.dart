@@ -87,6 +87,27 @@ void main() {
       },
     );
 
+    test('une série : son épisode regardé en dernier, quel que soit son '
+        'numéro ; fini, la série sort de la rangée', () {
+      // Insérés dans le désordre : seul compte l'ordre des dates.
+      var library = const Library()
+          .withProgress(_progress(_episode('e8', 1, 8), minutesLater: 1))
+          .withProgress(_progress(_episode('e5', 1, 5), minutesLater: 3))
+          .withProgress(
+            _progress(_episode('x', 1, 1, series: '9'), minutesLater: 2),
+          );
+      expect(library.continueWatching.map((p) => p.item.key), [
+        'episode:e5',
+        'episode:x',
+      ]);
+
+      // E5 abandonné il y a longtemps, puis E8 vu jusqu'au bout.
+      library = library.withProgress(
+        _progress(_episode('e8', 1, 8), watched: true, minutesLater: 4),
+      );
+      expect(library.continueWatching.map((p) => p.item.key), ['episode:x']);
+    });
+
     test('exclut les contenus vus, retirés ou à peine commencés', () {
       final library = const Library()
           .withProgress(_progress(_movie, watched: true))

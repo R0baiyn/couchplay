@@ -263,29 +263,26 @@ final class Library {
   );
 
   /// « Continuer à regarder » : commencés (30 s ou plus), ni vus ni retirés,
-  /// une seule entrée par série (son épisode le plus récent), du plus récent
-  /// au plus ancien.
+  /// du plus récent au plus ancien. Une série n'y figure que par l'épisode
+  /// regardé en dernier, quel que soit son numéro : s'il est fini ou retiré,
+  /// la série n'y est plus, sans ressortir un épisode plus ancien.
   List<Progress> get continueWatching {
-    final bySeries = <String, Progress>{};
-    final movies = <Progress>[];
+    final latest = <String, Progress>{};
     for (final entry in progress.values) {
-      if (entry.watched ||
-          entry.hidden ||
-          entry.position < Progress.minResume) {
-        continue;
-      }
-      final seriesId = entry.item.seriesId;
-      if (seriesId == null) {
-        movies.add(entry);
-      } else if (bySeries[seriesId] case final other?
+      final key = entry.item.seriesId ?? entry.item.key;
+      if (latest[key] case final other?
           when !entry.updatedAt.isAfter(other.updatedAt)) {
         continue;
-      } else {
-        bySeries[seriesId] = entry;
       }
+      latest[key] = entry;
     }
-    return [...movies, ...bySeries.values]
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return [
+      for (final entry in latest.values)
+        if (!entry.watched &&
+            !entry.hidden &&
+            entry.position >= Progress.minResume)
+          entry,
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 }
 
