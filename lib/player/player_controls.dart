@@ -327,7 +327,6 @@ class _PlayerControlsState extends State<PlayerControls> {
   }
 }
 
-/// Barre de progression : temps écoulé, curseur, durée.
 /// Taille réelle de l'image décodée (« 3840 × 1600 ») : dit quelle version
 /// d'un film est lue, quoi qu'annonce son nom.
 class _Resolution extends StatelessWidget {
@@ -361,6 +360,7 @@ class _Resolution extends StatelessWidget {
   }
 }
 
+/// Barre de progression : temps écoulé, curseur, durée.
 class _ProgressBar extends StatefulWidget {
   const _ProgressBar({required this.player, required this.onSeek});
 

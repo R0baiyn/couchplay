@@ -99,7 +99,6 @@ class HomeScreen extends ConsumerWidget {
                   _tile(
                     key: ValueKey(favorite.key),
                     title: favorite.item.parsedName.display,
-
                     imageUrl: favorite.poster,
                     onTap: () =>
                         openDetails(context, CatalogEntry([favorite.item])),
