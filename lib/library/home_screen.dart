@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../catalog/catalog_providers.dart';
 import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
 import '../player/player_screen.dart';
@@ -44,23 +45,26 @@ class HomeScreen extends ConsumerWidget {
             _PosterRow(
               children: [
                 for (final entry in started)
-                  PosterTile(
-                    key: ValueKey(entry.item.key),
-                    title: entry.item.isEpisode
-                        ? '${entry.item.name} · '
-                              'S${entry.item.season}E${entry.item.episode}'
-                        : entry.item.name,
-                    imageUrl: entry.item.poster,
-                    progress: entry.fraction,
-                    // Reprend directement, sans passer par la fiche.
-                    onTap: () => openPlayer(
-                      context,
-                      ref,
-                      entry.item,
-                      resume: entry.position,
-                    ),
-                    onMenu: () => _confirmHide(context, ref, entry),
-                  ),
+                  entry.watched
+                      ? _UpNext(
+                          key: ValueKey(entry.item.key),
+                          finished: entry,
+                          onMenu: () => _confirmHide(context, ref, entry),
+                        )
+                      : _tile(
+                          key: ValueKey(entry.item.key),
+                          title: _shortTitle(entry.item),
+                          imageUrl: entry.item.poster,
+                          progress: entry.fraction,
+                          // Reprend directement, sans passer par la fiche.
+                          onTap: () => openPlayer(
+                            context,
+                            ref,
+                            entry.item,
+                            resume: entry.position,
+                          ),
+                          onMenu: () => _confirmHide(context, ref, entry),
+                        ),
               ],
             ),
           ],
@@ -90,7 +94,7 @@ class HomeScreen extends ConsumerWidget {
             _PosterRow(
               children: [
                 for (final favorite in favorites)
-                  PosterTile(
+                  _tile(
                     key: ValueKey(favorite.key),
                     title: favorite.name,
                     imageUrl: favorite.poster,
@@ -133,6 +137,61 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+String _shortTitle(PlayItem item) => item.isEpisode
+    ? '${item.name} · S${item.season}E${item.episode}'
+    : item.name;
+
+const _tileWidth = 130.0;
+
+Widget _tile({
+  required Key key,
+  required String title,
+  required String? imageUrl,
+  required VoidCallback onTap,
+  double? progress,
+  VoidCallback? onMenu,
+}) => SizedBox(
+  key: key,
+  width: _tileWidth,
+  child: PosterTile(
+    title: title,
+    imageUrl: imageUrl,
+    onTap: onTap,
+    progress: progress,
+    onMenu: onMenu,
+  ),
+);
+
+/// Série dont l'épisode regardé en dernier est fini : l'épisode qui suit,
+/// à lancer depuis le début. Rien tant que la fiche de la série n'est pas
+/// chargée, ni à la fin de la série.
+///
+/// `ponytail:` une requête au serveur par série ainsi terminée, à chaque
+/// lancement de l'app ; à mettre en cache si les séries suivies se
+/// multiplient.
+class _UpNext extends ConsumerWidget {
+  const _UpNext({super.key, required this.finished, required this.onMenu});
+
+  final Progress finished;
+  final VoidCallback onMenu;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final series = ref
+        .watch(seriesDetailsProvider(finished.item.seriesId!))
+        .value;
+    final next = series == null ? null : nextEpisode(series, finished.item);
+    if (next == null) return const SizedBox.shrink();
+    return _tile(
+      key: ValueKey(next.item.key),
+      title: _shortTitle(next.item),
+      imageUrl: next.item.poster,
+      onTap: () => openPlayer(context, ref, next.item),
+      onMenu: onMenu,
+    );
+  }
+}
+
 /// Rangée d'affiches qui défile de côté : au doigt, à la souris (glisser),
 /// à Shift + molette et aux flèches. Construite en entier : ces rangées
 /// restent courtes.
@@ -140,8 +199,6 @@ class _PosterRow extends StatelessWidget {
   const _PosterRow({required this.children});
 
   final List<Widget> children;
-
-  static const _tileWidth = 130.0;
 
   @override
   Widget build(BuildContext context) {
@@ -154,10 +211,7 @@ class _PosterRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: SliverPosterGrid.spacing,
-          children: [
-            for (final child in children)
-              SizedBox(width: _tileWidth, child: child),
-          ],
+          children: children,
         ),
       ),
     );

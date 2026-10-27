@@ -340,6 +340,36 @@ void main() {
     expect(movie['hidden'], isTrue);
   });
 
+  testWidgets('épisode fini : « Continuer » propose le suivant', (
+    tester,
+  ) async {
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'progress': {
+            'episode:6913': {
+              'seriesId': '1',
+              'season': 1,
+              'episode': 2,
+              'name': 'Vikings',
+              'extension': 'mkv',
+              'position': 2700,
+              'duration': 2700,
+              'watched': true,
+              'updatedAt': '2026-01-03T00:00:00Z',
+            },
+          },
+        }),
+      );
+    await pumpApp(tester, openMovies: false);
+
+    expect(find.text('Continuer à regarder'), findsOneWidget);
+    expect(find.text('Vikings · S1E3'), findsOneWidget);
+    expect(find.text('Vikings · S1E2'), findsNothing);
+  });
+
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (
     tester,
   ) async {

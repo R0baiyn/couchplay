@@ -88,7 +88,7 @@ void main() {
     );
 
     test('une série : son épisode regardé en dernier, quel que soit son '
-        'numéro ; fini, la série sort de la rangée', () {
+        'numéro ; fini, il reste pour proposer le suivant', () {
       // Insérés dans le désordre : seul compte l'ordre des dates.
       var library = const Library()
           .withProgress(_progress(_episode('e8', 1, 8), minutesLater: 1))
@@ -101,11 +101,15 @@ void main() {
         'episode:x',
       ]);
 
-      // E5 abandonné il y a longtemps, puis E8 vu jusqu'au bout.
+      // E5 abandonné il y a longtemps, puis E8 vu jusqu'au bout : E8 reste,
+      // l'accueil propose E9.
       library = library.withProgress(
         _progress(_episode('e8', 1, 8), watched: true, minutesLater: 4),
       );
-      expect(library.continueWatching.map((p) => p.item.key), ['episode:x']);
+      expect(library.continueWatching.map((p) => p.item.key), [
+        'episode:e8',
+        'episode:x',
+      ]);
     });
 
     test('exclut les contenus vus, retirés ou à peine commencés', () {
