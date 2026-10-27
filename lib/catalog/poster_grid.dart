@@ -4,37 +4,63 @@ import 'package:flutter/material.dart';
 
 import '../server/models.dart';
 
-/// Grille d'affiches. Seules les cases visibles sont construites, et chaque
-/// image est décodée à la taille de sa case, pas à celle du fichier.
-class PosterGrid extends StatelessWidget {
-  const PosterGrid({super.key, required this.items, required this.onOpen});
+/// Grille d'affiches, en sliver : elle défile avec l'en-tête de l'écran.
+///
+/// Rangée par rangée plutôt qu'en grille à cases fixes : chaque rangée prend
+/// la hauteur de ses titres (une ou deux lignes), sans réserver deux lignes
+/// partout. Seules les rangées visibles sont construites, et chaque image est
+/// décodée à la taille de sa case.
+class SliverPosterGrid extends StatelessWidget {
+  const SliverPosterGrid({
+    super.key,
+    required this.items,
+    required this.onOpen,
+  });
 
   final List<CatalogItem> items;
   final ValueChanged<CatalogItem> onOpen;
 
+  static const maxTileWidth = 170.0;
+  static const spacing = 12.0;
+  static const rowSpacing = 16.0;
+
+  /// Colonnes pour une largeur donnée : des cases de [maxTileWidth] au plus.
+  static int columnsFor(double width) =>
+      ((width + spacing) / (maxTileWidth + spacing)).ceil().clamp(1, 1000);
+
   @override
   Widget build(BuildContext context) {
-    return FocusTraversalGroup(
-      child: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 170,
-          // Affiche en 2:3, plus deux lignes de titre.
-          childAspectRatio: 0.52,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 12,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return PosterTile(
-            key: ValueKey(item.id),
-            title: item.name,
-            imageUrl: item.poster,
-            onTap: () => onOpen(item),
-          );
-        },
-      ),
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final columns = columnsFor(constraints.crossAxisExtent);
+        final rows = (items.length / columns).ceil();
+        return SliverList.builder(
+          itemCount: rows,
+          itemBuilder: (context, row) => Padding(
+            padding: const EdgeInsets.only(bottom: rowSpacing),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: spacing,
+              children: [
+                for (var column = 0; column < columns; column++)
+                  Expanded(child: _tile(row * columns + column)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _tile(int index) {
+    // Dernière rangée incomplète : des cases vides gardent la même largeur.
+    if (index >= items.length) return const SizedBox.shrink();
+    final item = items[index];
+    return PosterTile(
+      key: ValueKey(item.id),
+      title: item.name,
+      imageUrl: item.poster,
+      onTap: () => onOpen(item),
     );
   }
 }

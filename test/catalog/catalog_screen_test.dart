@@ -151,35 +151,50 @@ void main() {
     expect(find.textContaining('S02E01'), findsOneWidget);
   });
 
-  testWidgets('écran étroit : catégories dans un panneau, onglets en bas', (
+  testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (
     tester,
   ) async {
-    await pumpApp(tester, size: const Size(400, 800));
+    // Assez bas pour que la grille de test (8 affiches) défile sous l'en-tête.
+    await pumpApp(tester, size: const Size(400, 600));
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
     expect(find.text('Libre (2024) HD VF'), findsOneWidget);
 
-    // Le bouton montre la catégorie choisie et ouvre le panneau.
+    // Le bouton montre la catégorie choisie et ouvre le panneau ; toucher à
+    // côté le ferme sans rien changer.
     final picker = find.widgetWithText(OutlinedButton, 'Films 4K');
     expect(picker, findsOneWidget);
     await tester.tap(picker);
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsOneWidget);
-
-    // Toucher à côté ferme le panneau sans rien changer.
     await tester.tapAt(const Offset(200, 20));
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, 'Films 4K'), findsOneWidget);
+    expect(picker, findsOneWidget);
 
-    // Choisir une catégorie la sélectionne.
+    // Choisir dans le panneau change de catégorie.
     await tester.tap(picker);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('FR · Drame'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('FR · Drame'),
+      ),
+    );
     await settle(tester);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'FR · Drame'), findsOneWidget);
+
+    // Descendre replie l'en-tête, remonter un peu le fait revenir.
+    final refresh = find.byTooltip('Actualiser').hitTestable();
+    expect(refresh, findsOneWidget);
+    await tester.dragFrom(const Offset(200, 400), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(refresh, findsNothing);
+    await tester.dragFrom(const Offset(200, 300), const Offset(0, 60));
+    await tester.pumpAndSettle();
+    expect(refresh, findsOneWidget);
   });
 
   testWidgets('hors ligne avec un cache : bandeau ; sans cache : Réessayer', (
