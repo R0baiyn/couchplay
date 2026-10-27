@@ -13,6 +13,8 @@ final class PlayRequest {
     required this.url,
     required this.userAgent,
     this.secrets = const [],
+    this.audioLanguage,
+    this.subtitleLanguage,
   });
 
   final String title;
@@ -23,6 +25,12 @@ final class PlayRequest {
 
   /// Identifiants du compte, masqués dans tout message du lecteur.
   final List<String> secrets;
+
+  /// Langues des pistes à choisir si elles existent (code du fichier, `fre`
+  /// par exemple) : celles de l'épisode précédent. Sinon, audio français et
+  /// pas de sous-titres.
+  final String? audioLanguage;
+  final String? subtitleLanguage;
 }
 
 /// Le flux n'a pas pu démarrer, nouvelles tentatives comprises.
@@ -91,7 +99,7 @@ final class Playback {
     final generation = ++_generation;
     _abandonStart();
     await player.stop();
-    await _defaultTracks();
+    await _tracks(request);
     final media = Media(
       request.url.toString(),
       httpHeaders: {'User-Agent': request.userAgent},
@@ -111,15 +119,22 @@ final class Playback {
     }
   }
 
-  /// Piste audio française si elle existe, sous-titres désactivés : les
-  /// fichiers marquent souvent une piste anglaise « par défaut ». Remis à
-  /// chaque ouverture, sinon le choix fait sur un film suivrait au suivant.
-  Future<void> _defaultTracks() async {
+  /// Par défaut, piste audio française si elle existe et sous-titres
+  /// désactivés : les fichiers marquent souvent une piste anglaise « par
+  /// défaut ». Remis à chaque ouverture, sinon le choix fait sur un film
+  /// suivrait au suivant. mpv retombe sur sa piste par défaut si la langue
+  /// demandée manque.
+  Future<void> _tracks(PlayRequest request) async {
     final native = player.platform;
     if (native is! NativePlayer) return;
-    await native.setProperty('alang', 'fr,fre,fra,fr-FR');
+    await native.setProperty(
+      'alang',
+      request.audioLanguage ?? 'fr,fre,fra,fr-FR',
+    );
     await native.setProperty('aid', 'auto');
-    await native.setProperty('sid', 'no');
+    final subtitles = request.subtitleLanguage;
+    if (subtitles != null) await native.setProperty('slang', subtitles);
+    await native.setProperty('sid', subtitles == null ? 'no' : 'auto');
   }
 
   Future<void> _start(Media media, List<String> secrets) async {

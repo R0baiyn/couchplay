@@ -293,3 +293,37 @@ final _favoriteKey = RegExp(r'^(movie|series):.+$');
 
 DateTime _date(Object? value) =>
     asDate(value) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
+/// Épisode qui suit [current] dans [series] : le suivant de la saison, sinon
+/// le premier de la saison suivante. Les épisodes sans fichier connu sont
+/// sautés, et avec eux une saison qui n'a que ceux-là. `null` en fin de
+/// série, ou si [current] n'y figure plus.
+({PlayItem item, String? image})? nextEpisode(
+  SeriesDetails series,
+  PlayItem current,
+) {
+  var found = false;
+  for (final season in series.seasons) {
+    for (final episode in season.episodes) {
+      final extension = episode.extension;
+      if (!found) {
+        found = episode.id == current.id;
+      } else if (extension != null) {
+        return (
+          item: PlayItem.episode(
+            id: episode.id,
+            extension: extension,
+            name: current.name,
+            seriesId: current.seriesId!,
+            season: season.number,
+            episode: episode.number,
+            episodeTitle: episode.title,
+            poster: current.poster,
+          ),
+          image: episode.image,
+        );
+      }
+    }
+  }
+  return null;
+}

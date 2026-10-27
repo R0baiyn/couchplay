@@ -8,6 +8,8 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../accounts/account_store.dart';
 import '../accounts/server_session.dart';
+import '../catalog/catalog_providers.dart';
+import '../catalog/poster_grid.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../server/models.dart';
@@ -59,7 +61,12 @@ Future<void> openPlayer(
 }
 
 /// Flux d'un contenu sur le compte actif, ou `null` sans compte.
-PlayRequest? _requestFor(WidgetRef ref, PlayItem item) {
+PlayRequest? _requestFor(
+  WidgetRef ref,
+  PlayItem item, {
+  String? audioLanguage,
+  String? subtitleLanguage,
+}) {
   final account = ref.read(activeAccountProvider);
   final client = ref.read(serverClientProvider);
   if (account == null || client == null) return null;
@@ -72,6 +79,8 @@ PlayRequest? _requestFor(WidgetRef ref, PlayItem item) {
     ),
     userAgent: account.userAgent,
     secrets: [account.username, account.password],
+    audioLanguage: audioLanguage,
+    subtitleLanguage: subtitleLanguage,
   );
 }
 
@@ -100,7 +109,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   static const _saveEvery = Duration(seconds: 10);
 
-  late final PlayItem _item = widget.item;
+  /// Ce qu'on regarde : change quand l'épisode suivant s'enchaîne.
+  late PlayItem _item = widget.item;
+
+  /// Langues des pistes reprises de l'épisode précédent.
+  String? _audioLanguage;
+  String? _subtitleLanguage;
+
+  /// Épisode suivant proposé à la fin de celui-ci, et son compte à rebours.
+  ({PlayItem item, String? image})? _next;
+  Timer? _countdown;
+  var _secondsLeft = 0;
+  static const _nextDelay = 10;
+  final _playNowFocus = FocusNode();
 
   // Sur mobile, le lecteur est toujours en plein écran paysage.
   static final _mobile = Platform.isAndroid || Platform.isIOS;
@@ -168,14 +189,69 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final cutShort =
         state.duration > Duration.zero &&
         state.position < state.duration - const Duration(seconds: 30);
-    if (completed && cutShort && !_opening && mounted) {
-      _save();
+    if (!completed || _opening || !mounted) return;
+    _save();
+    if (cutShort) {
       _resumeAt = state.position;
       setState(
         () => _error =
             'La lecture s\'est interrompue : le serveur a coupé la connexion.',
       );
+    } else if (_item.seriesId case final seriesId? when _next == null) {
+      _offerNext(seriesId);
     }
+  }
+
+  /// Fin d'un épisode : propose le suivant, lancé seul après 10 s. Au
+  /// dernier de la série, le lecteur se ferme. Si la fiche de la série n'a
+  /// pas pu être chargée, le lecteur reste simplement sur la fin.
+  void _offerNext(String seriesId) {
+    final series = ref.read(seriesDetailsProvider(seriesId)).value;
+    if (series == null) return;
+    final next = nextEpisode(series, _item);
+    if (next == null) {
+      _exit();
+      return;
+    }
+    setState(() {
+      _next = next;
+      _secondsLeft = _nextDelay;
+    });
+    _countdown = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_secondsLeft <= 1) {
+        _playNext();
+      } else {
+        setState(() => _secondsLeft--);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _playNowFocus.requestFocus(),
+    );
+  }
+
+  void _cancelNext() {
+    _countdown?.cancel();
+    setState(() => _next = null);
+  }
+
+  /// Enchaîne sur l'épisode suivant dans le même écran, avec les mêmes
+  /// langues de pistes. `Playback.open` ferme le flux courant avant d'ouvrir
+  /// le suivant : une seule connexion à la fois.
+  void _playNext() {
+    final next = _next;
+    if (next == null) return;
+    _countdown?.cancel();
+    final track = _playback.player.state.track;
+    _audioLanguage = track.audio.language;
+    _subtitleLanguage = track.subtitle.id == 'no'
+        ? null
+        : track.subtitle.language;
+    setState(() {
+      _item = next.item;
+      _next = null;
+      _resumeAt = null;
+    });
+    _open();
   }
 
   /// Position où reprendre après une coupure.
@@ -186,7 +262,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _opening = true;
       _error = null;
     });
-    final request = _requestFor(ref, _item);
+    final request = _requestFor(
+      ref,
+      _item,
+      audioLanguage: _audioLanguage,
+      subtitleLanguage: _subtitleLanguage,
+    );
     if (request == null) {
       _exit();
       return;
@@ -217,6 +298,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void dispose() {
     _lifecycle.dispose();
     _saveTimer?.cancel();
+    _countdown?.cancel();
+    _playNowFocus.dispose();
     unawaited(_completed?.cancel());
     unawaited(_playing?.cancel());
     _save();
@@ -228,6 +311,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final error = _error;
+    // Fiche de la série gardée chargée pendant un épisode, pour connaître le
+    // suivant à la fin, même lancé depuis l'accueil.
+    if (_item.seriesId case final seriesId?) {
+      ref.watch(seriesDetailsProvider(seriesId));
+    }
+    final next = _next;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -265,6 +354,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             if (_opening)
               const IgnorePointer(
                 child: Center(child: CircularProgressIndicator()),
+              ),
+            if (next != null)
+              Align(
+                alignment: Alignment.bottomRight,
+                child: _NextEpisodePanel(
+                  title: next.item.title,
+                  image: next.image ?? next.item.poster,
+                  secondsLeft: _secondsLeft,
+                  playNowFocus: _playNowFocus,
+                  onPlayNow: _playNext,
+                  onCancel: _cancelNext,
+                ),
               ),
           ],
         ],
@@ -321,6 +422,99 @@ class _ErrorPanel extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// « Épisode suivant dans 10 s », en bas à droite, par-dessus la fin.
+class _NextEpisodePanel extends StatelessWidget {
+  const _NextEpisodePanel({
+    required this.title,
+    required this.image,
+    required this.secondsLeft,
+    required this.playNowFocus,
+    required this.onPlayNow,
+    required this.onCancel,
+  });
+
+  final String title;
+  final String? image;
+  final int secondsLeft;
+  final FocusNode playNowFocus;
+  final VoidCallback onPlayNow;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: ThemeData(
+        brightness: Brightness.dark,
+        colorSchemeSeed: Colors.deepPurple,
+      ),
+      child: Builder(
+        builder: (context) {
+          final text = Theme.of(context).textTheme;
+          return Card(
+            margin: const EdgeInsets.all(24),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: 320,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 12,
+                  children: [
+                    Text(
+                      'Épisode suivant dans $secondsLeft s',
+                      style: text.titleMedium,
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 12,
+                      children: [
+                        SizedBox(
+                          width: 120,
+                          child: AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: PosterImage(url: image, icon: Icons.tv),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: onCancel,
+                          child: const Text('Annuler'),
+                        ),
+                        FilledButton(
+                          focusNode: playNowFocus,
+                          onPressed: onPlayNow,
+                          child: const Text('Lire maintenant'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
