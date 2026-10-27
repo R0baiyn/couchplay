@@ -138,11 +138,25 @@ final class ServerClient {
     }
 
     final status = response.statusCode ?? 0;
-    if (status == 200) return response.data ?? '';
+    final text = response.data ?? '';
+    if (status == 200) {
+      // Identifiants révoqués : certains serveurs répondent 200 avec
+      // `{"user_info":{"auth":0}}`, même pour une liste. Sans ce contrôle,
+      // l'app mettrait en cache un catalogue vide. Les listes commencent par
+      // `[` : seul un petit objet est décodé ici.
+      if (text.length < 4096 && text.trimLeft().startsWith('{')) {
+        final body = _tryDecode(text);
+        final userInfo = body is Map ? body['user_info'] : null;
+        if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
+          throw const CredentialsRejected();
+        }
+      }
+      return text;
+    }
 
     // Corps d'erreur, petit : décodé ici. Mauvais identifiants : `auth: 0`
     // avec un code d'erreur chez certains serveurs (404). Le contenu prime.
-    final body = _tryDecode(response.data);
+    final body = _tryDecode(text);
     final userInfo = body is Map ? body['user_info'] : null;
     if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
       throw const CredentialsRejected();
