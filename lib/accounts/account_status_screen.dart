@@ -3,12 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server/models.dart';
 import '../server/server_client.dart';
-import '../settings/settings_screen.dart';
 import 'account_store.dart';
 import 'server_session.dart';
 
-/// État de l'abonnement du compte actif. Accueil provisoire, jusqu'au
-/// catalogue de l'étape 3.
+/// État de l'abonnement du compte actif, ouvert depuis les réglages.
 class AccountStatusScreen extends ConsumerWidget {
   const AccountStatusScreen({super.key});
 
@@ -18,7 +16,7 @@ class AccountStatusScreen extends ConsumerWidget {
     final info = ref.watch(accountInfoProvider);
     return Scaffold(
       appBar: AppBar(
-        title: Text(name ?? ''),
+        title: Text(name == null ? 'Abonnement' : 'Abonnement · $name'),
         actions: [
           IconButton(
             tooltip: 'Actualiser',
@@ -26,14 +24,6 @@ class AccountStatusScreen extends ConsumerWidget {
             onPressed: info.isLoading
                 ? null
                 : () => ref.invalidate(accountInfoProvider),
-          ),
-          IconButton(
-            tooltip: 'Réglages',
-            icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-            ),
           ),
         ],
       ),

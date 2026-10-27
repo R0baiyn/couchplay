@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../accounts/account_status_screen.dart';
 import '../accounts/accounts_screen.dart';
 import 'settings.dart';
 
@@ -30,6 +31,18 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute<void>(builder: (_) => const AccountsScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.verified_user_outlined),
+            title: const Text('Abonnement'),
+            subtitle: const Text('Statut, expiration, connexions'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const AccountStatusScreen(),
+              ),
             ),
           ),
           const Divider(),

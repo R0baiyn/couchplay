@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:couchplay/accounts/account.dart';
+import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
+import 'package:couchplay/accounts/login_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/server/server_client.dart';
@@ -22,6 +26,9 @@ void main() {
       ProviderScope(
         overrides: [
           accountStoreProvider.overrideWithValue(store!),
+          accountFilesProvider.overrideWithValue(
+            AccountFiles(Directory.systemTemp.createTempSync('couchplay_')),
+          ),
           serverClientFactoryProvider.overrideWithValue(
             (account) => ServerClient(
               host: account.host,
@@ -48,9 +55,14 @@ void main() {
     await tester.enterText(fields.at(2), 'moi');
     await tester.enterText(fields.at(3), 'mdp');
     await tester.tap(find.text('Se connecter'));
-    // Laisse le faux serveur et le stockage répondre.
-    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
-    await tester.pumpAndSettle();
+    // Laisse le faux serveur et le stockage répondre. Pas de pumpAndSettle :
+    // après la connexion, le catalogue tourne avec une roue de chargement.
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
   }
 
   testWidgets('premier lancement : écran de connexion, User-Agent prérempli', (
@@ -101,21 +113,20 @@ void main() {
     expect(container.read(accountsProvider).accounts, isEmpty);
   });
 
-  testWidgets('connexion réussie : compte enregistré, état affiché', (
+  testWidgets('connexion réussie : compte enregistré, catalogue affiché', (
     tester,
   ) async {
     server = FakeAdapter.replying(activeAccountJson);
     final container = await pumpApp(tester);
 
     await fillAndSubmit(tester, host: 'HTTP://serveur.com:8080/');
-    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
-    await tester.pumpAndSettle();
 
     final active = container.read(activeAccountProvider)!;
     expect(active.host, 'http://serveur.com:8080');
     expect(active.name, 'Salon');
-    expect(find.text('Actif'), findsOneWidget);
-    expect(find.text('Aucune'), findsOneWidget);
+    // L'app passe aux onglets du catalogue.
+    expect(find.byType(HomeShell), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
 
     // Relu depuis le stockage, comme au lancement suivant.
     final reopened = await tester.runAsync(AccountStore.open);

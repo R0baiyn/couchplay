@@ -17,6 +17,16 @@ final class FakeAdapter implements HttpClientAdapter {
             throw DioException(requestOptions: options, type: type),
       );
 
+  /// Répond selon le paramètre `action` de la requête (`''` pour les infos
+  /// du compte) ; une action absente de [bodies] donne un 404.
+  FakeAdapter.routes(Map<String, String> bodies)
+    : this((options) async {
+        final body = bodies[options.uri.queryParameters['action'] ?? ''];
+        return body == null
+            ? ResponseBody.fromString('', 404)
+            : ResponseBody.fromString(body, 200);
+      });
+
   final Future<ResponseBody> Function(RequestOptions options) _respond;
   RequestOptions? last;
   var calls = 0;
