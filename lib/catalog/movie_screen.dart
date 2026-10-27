@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/favorite_button.dart';
+import '../library/library.dart';
 import '../player/player_screen.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
@@ -66,10 +67,12 @@ class _PlayButton extends ConsumerWidget {
           : () => openPlayer(
               context,
               ref,
-              kind: ContentKind.movies,
-              id: item.id,
-              extension: extension,
-              title: item.name,
+              PlayItem.movie(
+                id: item.id,
+                extension: extension,
+                name: item.name,
+                poster: item.poster,
+              ),
             ),
     );
   }

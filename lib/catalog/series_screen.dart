@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/favorite_button.dart';
+import '../library/library.dart';
+import '../library/library_store.dart';
 import '../player/player_screen.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
@@ -53,6 +55,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         series.seasons.where((s) => s.number == _season).firstOrNull ??
         series.seasons.where((s) => s.number > 0).firstOrNull ??
         series.seasons.firstOrNull;
+    final progress = ref.watch(libraryProvider.select((l) => l.progress));
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(child: DetailsHeader(details: series.details)),
@@ -90,20 +93,30 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
               itemBuilder: (context, index) {
                 final episode = season.episodes[index];
                 final extension = episode.extension;
+                // Sans fichier connu, ni lecture ni suivi possibles.
+                final item = extension == null
+                    ? null
+                    : PlayItem.episode(
+                        id: episode.id,
+                        extension: extension,
+                        name: widget.item.name,
+                        seriesId: widget.item.id,
+                        season: season.number,
+                        episode: episode.number,
+                        episodeTitle: episode.title,
+                        poster: widget.item.poster,
+                      );
                 return _EpisodeTile(
                   episode: episode,
-                  onPlay: extension == null
+                  progress: item == null ? null : progress[item.key],
+                  onPlay: item == null
                       ? null
-                      : () => openPlayer(
-                          context,
-                          ref,
-                          kind: ContentKind.series,
-                          id: episode.id,
-                          extension: extension,
-                          title:
-                              '${widget.item.name} · ${season.name} · '
-                              'Épisode ${episode.number}',
-                        ),
+                      : () => openPlayer(context, ref, item),
+                  onWatched: item == null
+                      ? null
+                      : (watched) => ref
+                            .read(libraryProvider.notifier)
+                            .setWatched(item, watched: watched),
                 );
               },
             ),
@@ -115,18 +128,28 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
 }
 
 class _EpisodeTile extends StatelessWidget {
-  const _EpisodeTile({required this.episode, required this.onPlay});
+  const _EpisodeTile({
+    required this.episode,
+    required this.progress,
+    required this.onPlay,
+    required this.onWatched,
+  });
 
   final Episode episode;
+  final Progress? progress;
 
   /// `null` si le fichier de l'épisode est inconnu.
   final VoidCallback? onPlay;
+  final ValueChanged<bool>? onWatched;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final e = episode;
     final minutes = e.duration?.inMinutes;
+    final watched = progress?.watched ?? false;
+    final fraction = progress?.fraction ?? 0;
+    final onWatched = this.onWatched;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -143,7 +166,18 @@ class _EpisodeTile extends StatelessWidget {
                   aspectRatio: 16 / 9,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: PosterImage(url: e.image, icon: Icons.tv),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        PosterImage(url: e.image, icon: Icons.tv),
+                        // Commencé : où on en est, en bas de la vignette.
+                        if (!watched && fraction > 0)
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: LinearProgressIndicator(value: fraction),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -152,9 +186,23 @@ class _EpisodeTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   spacing: 4,
                   children: [
-                    Text(
-                      '${e.number}. ${e.title}',
-                      style: theme.textTheme.titleSmall,
+                    Row(
+                      spacing: 6,
+                      children: [
+                        if (watched)
+                          Icon(
+                            Icons.check_circle,
+                            size: 18,
+                            semanticLabel: 'Vu',
+                            color: theme.colorScheme.primary,
+                          ),
+                        Expanded(
+                          child: Text(
+                            '${e.number}. ${e.title}',
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
                     ),
                     if (minutes != null && minutes > 0)
                       Text('$minutes min', style: theme.textTheme.bodySmall),
@@ -168,6 +216,21 @@ class _EpisodeTile extends StatelessWidget {
                   ],
                 ),
               ),
+              // Menu plutôt qu'appui long : il marche aussi au clavier et à
+              // la télécommande.
+              if (onWatched != null)
+                PopupMenuButton<bool>(
+                  tooltip: "Plus d'options",
+                  onSelected: onWatched,
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: !watched,
+                      child: Text(
+                        watched ? 'Marquer comme non vu' : 'Marquer comme vu',
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

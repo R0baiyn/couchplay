@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account.dart';
@@ -202,6 +203,76 @@ void main() {
     expect(firstEpisode, findsNothing);
     await tester.scrollUntilVisible(find.textContaining('S02E01'), 300);
     expect(find.textContaining('S02E01'), findsOneWidget);
+  });
+
+  testWidgets('un film commencé propose de reprendre ou de recommencer', (
+    tester,
+  ) async {
+    // 12:34 regardées sur 1 h 50, enregistrées lors d'une séance précédente.
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'progress': {
+            'movie:144014': {
+              'name': 'Libre (2024) HD VF',
+              'extension': 'mp4',
+              'position': 754,
+              'duration': 6600,
+              'updatedAt': '2026-01-01T00:00:00Z',
+            },
+          },
+        }),
+      );
+    await pumpApp(tester);
+    await tester.tap(find.text('Libre (2024) HD VF'));
+    await settle(tester);
+    await tester.tap(find.text('Lecture'));
+    await settle(tester);
+
+    expect(find.text('Reprendre à 12:34'), findsOneWidget);
+    expect(find.text('Recommencer'), findsOneWidget);
+    // Fermer sans choisir laisse sur la fiche.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.text('Reprendre à 12:34'), findsNothing);
+    expect(find.byType(MovieScreen), findsOneWidget);
+  });
+
+  testWidgets('un épisode se marque vu ou non vu, et le reste', (tester) async {
+    Future<void> openVikings() async {
+      await tester.tap(find.text('Séries'));
+      await settle(tester);
+      await tester.tap(find.text('Vikings'));
+      await settle(tester);
+    }
+
+    final firstEpisode = find.textContaining('1. Vikings - S01E01');
+    final menu = find.byTooltip("Plus d'options");
+    final seen = find.byIcon(Icons.check_circle);
+
+    await pumpApp(tester);
+    await openVikings();
+    await tester.scrollUntilVisible(firstEpisode, 300);
+    expect(seen, findsNothing);
+    await tester.tap(menu.first);
+    await settle(tester);
+    await tester.tap(find.text('Marquer comme vu'));
+    await settle(tester);
+    expect(seen, findsOneWidget);
+
+    // Nouveau lancement : toujours vu, et on peut l'annuler.
+    await tester.pumpWidget(const SizedBox());
+    await pumpApp(tester);
+    await openVikings();
+    await tester.scrollUntilVisible(firstEpisode, 300);
+    expect(seen, findsOneWidget);
+    await tester.tap(menu.first);
+    await settle(tester);
+    await tester.tap(find.text('Marquer comme non vu'));
+    await settle(tester);
+    expect(seen, findsNothing);
   });
 
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (

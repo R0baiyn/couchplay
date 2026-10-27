@@ -8,41 +8,82 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../accounts/account_store.dart';
 import '../accounts/server_session.dart';
+import '../library/library.dart';
+import '../library/library_store.dart';
 import '../server/models.dart';
 import 'playback.dart';
 import 'player_controls.dart';
 
-/// Ouvre le lecteur sur un film ou un épisode du compte actif.
+/// Ouvre le lecteur sur un film ou un épisode du compte actif. Un contenu
+/// commencé propose de reprendre ou de recommencer ; avec [resume], la
+/// lecture reprend là sans rien demander (« Continuer à regarder »).
 Future<void> openPlayer(
   BuildContext context,
-  WidgetRef ref, {
-  required ContentKind kind,
-  required String id,
-  required String extension,
-  required String title,
-}) {
+  WidgetRef ref,
+  PlayItem item, {
+  Duration? resume,
+}) async {
   // Un double clic sur « Lecture » ne doit pas empiler deux lecteurs.
-  if (ModalRoute.of(context)?.isCurrent == false) return Future.value();
-  final account = ref.read(activeAccountProvider);
-  final client = ref.read(serverClientProvider);
-  if (account == null || client == null) return Future.value();
-  final request = PlayRequest(
-    title: title,
-    url: client.streamUri(kind, id, extension),
-    userAgent: account.userAgent,
-    secrets: [account.username, account.password],
-  );
-  return Navigator.push(
+  if (ModalRoute.of(context)?.isCurrent == false) return;
+  var start = resume;
+  if (start == null) {
+    if (ref.read(libraryProvider).progress[item.key]?.resumeAt
+        case final saved?) {
+      start = await showDialog<Duration>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(item.title),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, Duration.zero),
+              child: const Text('Recommencer'),
+            ),
+            FilledButton(
+              autofocus: true,
+              onPressed: () => Navigator.pop(context, saved),
+              child: Text('Reprendre à ${formatTime(saved)}'),
+            ),
+          ],
+        ),
+      );
+      // Fermé sans choisir : on reste sur la fiche.
+      if (start == null || !context.mounted) return;
+    }
+  }
+  await Navigator.push(
     context,
-    MaterialPageRoute<void>(builder: (_) => PlayerScreen(request: request)),
+    MaterialPageRoute<void>(
+      builder: (_) => PlayerScreen(item: item, startAt: start),
+    ),
   );
 }
 
-/// Lecture plein cadre. Quitter l'écran arrête le flux.
-class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.request});
+/// Flux d'un contenu sur le compte actif, ou `null` sans compte.
+PlayRequest? _requestFor(WidgetRef ref, PlayItem item) {
+  final account = ref.read(activeAccountProvider);
+  final client = ref.read(serverClientProvider);
+  if (account == null || client == null) return null;
+  return PlayRequest(
+    title: item.title,
+    url: client.streamUri(
+      item.isEpisode ? ContentKind.series : ContentKind.movies,
+      item.id,
+      item.extension,
+    ),
+    userAgent: account.userAgent,
+    secrets: [account.username, account.password],
+  );
+}
 
-  final PlayRequest request;
+/// Lecture plein cadre. La position est enregistrée toutes les 10 s, à la
+/// pause et à la sortie. Quitter l'écran arrête le flux.
+class PlayerScreen extends ConsumerStatefulWidget {
+  const PlayerScreen({super.key, required this.item, this.startAt});
+
+  final PlayItem item;
+
+  /// Position où démarrer, sinon le début.
+  final Duration? startAt;
 
   @override
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
@@ -50,8 +91,16 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final Playback _playback = ref.read(playbackProvider);
+  // Gardé ici : `ref` n'est plus utilisable dans dispose.
+  late final LibraryNotifier _library = ref.read(libraryProvider.notifier);
   late final AppLifecycleListener _lifecycle;
   StreamSubscription<bool>? _completed;
+  StreamSubscription<bool>? _playing;
+  Timer? _saveTimer;
+
+  static const _saveEvery = Duration(seconds: 10);
+
+  late final PlayItem _item = widget.item;
 
   // Sur mobile, le lecteur est toujours en plein écran paysage.
   static final _mobile = Platform.isAndroid || Platform.isIOS;
@@ -69,7 +118,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (_mobile) _setFullscreen(true);
     _lifecycle = AppLifecycleListener(onHide: _onHide);
     _completed = _playback.player.stream.completed.listen(_onCompleted);
+    _playing = _playback.player.stream.playing.listen((playing) {
+      if (!playing) _save();
+    });
+    _saveTimer = Timer.periodic(_saveEvery, (_) {
+      if (_playback.player.state.playing) _save();
+    });
+    if (widget.startAt case final start? when start > Duration.zero) {
+      _resumeAt = start;
+    }
     _open();
+  }
+
+  /// Enregistre où on en est, seulement sur un flux bien démarré : quitter
+  /// pendant le chargement ou après un échec (position à 0) ne doit pas
+  /// effacer la position enregistrée. À appeler avant tout arrêt du flux.
+  void _save() {
+    if (_opening || _error != null) return;
+    final state = _playback.player.state;
+    if (state.position <= Duration.zero) return;
+    unawaited(
+      _library.saveProgress(
+        _item,
+        position: state.position,
+        duration: state.duration,
+      ),
+    );
   }
 
   /// Sur mobile, passer l'app en arrière-plan arrête le flux tout de suite
@@ -77,6 +151,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// pas la fermeture de l'écran), puis quitte le lecteur, menu ouvert ou non.
   void _onHide() {
     if (!_mobile || !mounted) return;
+    _save();
     unawaited(_playback.stop(_ticket));
     final route = ModalRoute.of(context);
     final navigator = Navigator.of(context);
@@ -94,6 +169,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         state.duration > Duration.zero &&
         state.position < state.duration - const Duration(seconds: 30);
     if (completed && cutShort && !_opening && mounted) {
+      _save();
       _resumeAt = state.position;
       setState(
         () => _error =
@@ -110,7 +186,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _opening = true;
       _error = null;
     });
-    final opening = _playback.open(widget.request);
+    final request = _requestFor(ref, _item);
+    if (request == null) {
+      _exit();
+      return;
+    }
+    final opening = _playback.open(request);
     _ticket = _playback.ticket;
     try {
       await opening;
@@ -135,7 +216,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _saveTimer?.cancel();
     unawaited(_completed?.cancel());
+    unawaited(_playing?.cancel());
+    _save();
     unawaited(_playback.stop(_ticket));
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
     super.dispose();
@@ -168,7 +252,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           else ...[
             PlayerControls(
               player: _playback.player,
-              title: widget.request.title,
+              title: _item.title,
               fill: _fill,
               onToggleFill: () => setState(() => _fill = !_fill),
               // Sur mobile, toujours en plein écran : pas de bouton.
