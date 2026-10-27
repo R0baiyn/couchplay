@@ -129,12 +129,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         actions: const [SettingsButton()],
         // L'index se refait (filtre changé) : les résultats restent affichés.
-        bottom: index.isLoading && index.hasValue
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(4),
-                child: LinearProgressIndicator(),
-              )
-            : null,
+        // Place gardée, pour que l'en-tête ne saute pas.
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: index.isLoading && index.hasValue
+              ? const LinearProgressIndicator()
+              : const SizedBox.shrink(),
+        ),
       ),
       body: body,
     );
