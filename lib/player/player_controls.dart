@@ -238,6 +238,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
+                  _Resolution(player: _player),
                 ],
               ),
             ),
@@ -327,6 +328,39 @@ class _PlayerControlsState extends State<PlayerControls> {
 }
 
 /// Barre de progression : temps écoulé, curseur, durée.
+/// Taille réelle de l'image décodée (« 3840 × 1600 ») : dit quelle version
+/// d'un film est lue, quoi qu'annonce son nom.
+class _Resolution extends StatelessWidget {
+  const _Resolution({required this.player});
+
+  final Player player;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int?>(
+      stream: player.stream.width,
+      initialData: player.state.width,
+      builder: (context, width) => StreamBuilder<int?>(
+        stream: player.stream.height,
+        initialData: player.state.height,
+        builder: (context, height) {
+          final (w, h) = (width.data, height.data);
+          if (w == null || h == null || w == 0 || h == 0) {
+            return const SizedBox.shrink();
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              '$w × $h',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _ProgressBar extends StatefulWidget {
   const _ProgressBar({required this.player, required this.onSeek});
 
