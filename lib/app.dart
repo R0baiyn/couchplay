@@ -74,13 +74,10 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  // Une classe et non des records : le tri des icônes du build release ne
-  // voit pas les IconData rangées dans des records, et les retirait de la
-  // police (icônes invisibles dans l'app).
   static const _tabs = [
-    _Tab(Icons.movie_outlined, Icons.movie, 'Films'),
-    _Tab(Icons.tv_outlined, Icons.tv, 'Séries'),
-    _Tab(Icons.settings_outlined, Icons.settings, 'Réglages'),
+    (Icons.movie_outlined, Icons.movie, 'Films'),
+    (Icons.tv_outlined, Icons.tv, 'Séries'),
+    (Icons.settings_outlined, Icons.settings, 'Réglages'),
   ];
 
   var _index = 0;
@@ -118,11 +115,11 @@ class _HomeShellState extends State<HomeShell> {
               onDestinationSelected: _select,
               labelType: NavigationRailLabelType.all,
               destinations: [
-                for (final tab in _tabs)
+                for (final (icon, selected, label) in _tabs)
                   NavigationRailDestination(
-                    icon: Icon(tab.icon),
-                    selectedIcon: Icon(tab.selectedIcon),
-                    label: Text(tab.label),
+                    icon: Icon(icon),
+                    selectedIcon: Icon(selected),
+                    label: Text(label),
                   ),
               ],
             ),
@@ -138,22 +135,14 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: _select,
         destinations: [
-          for (final tab in _tabs)
+          for (final (icon, selected, label) in _tabs)
             NavigationDestination(
-              icon: Icon(tab.icon),
-              selectedIcon: Icon(tab.selectedIcon),
-              label: tab.label,
+              icon: Icon(icon),
+              selectedIcon: Icon(selected),
+              label: label,
             ),
         ],
       ),
     );
   }
-}
-
-final class _Tab {
-  const _Tab(this.icon, this.selectedIcon, this.label);
-
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
 }
