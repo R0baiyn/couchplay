@@ -122,6 +122,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// fichier, media_kit remet la piste courante à « auto ».
   String? _audioLanguage;
   String? _subtitleLanguage;
+
+  /// Noms des pistes choisies : départagent plusieurs pistes de la même
+  /// langue (sous-titres complets ou seulement les passages étrangers…).
+  String? _audioTitle;
+  String? _subtitleTitle;
   StreamSubscription<Track>? _track;
 
   /// Épisode suivant proposé à la fin de celui-ci, et son compte à rebours.
@@ -154,11 +159,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _track = _playback.player.stream.track.listen((track) {
       if (track.audio.language case final language?) {
         _audioLanguage = language;
+        _audioTitle = track.audio.title;
       }
       if (track.subtitle.id == 'no') {
         _subtitleLanguage = null;
       } else if (track.subtitle.language case final language?) {
         _subtitleLanguage = language;
+        _subtitleTitle = track.subtitle.title;
       }
     });
     _saveTimer = Timer.periodic(_saveEvery, (_) {
@@ -304,10 +311,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     try {
       await opening;
       _resumeAt = null;
+      _matchTracksByTitle();
     } on PlaybackFailed catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  /// mpv prend la première piste de la langue demandée. S'il y en a
+  /// plusieurs, on passe à celle qui porte le même nom que la précédente.
+  void _matchTracksByTitle() {
+    final player = _playback.player;
+    final tracks = player.state.tracks;
+    final audio = tracks.audio.where((t) => t.language == _audioLanguage);
+    if (_audioLanguage != null && audio.length > 1) {
+      final same = audio.where((t) => t.title == _audioTitle).firstOrNull;
+      if (same != null) unawaited(player.setAudioTrack(same));
+    }
+    final subtitles = tracks.subtitle.where(
+      (t) => t.language == _subtitleLanguage,
+    );
+    if (_subtitleLanguage != null && subtitles.length > 1) {
+      final same = subtitles
+          .where((t) => t.title == _subtitleTitle)
+          .firstOrNull;
+      if (same != null) unawaited(player.setSubtitleTrack(same));
     }
   }
 
