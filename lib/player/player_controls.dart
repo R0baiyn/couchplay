@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -455,6 +457,25 @@ class _VolumeButtonState extends State<_VolumeButton> {
   }
 }
 
+/// Ajoute à la lecture en cours les sous-titres d'un fichier choisi par
+/// l'utilisateur (.srt, .ass, .vtt…). Le texte est passé à mpv plutôt que
+/// le chemin : sous Android, le fichier choisi n'a pas toujours de chemin.
+Future<void> loadSubtitleFile(Player player) async {
+  final file = (await FilePicker.pickFiles(
+    dialogTitle: 'Fichier de sous-titres',
+  )).firstOrNull;
+  if (file == null) return;
+  final bytes = await file.xFile.readAsBytes();
+  String text;
+  try {
+    text = utf8.decode(bytes);
+  } on FormatException {
+    // Beaucoup de vieux .srt français sont en Windows-1252.
+    text = latin1.decode(bytes);
+  }
+  await player.setSubtitleTrack(SubtitleTrack.data(text, title: file.name));
+}
+
 /// Menus Audio et Sous-titres, d'après les pistes du fichier.
 class _TracksMenu extends StatelessWidget {
   const _TracksMenu({required this.player, required this.onOpened});
@@ -515,10 +536,18 @@ class _TracksMenu extends StatelessWidget {
               PopupMenuButton<SubtitleTrack>(
                 tooltip: 'Sous-titres',
                 icon: const Icon(Icons.subtitles),
-                enabled: subtitles.isNotEmpty,
                 onOpened: onOpened,
                 onSelected: player.setSubtitleTrack,
                 itemBuilder: (_) => [
+                  PopupMenuItem(
+                    onTap: () => loadSubtitleFile(player),
+                    child: const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.upload_file),
+                      title: Text('Charger un fichier…'),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
                   CheckedPopupMenuItem(
                     value: SubtitleTrack.no(),
                     checked: subtitlesOff,
