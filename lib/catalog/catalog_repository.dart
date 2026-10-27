@@ -54,8 +54,10 @@ final class CatalogRepository {
   }) => _load(
     '${kind.name}_list_$categoryId',
     () => _client.fetch(kind.listAction, {'category_id': categoryId}),
-    // Envoyée à l'isolate : elle ne capture que `kind`, pas le dépôt.
-    (text) => parseCatalogItems(text, kind),
+    switch (kind) {
+      ContentKind.movies => _parseMovies,
+      ContentKind.series => _parseSeries,
+    },
     refresh: refresh,
   );
 
@@ -70,18 +72,21 @@ final class CatalogRepository {
     parseSeriesDetails,
   );
 
+  /// [parse] doit être une fonction de premier niveau : elle part dans un
+  /// isolate, et une fermeture déclarée ici emporterait le dépôt, son client
+  /// http et ses connexions, impossibles à y envoyer.
   Future<Loaded<T>> _load<T>(
     String name,
     Future<String> Function() fetch,
     T Function(String) parse, {
     required bool refresh,
   }) async {
-    final cached = await _cache.read(name);
-    if (cached != null &&
-        !refresh &&
-        _now().difference(cached.savedAt) < maxAge) {
-      if (await _tryDecode(cached.text, parse) case final value?) {
-        return Loaded(value, savedAt: cached.savedAt);
+    final path = _cache.path(name);
+    final savedAt = path == null ? null : await _cache.savedAt(path);
+    final fresh = savedAt != null && _now().difference(savedAt) < maxAge;
+    if (path != null && fresh && !refresh) {
+      if (await _readCached(path, parse) case final value?) {
+        return Loaded(value, savedAt: savedAt);
       }
     }
 
@@ -90,34 +95,64 @@ final class CatalogRepository {
       text = await fetch();
     } on ServerException catch (e) {
       final offline = e is ServerUnreachable || e is ServerTimeout;
-      if (offline && cached != null) {
-        if (await _tryDecode(cached.text, parse) case final value?) {
-          return Loaded(value, offline: true, savedAt: cached.savedAt);
+      if (offline && path != null && savedAt != null) {
+        if (await _readCached(path, parse) case final value?) {
+          return Loaded(value, offline: true, savedAt: savedAt);
         }
       }
       rethrow;
     }
-    final value = await _decode(text, parse);
-    await _cache.write(name, text);
-    return Loaded(value);
+    return Loaded(await _decodeAndStore(text, parse, path));
   }
+}
 
-  /// Décode dans un isolate ; une réponse illisible devient [InvalidResponse].
-  static Future<T> _decode<T>(String text, T Function(String) parse) async {
-    try {
-      return await Isolate.run(() => parse(text));
-    } on FormatException {
-      log('Catalogue', error: 'JSON invalide');
-      throw const InvalidResponse('JSON invalide');
-    }
+List<CatalogItem> _parseMovies(String text) =>
+    parseCatalogItems(text, ContentKind.movies);
+
+List<CatalogItem> _parseSeries(String text) =>
+    parseCatalogItems(text, ContentKind.series);
+
+// Fonctions de premier niveau : ce qu'elles envoient à l'isolate se limite
+// à leurs paramètres.
+
+Future<T> _decode<T>(String text, T Function(String) parse) async {
+  try {
+    return await Isolate.run(() => parse(text));
+  } on FormatException {
+    log('Catalogue', error: 'JSON invalide');
+    throw const InvalidResponse('JSON invalide');
   }
+}
 
-  // Cache corrompu : ignoré, comme s'il n'existait pas.
-  static Future<T?> _tryDecode<T>(String text, T Function(String) parse) async {
-    try {
-      return await _decode(text, parse);
-    } on InvalidResponse {
-      return null;
-    }
+/// Décode puis met en cache, dans l'isolate : le texte n'est ni décodé ni
+/// réencodé sur le thread de l'interface. Rien n'est écrit s'il est illisible.
+Future<T> _decodeAndStore<T>(
+  String text,
+  T Function(String) parse,
+  String? path,
+) async {
+  final (T, bool) result;
+  try {
+    result = await Isolate.run(() {
+      final value = parse(text);
+      return (value, path == null || writeText(path, text));
+    });
+  } on FormatException {
+    log('Catalogue', error: 'JSON invalide');
+    throw const InvalidResponse('JSON invalide');
+  }
+  if (!result.$2) log('Cache du catalogue non écrit');
+  return result.$1;
+}
+
+/// Cache illisible ou corrompu : `null`, comme s'il n'existait pas.
+Future<T?> _readCached<T>(String path, T Function(String) parse) async {
+  try {
+    return await Isolate.run(() {
+      final text = readText(path);
+      return text == null ? null : parse(text);
+    });
+  } on FormatException {
+    return null;
   }
 }

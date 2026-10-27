@@ -22,7 +22,7 @@ Future<void> main() async {
   final files = AccountFiles(Directory('${support.path}/accounts'));
   // En tâche de fond : ne retarde pas le premier rendu.
   unawaited(
-    files.removeOrphans({for (final a in accounts.current.accounts) a.id}),
+    files.sync({for (final a in accounts.current.accounts) a.id}),
   );
   runApp(
     ProviderScope(

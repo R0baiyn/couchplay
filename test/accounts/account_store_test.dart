@@ -167,17 +167,18 @@ void main() {
     });
   });
 
-  test('removeOrphans efface les dossiers des comptes disparus', () async {
-    final root = Directory.systemTemp.createTempSync('couchplay_orphans_');
-    addTearDown(() => root.deleteSync(recursive: true));
-    final files = AccountFiles(Directory('${root.path}/accounts'));
-    for (final id in ['garde', 'orphelin']) {
-      files.of(id).createSync(recursive: true);
-    }
+  test(
+    'sync crée les dossiers manquants et efface ceux des comptes disparus',
+    () async {
+      final root = Directory.systemTemp.createTempSync('couchplay_orphans_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final files = AccountFiles(Directory('${root.path}/accounts'));
+      files.of('orphelin').createSync(recursive: true);
 
-    await files.removeOrphans({'garde'});
+      await files.sync({'garde'});
 
-    expect(files.of('garde').existsSync(), isTrue);
-    expect(files.of('orphelin').existsSync(), isFalse);
-  });
+      expect(files.of('garde').existsSync(), isTrue);
+      expect(files.of('orphelin').existsSync(), isFalse);
+    },
+  );
 }

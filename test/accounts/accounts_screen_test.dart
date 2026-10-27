@@ -13,6 +13,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_server.dart';
+import '../support/settle.dart';
 
 Account _account(String id) => Account(
   id: id,
@@ -73,17 +74,6 @@ void main() {
     tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/comptes');
     await tester.pumpAndSettle();
     return container;
-  }
-
-  // Les écritures du stockage factice et du disque sont de vrais futurs.
-  // Plusieurs tours : chaque étape (stockage, puis disque) attend la précédente.
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 5; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      await tester.pumpAndSettle();
-    }
   }
 
   testWidgets('toucher un compte en fait le compte actif', (tester) async {

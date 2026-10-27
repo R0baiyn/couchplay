@@ -30,11 +30,25 @@ final class AccountFiles {
     if (await directory.exists()) await directory.delete(recursive: true);
   }
 
-  /// Efface les dossiers des comptes qui n'existent plus : suppression
-  /// interrompue, ou fichier verrouillé au moment de la suppression.
-  Future<void> removeOrphans(Set<String> accountIds) async {
+  /// Crée le dossier du compte. Seul l'enregistrement d'un compte le crée :
+  /// le cache n'en crée jamais, pour qu'une écriture en retard ne fasse pas
+  /// revenir le dossier d'un compte supprimé.
+  Future<void> create(String accountId) async {
     try {
-      if (!await root.exists()) return;
+      await of(accountId).create(recursive: true);
+    } on FileSystemException catch (e) {
+      log('Dossier du compte non créé', error: e.osError?.errorCode);
+    }
+  }
+
+  /// Met les dossiers en accord avec les comptes : crée ceux qui manquent,
+  /// efface ceux des comptes disparus (suppression interrompue, fichier
+  /// verrouillé au moment de la suppression).
+  Future<void> sync(Set<String> accountIds) async {
+    try {
+      for (final id in accountIds) {
+        await of(id).create(recursive: true);
+      }
       await for (final entry in root.list()) {
         final name = entry.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
         if (entry is Directory && !accountIds.contains(name)) {

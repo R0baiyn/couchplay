@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../accounts/account_files.dart';
@@ -12,11 +14,22 @@ final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
   ref,
 ) {
   final client = ref.watch(serverClientProvider);
-  final id = ref.watch(activeAccountProvider.select((a) => a?.id));
-  if (client == null || id == null) throw StateError('Aucun compte actif');
+  final access = ref.watch(
+    activeAccountProvider.select(
+      (a) => a == null ? null : (a.id, a.host, a.username),
+    ),
+  );
+  if (client == null || access == null) {
+    throw StateError('Aucun compte actif');
+  }
+  final (id, host, username) = access;
+  final folder = ref.watch(accountFilesProvider).of(id).path;
   return CatalogRepository(
     client,
-    CatalogCache(ref.watch(accountFilesProvider).of(id)),
+    CatalogCache(
+      Directory('$folder${Platform.pathSeparator}catalog'),
+      serverKey: serverKeyOf(host, username),
+    ),
   );
 });
 

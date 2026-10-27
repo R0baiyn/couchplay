@@ -20,6 +20,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import '../support/fake_server.dart';
+import '../support/settle.dart';
 
 String _fixture(String name) =>
     File('test/fixtures/$name.json').readAsStringSync();
@@ -42,24 +43,6 @@ void main() {
   });
   tearDown(() => root.deleteSync(recursive: true));
 
-  // Réseau factice, disque et isolates réels : quelques tours de vraie
-  // horloge, sans pumpAndSettle (les roues de chargement tournent sans fin).
-  Future<void> settle(WidgetTester tester) async {
-    // Le premier isolate d'un test démarre lentement : on attend la fin des
-    // chargements (plus de roue), au plus quelques secondes.
-    for (var i = 0; i < 100; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 30)),
-      );
-      await tester.pump(const Duration(milliseconds: 50));
-      final loading = find.byType(CircularProgressIndicator).evaluate();
-      // Fini : plus de chargement ni d'animation (transition de page).
-      if (i > 2 && loading.isEmpty && !tester.binding.hasScheduledFrame) {
-        return;
-      }
-    }
-  }
-
   Future<void> pumpApp(
     WidgetTester tester, {
     Size size = const Size(1280, 800),
@@ -68,6 +51,8 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
+    // Comme au lancement de l'app : le dossier du compte existe.
+    Directory('${root.path}/accounts/compte').createSync(recursive: true);
     FlutterSecureStorage.setMockInitialValues({});
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();

@@ -124,8 +124,10 @@ final class AccountsNotifier extends Notifier<AccountsState> {
   @override
   AccountsState build() => ref.watch(accountStoreProvider).current;
 
-  Future<void> save(Account account, {bool activate = false}) =>
-      _commit((s) => s.withAccount(account, activate: activate));
+  Future<void> save(Account account, {bool activate = false}) async {
+    await _commit((s) => s.withAccount(account, activate: activate));
+    await ref.read(accountFilesProvider).create(account.id);
+  }
 
   /// Efface les identifiants du compte, puis son dossier de données.
   Future<void> remove(String id) async {
