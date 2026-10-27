@@ -74,11 +74,19 @@ class PosterTile extends StatefulWidget {
     required this.title,
     required this.imageUrl,
     required this.onTap,
+    this.progress,
+    this.onMenu,
   });
 
   final String title;
   final String? imageUrl;
   final VoidCallback onTap;
+
+  /// Part regardée, en barre au bas de l'affiche.
+  final double? progress;
+
+  /// Appui long ou clic droit : les actions secondaires.
+  final VoidCallback? onMenu;
 
   @override
   State<PosterTile> createState() => _PosterTileState();
@@ -90,8 +98,11 @@ class _PosterTileState extends State<PosterTile> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final progress = widget.progress;
     return InkWell(
       onTap: widget.onTap,
+      onLongPress: widget.onMenu,
+      onSecondaryTap: widget.onMenu,
       onFocusChange: (focused) => setState(() => _focused = focused),
       borderRadius: BorderRadius.circular(8),
       child: Column(
@@ -112,7 +123,18 @@ class _PosterTileState extends State<PosterTile> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(5),
-                child: PosterImage(url: widget.imageUrl, deferred: true),
+                child: progress == null
+                    ? PosterImage(url: widget.imageUrl, deferred: true)
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          PosterImage(url: widget.imageUrl, deferred: true),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: LinearProgressIndicator(value: progress),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),

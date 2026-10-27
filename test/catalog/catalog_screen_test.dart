@@ -275,6 +275,71 @@ void main() {
     expect(seen, findsNothing);
   });
 
+  testWidgets('« Continuer à regarder » : une entrée par série, « Retirer »', (
+    tester,
+  ) async {
+    Map<String, Object?> episode(int number, int position, String date) => {
+      'seriesId': '1',
+      'season': 1,
+      'episode': number,
+      'name': 'Vikings',
+      'extension': 'mkv',
+      'position': position,
+      'duration': 2700,
+      'updatedAt': date,
+    };
+    final file = File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'progress': {
+            'movie:144014': {
+              'name': 'Libre (2024) HD VF',
+              'extension': 'mp4',
+              'position': 754,
+              'duration': 6600,
+              'updatedAt': '2026-01-01T00:00:00Z',
+            },
+            'movie:144015': {
+              'name': 'Libre (2024) FHD VF',
+              'extension': 'mkv',
+              'position': 6600,
+              'duration': 6600,
+              'watched': true,
+              'updatedAt': '2026-01-04T00:00:00Z',
+            },
+            'episode:6912': episode(1, 600, '2026-01-02T00:00:00Z'),
+            'episode:6913': episode(2, 100, '2026-01-03T00:00:00Z'),
+          },
+        }),
+      );
+    await pumpApp(tester, openMovies: false);
+
+    expect(find.text('Continuer à regarder'), findsOneWidget);
+    // L'épisode le plus récent de la série, puis le film ; rien de vu.
+    expect(find.text('Vikings · S1E2'), findsOneWidget);
+    expect(find.text('Vikings · S1E1'), findsNothing);
+    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+    expect(find.text('Libre (2024) FHD VF'), findsNothing);
+    expect(
+      tester.getTopLeft(find.text('Vikings · S1E2')).dx,
+      lessThan(tester.getTopLeft(find.text('Libre (2024) HD VF')).dx),
+    );
+
+    // Appui long, « Retirer » : l'entrée part, la progression reste.
+    await tester.longPress(find.text('Libre (2024) HD VF'));
+    await settle(tester);
+    await tester.tap(find.text('Retirer'));
+    await settle(tester);
+    expect(find.text('Libre (2024) HD VF'), findsNothing);
+    expect(find.text('Vikings · S1E2'), findsOneWidget);
+    final saved = await tester.runAsync(file.readAsString);
+    final movie = (jsonDecode(saved!) as Map)['progress']['movie:144014'];
+    expect(movie['position'], 754);
+    expect(movie['hidden'], isTrue);
+  });
+
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (
     tester,
   ) async {
