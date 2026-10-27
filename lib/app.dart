@@ -144,7 +144,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (mounted) _fields[_index]?.requestFocus();
   });
 
-  /// `true` : touche prise, elle ne va pas plus loin.
+  /// `true` : touche prise ; sur ordinateur, son caractère (« / ») n'est
+  /// alors pas tapé.
   bool _onKey(KeyEvent event) {
     // Seulement quand l'accueil est devant : pas sous le lecteur, une fiche,
     // un dialogue ou le panneau des catégories.
@@ -170,6 +171,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return true;
   }
 
+  // Créés une fois : changer d'onglet, ou ouvrir et fermer une fiche (la
+  // route de l'accueil change d'état), ne reconstruit pas les onglets.
+  final _built = <int, Widget>{};
+
   Widget _tab(int index) => switch (index) {
     0 => const HomeScreen(),
     1 => CatalogScreen(kind: ContentKind.movies, filterFocus: _fields[1]),
@@ -183,7 +188,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       index: _index,
       children: [
         for (var i = 0; i < _tabs.length; i++)
-          _visited.contains(i) ? _tab(i) : const SizedBox.shrink(),
+          _visited.contains(i)
+              ? _built.putIfAbsent(i, () => _tab(i))
+              : const SizedBox.shrink(),
       ],
     );
     if (MediaQuery.sizeOf(context).width >= 720) {

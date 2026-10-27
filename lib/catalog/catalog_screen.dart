@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,6 +48,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   var _refreshing = false;
   final _filter = TextEditingController();
 
+  /// Texte du filtre seul : bouger le curseur ne refiltre pas la grille.
+  final _query = ValueNotifier('');
+
+  @override
+  void initState() {
+    super.initState();
+    _filter.addListener(() => _query.value = _filter.text);
+  }
+
   ContentKind get _kind => widget.kind;
 
   String get _title => _kind == ContentKind.movies ? 'Films' : 'Séries';
@@ -64,6 +74,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   @override
   void dispose() {
     _filter.dispose();
+    _query.dispose();
     super.dispose();
   }
 
@@ -257,7 +268,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       key: key,
                       kind: _kind,
                       categoryId: current.id,
-                      filter: _filter,
+                      query: _query,
                       onOpen: _open,
                     ),
                   ),
@@ -275,7 +286,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               key: key,
               kind: _kind,
               categoryId: current.id,
-              filter: _filter,
+              query: _query,
               onOpen: _open,
               header: SliverAppBar(
                 floating: true,
@@ -348,21 +359,21 @@ class _CategoryList extends StatelessWidget {
   }
 }
 
-/// Grille d'une catégorie, réduite par le texte de [filter], avec son
+/// Grille d'une catégorie, réduite par le texte de [query], avec son
 /// éventuel en-tête repliable.
 class _CategoryItems extends ConsumerWidget {
   const _CategoryItems({
     super.key,
     required this.kind,
     required this.categoryId,
-    required this.filter,
+    required this.query,
     required this.onOpen,
     this.header,
   });
 
   final ContentKind kind;
   final String categoryId;
-  final TextEditingController filter;
+  final ValueListenable<String> query;
 
   final ValueChanged<CatalogEntry> onOpen;
 
@@ -377,15 +388,11 @@ class _CategoryItems extends ConsumerWidget {
     // contient, restent les mêmes widgets.
     return FocusTraversalGroup(
       child: ValueListenableBuilder(
-        valueListenable: filter,
-        builder: (context, value, _) => CustomScrollView(
+        valueListenable: query,
+        builder: (context, text, _) => CustomScrollView(
           slivers: [
             ?header,
-            ..._content(
-              loaded,
-              value.text,
-              onRetry: () => ref.invalidate(provider),
-            ),
+            ..._content(loaded, text, onRetry: () => ref.invalidate(provider)),
           ],
         ),
       ),
