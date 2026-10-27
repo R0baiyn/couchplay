@@ -52,6 +52,22 @@ void main() {
       expect(entries, hasLength(1));
     });
 
+    test('sans année ni tmdb_id : pas de regroupement', () {
+      final entries = entriesOf([
+        movie('1', 'Hamlet HD'),
+        movie('2', 'Hamlet SD'),
+      ]);
+      expect(entries, hasLength(2));
+    });
+
+    test('« Vostfr » en minuscules passe après le français, même SD', () {
+      final entries = entriesOf([
+        movie('1', 'Parasite Vostfr', tmdb: '7'),
+        movie('2', 'Parasite SD', tmdb: '7'),
+      ]);
+      expect(entries.single.item.id, '2');
+    });
+
     test('séries jamais regroupées', () {
       CatalogItem series(String id) =>
           CatalogItem(kind: ContentKind.series, id: id, name: 'Dark');

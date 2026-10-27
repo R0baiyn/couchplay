@@ -28,9 +28,11 @@ final class CatalogEntry {
 /// film n'en font qu'une, placée à la première d'entre elles.
 ///
 /// Même film : même `tmdb_id`, sinon même titre et même année (deux
-/// homonymes d'années différentes restent séparés). À n'appeler que sur des
-/// entrées de catégories visibles : sinon un film français se regroupe avec
-/// sa version espagnole. Les séries ne sont pas regroupées.
+/// homonymes d'années différentes restent séparés ; sans année ni
+/// `tmdb_id`, pas de regroupement : deux « Hamlet » ne sont pas forcément
+/// le même). À n'appeler que sur des entrées de catégories visibles : sinon
+/// un film français se regroupe avec sa version espagnole. Les séries ne
+/// sont pas regroupées.
 List<CatalogEntry> entriesOf(Iterable<CatalogItem> items) {
   final groups = <String, List<CatalogItem>>{};
   for (final item in items) {
@@ -48,7 +50,8 @@ String _groupKey(CatalogItem item) {
   if (item.kind == ContentKind.series) return 'i${item.id}';
   if (item.tmdbId case final tmdb?) return 't$tmdb';
   final name = item.parsedName;
-  return name.text.isEmpty ? 'i${item.id}' : 'n${name.text}|${name.year}';
+  if (name.text.isEmpty || name.year == null) return 'i${item.id}';
+  return 'n${name.text}|${name.year}';
 }
 
 /// Meilleure version d'abord : audio français avant version originale, puis
