@@ -96,22 +96,33 @@ final class ServerClient {
 
   /// Vérifie les identifiants et renvoie l'état de l'abonnement.
   Future<AccountInfo> accountInfo() async {
-    final userInfo = asMap(asMap(await _get())['user_info']);
-    // `auth: 0` est traité par _get ; reste le cas d'une liste vide.
+    final body = _tryDecode(await fetch());
+    if (body == null) {
+      _log('Infos du compte', 'JSON invalide');
+      throw const InvalidResponse('JSON invalide');
+    }
+    final userInfo = asMap(asMap(body)['user_info']);
+    // Mauvais identifiants : `auth: 0`, ou parfois une liste vide.
     if (asInt(userInfo['auth']) != 1) throw const CredentialsRejected();
     return AccountInfo.fromJson(userInfo);
   }
 
-  Uri _apiUri(String? action) => Uri.parse('$host/player_api.php').replace(
-    queryParameters: {
-      'username': username,
-      'password': password,
-      'action': ?action,
-    },
-  );
-
-  Future<Object?> _get([String? action]) async {
-    final uri = _apiUri(action);
+  /// Texte brut de la réponse à [action] (rien = infos du compte).
+  ///
+  /// Le texte n'est pas décodé ici : les grosses listes se décodent hors du
+  /// thread de l'interface (règle 5), et partent telles quelles en cache.
+  Future<String> fetch([
+    String? action,
+    Map<String, String> params = const {},
+  ]) async {
+    final uri = Uri.parse('$host/player_api.php').replace(
+      queryParameters: {
+        'username': username,
+        'password': password,
+        'action': ?action,
+        ...params,
+      },
+    );
     final Response<String> response;
     try {
       response = await _dio.getUri<String>(uri);
@@ -127,16 +138,16 @@ final class ServerClient {
     }
 
     final status = response.statusCode ?? 0;
+    if (status == 200) return response.data ?? '';
+
+    // Corps d'erreur, petit : décodé ici. Mauvais identifiants : `auth: 0`
+    // avec un code d'erreur chez certains serveurs (404). Le contenu prime.
     final body = _tryDecode(response.data);
-    // Mauvais identifiants : `auth: 0`, avec un code 200 ou une erreur selon
-    // le serveur (404 chez certains). Le contenu prime sur le code.
     final userInfo = body is Map ? body['user_info'] : null;
     if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
       throw const CredentialsRejected();
     }
     switch (status) {
-      case 200 when body != null:
-        return body;
       case 401:
         throw const CredentialsRejected();
       // Filtrage par User-Agent ou par adresse IP, pas les identifiants.
@@ -146,9 +157,8 @@ final class ServerClient {
       case 429:
         throw const TooManyRequests();
       default:
-        final details = status == 200 ? 'JSON invalide' : 'HTTP $status';
-        _log('GET $uri', details);
-        throw InvalidResponse(details);
+        _log('GET $uri', 'HTTP $status');
+        throw InvalidResponse('HTTP $status');
     }
   }
 
