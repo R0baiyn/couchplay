@@ -643,4 +643,86 @@ void main() {
     );
     expect(container.read(libraryProvider).favorites.keys, ['movie:144014']);
   });
+
+  testWidgets('« / » : le champ de l\'onglet ; rien sur une fiche', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final filter = find.byType(EditableText);
+    bool focused() => tester.widget<EditableText>(filter).focusNode.hasFocus;
+    expect(focused(), isFalse);
+
+    // Hors d'un champ, « / » y place le curseur.
+    await tester.sendKeyEvent(LogicalKeyboardKey.slash, character: '/');
+    await settle(tester);
+    expect(focused(), isTrue);
+    expect(find.byType(SearchScreen), findsNothing);
+
+    // Sur une fiche, Ctrl+F et « / » ne font rien.
+    await tester.tap(find.text('Libre (2024)'));
+    await settle(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.slash, character: '/');
+    await settle(tester);
+    expect(find.byType(MovieScreen), findsOneWidget);
+    expect(find.byType(SearchScreen), findsNothing);
+  });
+
+  testWidgets('pastilles : cœur après un favori, coche pour un film vu', (
+    tester,
+  ) async {
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'progress': {
+            'movie:122716': {
+              'name': 'Le Prince d\'Égypte (1998)',
+              'extension': 'mkv',
+              'position': 5000,
+              'duration': 5000,
+              'watched': true,
+              'updatedAt': '2026-01-01T00:00:00Z',
+            },
+          },
+        }),
+      );
+    await pumpApp(tester);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(find.byIcon(Icons.favorite), findsNothing);
+
+    await tester.tap(find.text('Libre (2024)'));
+    await settle(tester);
+    await tester.tap(find.byTooltip('Ajouter à ma liste'));
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.byIcon(Icons.favorite), findsOneWidget);
+  });
+
+  testWidgets('une version introuvable laisse choisir les autres', (
+    tester,
+  ) async {
+    // La 4K, proposée d'office, a disparu du serveur.
+    final routes = server;
+    server = FakeAdapter((options) async {
+      if (options.uri.queryParameters['vod_id'] == '144016') {
+        return ResponseBody.fromString('', 500);
+      }
+      return routes.fetch(options, null, null);
+    });
+    await pumpApp(tester);
+    await tester.tap(find.text('Libre (2024)'));
+    await settle(tester);
+    expect(find.text('Réessayer'), findsOneWidget);
+    expect(find.text('Lecture'), findsNothing);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'HD VF'));
+    await settle(tester);
+    expect(find.text('Réessayer'), findsNothing);
+    expect(find.text('Lecture'), findsOneWidget);
+  });
 }
