@@ -96,6 +96,21 @@ final class ServerClient {
   final String password;
   final Dio _dio;
 
+  /// Écart minimal entre deux requêtes à l'API de ce compte : ouvrir des
+  /// fiches à la chaîne ne bombarde pas le serveur et son pare-feu (4
+  /// requêtes par seconde au plus).
+  static const minInterval = Duration(milliseconds: 250);
+  DateTime _nextSlot = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Attend le tour de cette requête : chacune part au moins [minInterval]
+  /// après la précédente. Sans attente, aucune minuterie n'est créée.
+  Future<void> _waitTurn() async {
+    final now = DateTime.now();
+    final start = _nextSlot.isAfter(now) ? _nextSlot : now;
+    _nextSlot = start.add(minInterval);
+    if (start.isAfter(now)) await Future<void>.delayed(start.difference(now));
+  }
+
   /// Vérifie les identifiants et renvoie l'état de l'abonnement.
   Future<AccountInfo> accountInfo() async {
     final body = _tryDecode(await fetch());
@@ -125,6 +140,7 @@ final class ServerClient {
         ...params,
       },
     );
+    await _waitTurn();
     final Response<String> response;
     try {
       response = await _dio.getUri<String>(uri);

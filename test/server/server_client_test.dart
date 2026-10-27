@@ -138,6 +138,34 @@ void main() {
     });
   });
 
+  test(
+    'requêtes espacées d\'au moins 250 ms, la première sans attente',
+    () async {
+      final starts = <DateTime>[];
+      final adapter = FakeAdapter((_) async {
+        starts.add(DateTime.now());
+        return ResponseBody.fromString(
+          '{"user_info":{"auth":1,"status":"Active"}}',
+          200,
+        );
+      });
+      final client = _client(adapter);
+      final first = DateTime.now();
+      await Future.wait([for (var i = 0; i < 3; i++) client.accountInfo()]);
+
+      expect(
+        starts.first.difference(first),
+        lessThan(ServerClient.minInterval),
+      );
+      for (var i = 1; i < starts.length; i++) {
+        expect(
+          starts[i].difference(starts[i - 1]),
+          greaterThanOrEqualTo(const Duration(milliseconds: 240)),
+        );
+      }
+    },
+  );
+
   test('403 : accès refusé, pas identifiants refusés', () async {
     await expectLater(
       _client(FakeAdapter.replying('', status: 403)).accountInfo(),
