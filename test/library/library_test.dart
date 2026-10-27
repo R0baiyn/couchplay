@@ -182,5 +182,15 @@ void main() {
       );
       expect(file.existsSync(), isFalse);
     });
+
+    test('mal encodé : mis de côté aussi, jamais écrasé', () async {
+      // UTF-16 avec BOM, comme un fichier réenregistré par un éditeur.
+      const bytes = [0xFF, 0xFE, 0x7B, 0x00];
+      file.writeAsBytesSync(bytes);
+      final store = LibraryStore(file);
+      expect(store.load().favorites, isEmpty);
+      await store.save(const Library());
+      expect(File('${file.path}.bak').readAsBytesSync(), bytes);
+    });
   });
 }

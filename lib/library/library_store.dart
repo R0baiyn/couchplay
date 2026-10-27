@@ -21,16 +21,15 @@ final class LibraryStore {
   Library load() {
     // Lecture synchrone : quelques dizaines de Ko, nécessaires avant
     // d'afficher l'accueil.
-    final String text;
     try {
-      text = file.readAsStringSync();
-    } on FileSystemException {
-      return const Library();
-    }
-    if (text.trim().isEmpty) return const Library();
-    try {
+      final text = file.readAsStringSync();
+      if (text.trim().isEmpty) return const Library();
       return Library.fromJson(jsonDecode(text));
-    } on FormatException {
+    } on PathNotFoundException {
+      return const Library();
+    } on Exception {
+      // JSON invalide, mais aussi texte mal encodé ou fichier verrouillé :
+      // jamais écrasé sans trace par la prochaine écriture.
       log('Bibliothèque illisible, mise de côté en library.json.bak');
       try {
         file.renameSync('${file.path}.bak');
@@ -108,17 +107,18 @@ final class LibraryNotifier extends Notifier<Library> {
     required Duration duration,
   }) {
     final previous = state.progress[item.key];
+    final known = duration > Duration.zero
+        ? duration
+        : (previous?.duration ?? Duration.zero);
     return _set(
       state.withProgress(
         Progress(
           item: item,
           position: position,
-          duration: duration > Duration.zero
-              ? duration
-              : (previous?.duration ?? Duration.zero),
+          duration: known,
           watched:
               (previous?.watched ?? false) ||
-              Progress.reachesEnd(position, duration),
+              Progress.reachesEnd(position, known),
           // Regarder de nouveau un contenu retiré le fait revenir.
           hidden: false,
           updatedAt: DateTime.now().toUtc(),
