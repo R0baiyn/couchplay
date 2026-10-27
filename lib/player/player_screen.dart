@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../accounts/account_store.dart';
@@ -66,6 +67,7 @@ PlayRequest? _requestFor(
   PlayItem item, {
   String? audioLanguage,
   String? subtitleLanguage,
+  Duration? start,
 }) {
   final account = ref.read(activeAccountProvider);
   final client = ref.read(serverClientProvider);
@@ -81,6 +83,7 @@ PlayRequest? _requestFor(
     secrets: [account.username, account.password],
     audioLanguage: audioLanguage,
     subtitleLanguage: subtitleLanguage,
+    start: start,
   );
 }
 
@@ -112,9 +115,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Ce qu'on regarde : change quand l'épisode suivant s'enchaîne.
   late PlayItem _item = widget.item;
 
-  /// Langues des pistes reprises de l'épisode précédent.
+  /// Langues des pistes choisies à la main, gardées pour l'épisode suivant
+  /// (et pour « Réessayer »). Suivies au fil de la lecture : à la fin du
+  /// fichier, media_kit remet la piste courante à « auto ».
   String? _audioLanguage;
   String? _subtitleLanguage;
+  StreamSubscription<Track>? _track;
 
   /// Épisode suivant proposé à la fin de celui-ci, et son compte à rebours.
   ({PlayItem item, String? image})? _next;
@@ -141,6 +147,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _completed = _playback.player.stream.completed.listen(_onCompleted);
     _playing = _playback.player.stream.playing.listen((playing) {
       if (!playing) _save();
+    });
+    _track = _playback.player.stream.track.listen((track) {
+      if (track.audio.language case final language?) {
+        _audioLanguage = language;
+      }
+      if (track.subtitle.id == 'no') {
+        _subtitleLanguage = null;
+      } else if (track.subtitle.language case final language?) {
+        _subtitleLanguage = language;
+      }
     });
     _saveTimer = Timer.periodic(_saveEvery, (_) {
       if (_playback.player.state.playing) _save();
@@ -241,11 +257,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final next = _next;
     if (next == null) return;
     _countdown?.cancel();
-    final track = _playback.player.state.track;
-    _audioLanguage = track.audio.language;
-    _subtitleLanguage = track.subtitle.id == 'no'
-        ? null
-        : track.subtitle.language;
     setState(() {
       _item = next.item;
       _next = null;
@@ -267,6 +278,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _item,
       audioLanguage: _audioLanguage,
       subtitleLanguage: _subtitleLanguage,
+      start: _resumeAt,
     );
     if (request == null) {
       _exit();
@@ -276,10 +288,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _ticket = _playback.ticket;
     try {
       await opening;
-      if (_resumeAt case final position?) {
-        await _playback.player.seek(position);
-        _resumeAt = null;
-      }
+      _resumeAt = null;
     } on PlaybackFailed catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -302,6 +311,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _playNowFocus.dispose();
     unawaited(_completed?.cancel());
     unawaited(_playing?.cancel());
+    unawaited(_track?.cancel());
     _save();
     unawaited(_playback.stop(_ticket));
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
