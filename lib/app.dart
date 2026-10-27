@@ -7,7 +7,6 @@ import 'accounts/login_screen.dart';
 import 'catalog/catalog_screen.dart';
 import 'server/models.dart';
 import 'settings/settings.dart';
-import 'settings/settings_screen.dart';
 
 class CouchPlayApp extends ConsumerWidget {
   const CouchPlayApp({super.key, required this.home});
@@ -43,7 +42,10 @@ class CouchPlayApp extends ConsumerWidget {
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               _navigator.currentState?.maybePop(),
         },
-        child: child!,
+        // Encoche, caméra et boutons du téléphone : rien ne passe dessous,
+        // surtout en paysage où ils sont sur les côtés. Le haut est géré par
+        // les barres d'application.
+        child: SafeArea(top: false, child: child!),
       ),
       home: home,
     );
@@ -64,7 +66,7 @@ class HomeGate extends ConsumerWidget {
   }
 }
 
-/// Onglets Films, Séries et Réglages : barre en bas sur écran étroit,
+/// Onglets Films et Séries (les réglages sont en haut à droite) : barre en bas sur écran étroit,
 /// rail sur le côté sur grand écran (règle 9).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -77,7 +79,6 @@ class _HomeShellState extends State<HomeShell> {
   static const _tabs = [
     (Icons.movie_outlined, Icons.movie, 'Films'),
     (Icons.tv_outlined, Icons.tv, 'Séries'),
-    (Icons.settings_outlined, Icons.settings, 'Réglages'),
   ];
 
   var _index = 0;
@@ -93,8 +94,7 @@ class _HomeShellState extends State<HomeShell> {
 
   Widget _tab(int index) => switch (index) {
     0 => const CatalogScreen(kind: ContentKind.movies),
-    1 => const CatalogScreen(kind: ContentKind.series),
-    _ => const SettingsScreen(),
+    _ => const CatalogScreen(kind: ContentKind.series),
   };
 
   @override

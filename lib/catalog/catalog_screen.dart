@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server/models.dart';
+import '../settings/settings_screen.dart';
 import 'catalog_providers.dart';
 import 'catalog_settings.dart';
 import 'movie_screen.dart';
@@ -115,6 +116,14 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 ? null
                 : () => _refresh(selected?.id),
           ),
+          IconButton(
+            tooltip: 'Réglages',
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            ),
+          ),
         ],
         bottom: _refreshing
             ? const PreferredSize(
@@ -155,7 +164,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               onOpen: _open,
             );
             void select(String? id) => setState(() => _selectedId = id);
-            if (constraints.maxWidth >= 720) {
+            // Panneau des catégories seulement sur grand écran : sur un téléphone
+            // en paysage (~830 dp), il mangerait un tiers de la largeur.
+            if (constraints.maxWidth >= 1000) {
               return Row(
                 children: [
                   SizedBox(

@@ -247,7 +247,7 @@ void main() {
     await pumpApp(tester);
     expect(find.text('AR · ARABE أفلام عربية'), findsNothing);
 
-    await tester.tap(find.text('Réglages'));
+    await tester.tap(find.byTooltip('Réglages'));
     await settle(tester);
     await tester.tap(find.text('Catalogue'));
     await settle(tester);
@@ -255,7 +255,8 @@ void main() {
     await settle(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
-    await tester.tap(find.text('Films').first);
+    // Les réglages sont une page : Échap revient au catalogue.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
 
     await tester.scrollUntilVisible(
