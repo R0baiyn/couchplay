@@ -61,20 +61,29 @@ final class CatalogRepository {
     refresh: refresh,
   );
 
-  /// Fiches : pas de cache, elles sont petites et ouvertes une à une.
-  Future<MovieDetails> movie(String id) async => _decode(
-    await _client.fetch('get_vod_info', {'vod_id': id}),
+  /// Fiches gardées une heure : repasser sur une fiche ne rappelle pas le
+  /// serveur, et un nouvel épisode apparaît dans l'heure.
+  static const detailsMaxAge = Duration(hours: 1);
+
+  Future<MovieDetails> movie(String id) async => (await _load(
+    'vod_info_$id',
+    () => _client.fetch('get_vod_info', {'vod_id': id}),
     parseMovieDetails,
-  );
+    refresh: false,
+    maxAge: detailsMaxAge,
+  )).value;
 
-  Future<SeriesDetails> series(String id) async => _decode(
-    await _client.fetch('get_series_info', {'series_id': id}),
+  Future<SeriesDetails> series(String id) async => (await _load(
+    'series_info_$id',
+    () => _client.fetch('get_series_info', {'series_id': id}),
     parseSeriesDetails,
-  );
+    refresh: false,
+    maxAge: detailsMaxAge,
+  )).value;
 
-  /// Fiche d'une série depuis le cache (moins de [maxAge]), sinon le
-  /// serveur : pour l'accueil, qui ne doit pas interroger le serveur pour
-  /// chaque série suivie à chaque lancement.
+  /// Même fiche que [series], mais acceptée jusqu'à [maxAge] : pour
+  /// l'accueil, qui ne doit pas interroger le serveur pour chaque série
+  /// suivie à chaque lancement.
   Future<SeriesDetails> cachedSeries(String id) async => (await _load(
     'series_info_$id',
     () => _client.fetch('get_series_info', {'series_id': id}),
@@ -90,10 +99,12 @@ final class CatalogRepository {
     Future<String> Function() fetch,
     T Function(String) parse, {
     required bool refresh,
+    Duration? maxAge,
   }) async {
     final path = _cache.path(name);
     final savedAt = path == null ? null : await _cache.savedAt(path);
-    final fresh = savedAt != null && _now().difference(savedAt) < maxAge;
+    final fresh =
+        savedAt != null && _now().difference(savedAt) < (maxAge ?? this.maxAge);
     if (path != null && fresh && !refresh) {
       if (await _readCached(path, parse) case final value?) {
         return Loaded(value, savedAt: savedAt);
@@ -124,15 +135,6 @@ List<CatalogItem> _parseSeries(String text) =>
 
 // Fonctions de premier niveau : ce qu'elles envoient à l'isolate se limite
 // à leurs paramètres.
-
-Future<T> _decode<T>(String text, T Function(String) parse) async {
-  try {
-    return await Isolate.run(() => parse(text));
-  } on FormatException {
-    log('Catalogue', error: 'JSON invalide : ${_preview(text)}');
-    throw const InvalidResponse('JSON invalide');
-  }
-}
 
 /// Décode puis met en cache, dans l'isolate : le texte n'est ni décodé ni
 /// réencodé sur le thread de l'interface. Rien n'est écrit s'il est illisible.

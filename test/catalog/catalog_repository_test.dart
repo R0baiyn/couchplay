@@ -78,6 +78,25 @@ void main() {
     },
   );
 
+  test(
+    'fiche d\'une série : 1 h pour la fiche, 24 h pour l\'accueil',
+    () async {
+      server = FakeAdapter.replying(
+        File('test/fixtures/series_info.json').readAsStringSync(),
+      );
+      final first = await repository().series('1');
+      expect(first.seasons, isNotEmpty);
+      await repository().series('1');
+      expect(server.calls, 1, reason: 'repasser sur la fiche');
+
+      now = now.add(const Duration(hours: 2));
+      await repository().cachedSeries('1');
+      expect(server.calls, 1, reason: 'l\'accueil se contente du cache');
+      await repository().series('1');
+      expect(server.calls, 2, reason: 'la fiche veut moins d\'une heure');
+    },
+  );
+
   test('hors ligne sans cache : l\'erreur remonte', () async {
     server = FakeAdapter.failing(DioExceptionType.connectionError);
     await expectLater(
