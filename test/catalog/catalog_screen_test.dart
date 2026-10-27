@@ -151,15 +151,35 @@ void main() {
     expect(find.textContaining('S02E01'), findsOneWidget);
   });
 
-  testWidgets('écran étroit : catégories dans un menu, onglets en bas', (
+  testWidgets('écran étroit : catégories dans un panneau, onglets en bas', (
     tester,
   ) async {
     await pumpApp(tester, size: const Size(400, 800));
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
-    expect(find.byType(DropdownMenu<String>), findsOneWidget);
     expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+
+    // Le bouton montre la catégorie choisie et ouvre le panneau.
+    final picker = find.widgetWithText(OutlinedButton, 'Films 4K');
+    expect(picker, findsOneWidget);
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+
+    // Toucher à côté ferme le panneau sans rien changer.
+    await tester.tapAt(const Offset(200, 20));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Films 4K'), findsOneWidget);
+
+    // Choisir une catégorie la sélectionne.
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FR · Drame'));
+    await settle(tester);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'FR · Drame'), findsOneWidget);
   });
 
   testWidgets('hors ligne avec un cache : bandeau ; sans cache : Réessayer', (

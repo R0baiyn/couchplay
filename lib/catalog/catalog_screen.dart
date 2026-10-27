@@ -51,6 +51,45 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     ),
   );
 
+  /// Choix de la catégorie sur écran étroit : un panneau du bas qui défile,
+  /// reste au-dessus des boutons du téléphone, et se ferme sans rien changer
+  /// si on touche à côté ou si on fait retour.
+  Future<void> _pickCategory(
+    List<Category> categories,
+    String selectedId,
+  ) async {
+    final id = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.95,
+        builder: (context, controller) => ListView.builder(
+          controller: controller,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.paddingOf(context).bottom + 8,
+          ),
+          itemCount: categories.length,
+          itemBuilder: (context, index) {
+            final category = categories[index];
+            final current = category.id == selectedId;
+            return ListTile(
+              autofocus: current,
+              selected: current,
+              title: Text(category.name),
+              trailing: current ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(context, category.id),
+            );
+          },
+        ),
+      ),
+    );
+    if (id != null && mounted) setState(() => _selectedId = id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider(_kind));
@@ -136,18 +175,18 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: DropdownMenu<String>(
-                    // Recréé seulement quand la liste change (compte,
-                    // filtre) : un choix au clavier garde ainsi le focus.
-                    key: ValueKey(Object.hashAll(visible.map((c) => c.id))),
-                    initialSelection: selected.id,
-                    expandedInsets: EdgeInsets.zero,
-                    label: const Text('Catégorie'),
-                    onSelected: select,
-                    dropdownMenuEntries: [
-                      for (final c in visible)
-                        DropdownMenuEntry(value: c.id, label: c.name),
-                    ],
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      alignment: Alignment.centerLeft,
+                    ),
+                    icon: const Icon(Icons.arrow_drop_down),
+                    label: Text(
+                      selected.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onPressed: () => _pickCategory(visible, selected.id),
                   ),
                 ),
                 Expanded(child: items),
