@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../library/favorite_button.dart';
 import '../player/player_screen.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
@@ -25,7 +26,16 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   Widget build(BuildContext context) {
     final provider = seriesDetailsProvider(widget.item.id);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.item.name)),
+      appBar: AppBar(
+        title: Text(widget.item.name),
+        actions: [
+          FavoriteButton(
+            favoriteKey: 'series:${widget.item.id}',
+            name: widget.item.name,
+            poster: widget.item.poster,
+          ),
+        ],
+      ),
       body: switch (ref.watch(provider)) {
         AsyncData(:final value) => _content(value),
         AsyncError(:final error) => ErrorView(

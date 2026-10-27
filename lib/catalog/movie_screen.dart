@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../library/favorite_button.dart';
 import '../player/player_screen.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
@@ -17,7 +18,16 @@ class MovieScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = movieDetailsProvider(item.id);
     return Scaffold(
-      appBar: AppBar(title: Text(item.name)),
+      appBar: AppBar(
+        title: Text(item.name),
+        actions: [
+          FavoriteButton(
+            favoriteKey: 'movie:${item.id}',
+            name: item.name,
+            poster: item.poster,
+          ),
+        ],
+      ),
       body: switch (ref.watch(provider)) {
         AsyncData(:final value) => SingleChildScrollView(
           child: DetailsHeader(
