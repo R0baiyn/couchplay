@@ -22,13 +22,22 @@ class CatalogScreen extends ConsumerStatefulWidget {
 
 class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   String? _selectedId;
+  var _refreshing = false;
 
   ContentKind get _kind => widget.kind;
 
+  /// Catégories et grille affichée ensemble ; l'écran garde ses données (et
+  /// la grille sa position) pendant le rechargement.
   Future<void> _refresh(String? categoryId) async {
-    await ref.read(categoriesProvider(_kind).notifier).refresh();
-    if (categoryId != null) {
-      await ref.read(itemsProvider((_kind, categoryId)).notifier).refresh();
+    setState(() => _refreshing = true);
+    try {
+      await Future.wait([
+        ref.read(categoriesProvider(_kind).notifier).refresh(),
+        if (categoryId != null)
+          ref.read(itemsProvider((_kind, categoryId)).notifier).refresh(),
+      ]);
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
     }
   }
 
@@ -63,11 +72,17 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           IconButton(
             tooltip: 'Actualiser',
             icon: const Icon(Icons.refresh),
-            onPressed: categories.isLoading
+            onPressed: categories.isLoading || _refreshing
                 ? null
                 : () => _refresh(selected?.id),
           ),
         ],
+        bottom: _refreshing
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(4),
+                child: LinearProgressIndicator(),
+              )
+            : null,
       ),
       body: switch (categories) {
         AsyncValue(isLoading: true) => const Center(
@@ -122,8 +137,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: DropdownMenu<String>(
-                    // Recréé quand la sélection change de l'extérieur.
-                    key: ValueKey(selected.id),
+                    // Recréé seulement quand la liste change (compte,
+                    // filtre) : un choix au clavier garde ainsi le focus.
+                    key: ValueKey(Object.hashAll(visible.map((c) => c.id))),
                     initialSelection: selected.id,
                     expandedInsets: EdgeInsets.zero,
                     label: const Text('Catégorie'),

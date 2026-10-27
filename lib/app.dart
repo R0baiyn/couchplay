@@ -36,7 +36,8 @@ class CouchPlayApp extends ConsumerWidget {
       themeMode: themeMode,
       navigatorKey: _navigator,
       // Échap revient en arrière partout, comme le bouton retour (clavier,
-      // télécommande).
+      // télécommande). Placé au-dessus du Navigator, ce raccourci reçoit la
+      // touche en dernier : un menu ou un champ qui la gère passe avant.
       builder: (context, child) => CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): () =>

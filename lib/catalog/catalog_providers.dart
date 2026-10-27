@@ -52,14 +52,13 @@ final class CategoriesNotifier extends AsyncNotifier<Loaded<List<Category>>> {
   Future<Loaded<List<Category>>> build() =>
       ref.watch(catalogRepositoryProvider).categories(kind);
 
-  /// « Actualiser » : ignore le cache, même récent.
-  Future<void> refresh() async {
-    final repository = ref.read(catalogRepositoryProvider);
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => repository.categories(kind, refresh: true),
-    );
-  }
+  /// « Actualiser » : ignore le cache, même récent. Les données affichées
+  /// restent en place pendant le rechargement.
+  Future<void> refresh() => _refreshWith(
+    ref,
+    (repository) => repository.categories(kind, refresh: true),
+    (value) => state = value,
+  );
 }
 
 /// Films ou séries d'une catégorie.
@@ -78,13 +77,25 @@ final class ItemsNotifier extends AsyncNotifier<Loaded<List<CatalogItem>>> {
   Future<Loaded<List<CatalogItem>>> build() =>
       ref.watch(catalogRepositoryProvider).items(key.$1, key.$2);
 
-  Future<void> refresh() async {
-    final repository = ref.read(catalogRepositoryProvider);
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => repository.items(key.$1, key.$2, refresh: true),
-    );
-  }
+  Future<void> refresh() => _refreshWith(
+    ref,
+    (repository) => repository.items(key.$1, key.$2, refresh: true),
+    (value) => state = value,
+  );
+}
+
+/// Recharge, puis publie le résultat seulement si le provider est toujours
+/// celui qui a lancé la requête. Changer de compte pendant le rechargement
+/// reconstruit le provider : le résultat de l'ancien compte est alors jeté,
+/// au lieu de s'afficher sous le nouveau.
+Future<void> _refreshWith<T>(
+  Ref ref,
+  Future<T> Function(CatalogRepository repository) load,
+  void Function(AsyncValue<T> value) publish,
+) async {
+  final repository = ref.read(catalogRepositoryProvider);
+  final result = await AsyncValue.guard(() => load(repository));
+  if (ref.mounted) publish(result);
 }
 
 final movieDetailsProvider = FutureProvider.autoDispose

@@ -245,4 +245,23 @@ void main() {
     );
     expect(find.text('AR · ARABE أفلام عربية'), findsOneWidget);
   });
+
+  testWidgets('« Actualiser » recharge catégories et grille sans les cacher', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final fake = server as FakeAdapter;
+    final before = fake.calls;
+
+    await tester.tap(find.byTooltip('Actualiser'));
+    await tester.pump();
+    // Pendant le rechargement, la grille reste là.
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+
+    await settle(tester);
+    expect(fake.calls, before + 2, reason: 'catégories et liste, une fois');
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
+  });
 }

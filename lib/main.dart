@@ -21,9 +21,7 @@ Future<void> main() async {
   ).wait;
   final files = AccountFiles(Directory('${support.path}/accounts'));
   // En tâche de fond : ne retarde pas le premier rendu.
-  unawaited(
-    files.sync({for (final a in accounts.current.accounts) a.id}),
-  );
+  unawaited(files.sync({for (final a in accounts.current.accounts) a.id}));
   runApp(
     ProviderScope(
       overrides: [

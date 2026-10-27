@@ -24,7 +24,10 @@ final class CatalogFilterNotifier extends Notifier<CatalogFilter> {
   @override
   CatalogFilter build() {
     final id = ref.watch(activeAccountProvider.select((a) => a?.id));
-    if (id == null) return const CatalogFilter();
+    if (id == null) {
+      _file = null;
+      return const CatalogFilter();
+    }
     final file = _file = File(
       '${ref.watch(accountFilesProvider).of(id).path}'
       '${Platform.pathSeparator}catalog_settings.json',

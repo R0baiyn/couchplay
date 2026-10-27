@@ -130,9 +130,14 @@ class PosterImage extends StatelessWidget {
     if (url == null) return placeholder;
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Arrondi par paliers de 128 px : redimensionner la fenêtre ne change
+        // pas la clé du cache d'images à chaque pixel, donc ne retélécharge
+        // pas les affiches (pas de cache disque).
         final width = constraints.maxWidth.isFinite
-            ? (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
-                  .round()
+            ? ((constraints.maxWidth * MediaQuery.devicePixelRatioOf(context)) /
+                          128)
+                      .ceil() *
+                  128
             : null;
         return Image.network(
           url,
