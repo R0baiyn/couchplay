@@ -184,6 +184,23 @@ final class ServerClient {
     }
   }
 
+  /// Adresse du flux d'un film ou d'un épisode : `/movie/U/P/<id>.<ext>`.
+  ///
+  /// Les identifiants sont dans le chemin, imposé par le protocole : cette
+  /// URL ne doit passer par aucun log sans [redact].
+  Uri streamUri(ContentKind kind, String id, String extension) {
+    final path = switch (kind) {
+      ContentKind.movies => 'movie',
+      ContentKind.series => 'series',
+    };
+    final segments = [
+      username,
+      password,
+      '$id.$extension',
+    ].map(Uri.encodeComponent).join('/');
+    return Uri.parse('$host/$path/$segments');
+  }
+
   /// Libère les connexions. Le client n'est plus utilisable ensuite.
   void close() => _dio.close(force: true);
 

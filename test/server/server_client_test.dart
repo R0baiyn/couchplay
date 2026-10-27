@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:couchplay/logging.dart';
+import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -168,5 +170,27 @@ void main() {
         expect(line, isNot(contains(secret)), reason: line);
       }
     }
+  });
+
+  group('adresses des flux', () {
+    test('film et épisode, identifiants encodés dans le chemin', () {
+      final client = _client(FakeAdapter.replying(''));
+      expect(
+        client.streamUri(ContentKind.movies, '144015', 'mkv').toString(),
+        'http://example.com/movie/jean%20dupont/p%26ss%231/144015.mkv', // pre-push:allow : valeur de test fictive
+      );
+      expect(
+        client.streamUri(ContentKind.series, '6912', 'mkv').path,
+        '/series/jean%20dupont/p%26ss%231/6912.mkv', // pre-push:allow : valeur de test fictive
+      );
+    });
+
+    test('la version masquée ne contient pas les identifiants', () {
+      final url = _client(FakeAdapter.replying(''))
+          .streamUri(ContentKind.movies, '1', 'mp4')
+          .toString();
+      final masked = redact(url, secrets: [_user, _pass]);
+      expect(masked, 'http://example.com/movie/***/***/1.mp4');
+    });
   });
 }
