@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'item_name.dart';
 import 'json_read.dart';
 
 /// État de l'abonnement, tel que le serveur le décrit dans `user_info`.
@@ -62,7 +63,8 @@ final class CatalogItem {
     this.categoryId,
     this.tmdbId,
     this.extension,
-  });
+    ItemName? parsedName,
+  }) : _parsedName = parsedName;
 
   final ContentKind kind;
   final String id;
@@ -73,6 +75,12 @@ final class CatalogItem {
 
   /// Extension du fichier d'un film (`mkv`, `mp4`…) ; `null` pour une série.
   final String? extension;
+
+  final ItemName? _parsedName;
+
+  /// [name] décomposé. Les listes du serveur le calculent au décodage ; une
+  /// entrée faite à la main (favori) le calcule à la demande.
+  ItemName get parsedName => _parsedName ?? ItemName.parse(name);
 }
 
 /// En-tête commun des fiches film et série.
@@ -184,6 +192,7 @@ CatalogItem? _item(Map<String, Object?> map, ContentKind kind) {
     categoryId: asId(map['category_id']),
     tmdbId: _tmdb(map['tmdb_id'] ?? map['tmdb']),
     extension: movie ? asString(map['container_extension'])?.trim() : null,
+    parsedName: ItemName.parse(name),
   );
 }
 
