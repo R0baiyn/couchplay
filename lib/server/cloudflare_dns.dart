@@ -74,6 +74,9 @@ final class CloudflareDns {
   static Future<String> _https(String server, String host) async {
     // Connexion directe à [server], certificat vérifié pour le nom du
     // service : Dart refuse les certificats présentés pour une adresse IP.
+    // ponytail: sous Windows, la racine SSL.com de ce certificat n'est dans
+    // le magasin système qu'après un premier téléchargement par Windows ;
+    // l'embarquer dans l'app si un PC neuf échoue ici.
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 5)
       ..connectionFactory = (uri, _, _) async {
