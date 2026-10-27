@@ -550,7 +550,11 @@ void main() {
     expect(find.text('Libre (2024)'), findsOneWidget);
 
     await settle(tester);
-    expect(fake.calls, before + 2, reason: 'catégories et liste, une fois');
+    expect(
+      fake.calls,
+      before + 3,
+      reason: 'catégories, liste de la catégorie et liste complète, une fois',
+    );
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('Libre (2024)'), findsOneWidget);
   });
@@ -724,5 +728,55 @@ void main() {
     await settle(tester);
     expect(find.text('Réessayer'), findsNothing);
     expect(find.text('Lecture'), findsOneWidget);
+  });
+
+  testWidgets('« Actualiser » : un film ajouté au serveur se trouve aussitôt', (
+    tester,
+  ) async {
+    // Le serveur gagne un film entre le lancement et « Actualiser ».
+    final routes = server;
+    var added = false;
+    var fullLists = 0;
+    server = FakeAdapter((options) async {
+      final query = options.uri.queryParameters;
+      if (query['action'] == 'get_vod_streams' &&
+          !query.containsKey('category_id')) {
+        fullLists++;
+        if (added) {
+          final films = jsonDecode(_fixture('vod_streams')) as List<Object?>;
+          films.add({
+            'stream_id': 999,
+            'name': 'Nouveauté (2026) FHD MULTI',
+            'category_id': '148',
+            'container_extension': 'mkv',
+          });
+          return ResponseBody.fromString(jsonEncode(films), 200);
+        }
+      }
+      return routes.fetch(options, null, null);
+    });
+    await pumpApp(tester);
+    expect(fullLists, 1);
+
+    added = true;
+    await tester.tap(find.byTooltip('Actualiser'));
+    await settle(tester);
+    for (var i = 0; i < 40 && fullLists < 2; i++) {
+      await settle(tester);
+    }
+    expect(fullLists, 2, reason: 'la liste complète redemandée, une fois');
+
+    await tester.tap(find.text('Recherche'));
+    await settle(tester);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(SearchScreen),
+        matching: find.byType(EditableText),
+      ),
+      'nouveaute',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await settle(tester);
+    expect(find.text('Nouveauté (2026)'), findsOneWidget);
   });
 }

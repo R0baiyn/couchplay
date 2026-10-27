@@ -66,11 +66,15 @@ final class CatalogRepository {
   /// Tous les films ou toutes les séries en une requête, pour la recherche,
   /// gardés aussi longtemps que les catégories. [parse] en fait l'index dans
   /// l'isolate de décodage (mêmes contraintes que pour `_load`).
-  Future<Loaded<T>> all<T>(ContentKind kind, T Function(String) parse) => _load(
+  Future<Loaded<T>> all<T>(
+    ContentKind kind,
+    T Function(String) parse, {
+    bool refresh = false,
+  }) => _load(
     '${kind.name}_all',
     () => _client.fetch(kind.listAction),
     parse,
-    refresh: false,
+    refresh: refresh,
   );
 
   /// Fiches gardées une heure : repasser sur une fiche ne rappelle pas le

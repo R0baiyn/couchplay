@@ -27,6 +27,12 @@ Account _account(String id) => Account(
   userAgent: defaultUserAgent,
 );
 
+/// Index qui ne finit jamais de charger : aucune requête en vol.
+class _PendingIndex extends SearchIndexNotifier {
+  @override
+  Future<SearchIndex> build() => Completer<SearchIndex>().future;
+}
+
 void main() {
   late Directory root;
   late AccountFiles files;
@@ -57,9 +63,7 @@ void main() {
           accountFilesProvider.overrideWithValue(files),
           // Sans objet ici : l'index de recherche, chargé en arrière-plan
           // derrière l'accueil, laisserait des requêtes en vol.
-          searchIndexProvider.overrideWith(
-            (ref) => Completer<SearchIndex>().future,
-          ),
+          searchIndexProvider.overrideWith(_PendingIndex.new),
           serverClientFactoryProvider.overrideWithValue(
             (account) => ServerClient(
               host: account.host,

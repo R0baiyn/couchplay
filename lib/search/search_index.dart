@@ -80,33 +80,65 @@ List<CatalogEntry> search(List<CatalogEntry> entries, String query) {
 /// Index du compte actif. Chargé en arrière-plan dès l'accueil affiché
 /// (voir `HomeShell`), puis gardé tant que l'accueil existe ; refait au
 /// changement de compte, de filtre ou de catégories. Le refaire relit le
-/// cache disque, sans appel au serveur pendant 24 h.
-final searchIndexProvider = FutureProvider.autoDispose<SearchIndex>((
-  ref,
-) async {
-  final repository = ref.watch(catalogRepositoryProvider);
-  final filter = ref.watch(catalogFilterProvider);
-  final movieCategories = ref.watch(
-    categoriesProvider(ContentKind.movies).future,
-  );
-  final seriesCategories = ref.watch(
-    categoriesProvider(ContentKind.series).future,
-  );
+/// cache disque, sans appel au serveur pendant 24 h, sauf « Actualiser »
+/// ([SearchIndexNotifier.refresh]).
+final searchIndexProvider =
+    AsyncNotifierProvider.autoDispose<SearchIndexNotifier, SearchIndex>(
+      SearchIndexNotifier.new,
+      retry: noRetry,
+    );
 
-  Future<KindIndex> load(
-    ContentKind kind,
-    Future<Loaded<List<Category>>> categories,
-  ) async {
-    final visible = {
-      for (final category in filter.apply(kind, (await categories).value))
-        category.id,
-    };
-    return (await repository.all(kind, indexParser(kind, visible))).value;
+class SearchIndexNotifier extends AsyncNotifier<SearchIndex> {
+  /// Types à redemander au serveur au prochain calcul, même si le cache est
+  /// récent.
+  final _stale = <ContentKind>{};
+
+  @override
+  Future<SearchIndex> build() async {
+    final repository = ref.watch(catalogRepositoryProvider);
+    final filter = ref.watch(catalogFilterProvider);
+    final movieCategories = ref.watch(
+      categoriesProvider(ContentKind.movies).future,
+    );
+    final seriesCategories = ref.watch(
+      categoriesProvider(ContentKind.series).future,
+    );
+    final stale = {..._stale};
+    _stale.clear();
+
+    Future<KindIndex> load(
+      ContentKind kind,
+      Future<Loaded<List<Category>>> categories,
+    ) async {
+      final visible = {
+        for (final category in filter.apply(kind, (await categories).value))
+          category.id,
+      };
+      return (await repository.all(
+        kind,
+        indexParser(kind, visible),
+        refresh: stale.contains(kind),
+      )).value;
+    }
+
+    final [movies, series] = await Future.wait([
+      load(ContentKind.movies, movieCategories),
+      load(ContentKind.series, seriesCategories),
+    ]);
+    return SearchIndex(movies: movies, series: series);
   }
 
-  final [movies, series] = await Future.wait([
-    load(ContentKind.movies, movieCategories),
-    load(ContentKind.series, seriesCategories),
-  ]);
-  return SearchIndex(movies: movies, series: series);
-}, retry: noRetry);
+  /// « Actualiser » : redemande au serveur la liste complète de [kind]
+  /// (l'autre type relit son cache). Les résultats affichés restent en place
+  /// pendant le chargement. Une erreur est gardée dans l'état, pour l'onglet
+  /// Recherche, sans être relancée ici.
+  Future<void> refresh(ContentKind kind) async {
+    _stale.add(kind);
+    ref.invalidateSelf();
+    try {
+      await future;
+    } on Object {
+      // L'onglet Recherche affiche l'erreur et propose « Réessayer ».
+    }
+  }
+}

@@ -84,8 +84,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     _filter.clear();
   });
 
-  /// Catégories et grille affichée ensemble ; l'écran garde ses données (et
-  /// la grille sa position) pendant le rechargement.
+  /// Catégories et grille affichée ensemble, puis la liste complète de la
+  /// recherche (un nouveau film y apparaît, et parmi les versions) ; l'écran
+  /// garde ses données (et la grille sa position) pendant le rechargement.
   Future<void> _refresh(String? categoryId) async {
     setState(() => _refreshing = true);
     try {
@@ -94,6 +95,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         if (categoryId != null)
           ref.read(itemsProvider((_kind, categoryId)).notifier).refresh(),
       ]);
+      // Après les catégories : l'index, qui en dépend, ne se refait qu'une
+      // fois avec les nouvelles.
+      await ref.read(searchIndexProvider.notifier).refresh(_kind);
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }
