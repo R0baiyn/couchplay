@@ -42,6 +42,7 @@ jobs:
 
       # Versions et empreintes exactes de pubspec.lock, sinon échec.
       - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
       - run: flutter build windows --release
