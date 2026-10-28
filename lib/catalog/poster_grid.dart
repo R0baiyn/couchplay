@@ -27,7 +27,8 @@ class SliverPosterGrid extends StatelessWidget {
 
   static const maxTileWidth = 170.0;
   static const spacing = 12.0;
-  static const rowSpacing = 16.0;
+  /// Entre deux rangées, en plus de la marge sous chaque titre.
+  static const rowSpacing = 8.0;
 
   /// Colonnes pour une largeur donnée : des cases de [maxTileWidth] au plus.
   static int columnsFor(double width) =>
@@ -210,8 +211,10 @@ class _PosterTileState extends State<PosterTile> {
               ),
             ),
           ),
+          // Même marge dessus et dessous : le titre est centré entre
+          // l'affiche et le bas de la case, en retrait des bords du surlignage.
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Text(
               widget.title,
               maxLines: 2,
