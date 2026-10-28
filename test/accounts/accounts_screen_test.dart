@@ -13,6 +13,7 @@ import 'package:couchplay/search/search_index.dart';
 
 import 'package:couchplay/server/server_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -91,6 +92,27 @@ void main() {
     await tester.pumpAndSettle();
     return container;
   }
+
+  testWidgets('flèches : → depuis un compte mène à Modifier puis Supprimer', (
+    tester,
+  ) async {
+    await pumpAccounts(tester, [_account('a'), _account('b')]);
+    String? button() => FocusManager.instance.primaryFocus?.context
+        ?.findAncestorWidgetOfExactType<IconButton>()
+        ?.tooltip;
+
+    Focus.of(tester.element(find.text('Compte a'))).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(button(), 'Modifier');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(button(), 'Supprimer');
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(find.text('Supprimer « Compte a » ?'), findsOneWidget);
+  });
 
   testWidgets('toucher un compte en fait le compte actif', (tester) async {
     final container = await pumpAccounts(tester, [

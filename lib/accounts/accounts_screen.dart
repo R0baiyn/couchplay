@@ -83,34 +83,39 @@ class AccountsScreen extends ConsumerWidget {
         padding: const EdgeInsets.only(bottom: 88),
         children: [
           for (final account in state.accounts)
-            ListTile(
-              leading: Icon(
-                account.id == state.activeId
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
-              ),
-              title: Text(account.name),
-              subtitle: Text(account.host),
-              selected: account.id == state.activeId,
-              onTap: () => _write(
-                context,
-                ref.read(accountsProvider.notifier).activate(account.id),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Modifier',
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _edit(context, account),
+            // Boutons à côté de la ligne, pas dedans : → depuis le compte les
+            // atteint (télécommande, clavier). Dans la ligne, ils n'étaient
+            // ni à sa droite ni dessous pour les flèches.
+            Row(
+              children: [
+                Expanded(
+                  child: ListTile(
+                    leading: Icon(
+                      account.id == state.activeId
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(account.name),
+                    subtitle: Text(account.host),
+                    selected: account.id == state.activeId,
+                    onTap: () => _write(
+                      context,
+                      ref.read(accountsProvider.notifier).activate(account.id),
+                    ),
                   ),
-                  IconButton(
-                    tooltip: 'Supprimer',
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _remove(context, ref, account),
-                  ),
-                ],
-              ),
+                ),
+                IconButton(
+                  tooltip: 'Modifier',
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _edit(context, account),
+                ),
+                IconButton(
+                  tooltip: 'Supprimer',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _remove(context, ref, account),
+                ),
+                const SizedBox(width: 8),
+              ],
             ),
         ],
       ),
