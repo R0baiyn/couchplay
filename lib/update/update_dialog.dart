@@ -7,8 +7,9 @@ import '../logging.dart';
 import 'updater.dart';
 
 /// « Version X disponible » et ses notes. « Mettre à jour » l'installe tout
-/// de suite et relance l'app ; « Plus tard » la télécharge en fond et
-/// l'installe à la fermeture.
+/// de suite (Windows relance l'app, Android ouvre son installateur) ;
+/// « Plus tard » la télécharge en fond, et elle s'installe à la fermeture
+/// (Windows) ou au prochain démarrage (Android).
 Future<void> showUpdateDialog(
   BuildContext context,
   Updater updater,
@@ -26,7 +27,7 @@ Future<void> showUpdateDialog(
           children: [
             if (update.notes.isNotEmpty) Text(update.notes),
             Text(
-              'Plus tard : elle s\'installera à la fermeture de CouchPlay.',
+              'Plus tard : elle s\'installera ${updater.installer.later}.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -55,10 +56,10 @@ Future<void> showUpdateDialog(
           .prepare(update)
           .then<void>(
             (_) => messenger.showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text(
-                  'Mise à jour prête : elle s\'installera à la fermeture de '
-                  'CouchPlay.',
+                  'Mise à jour prête : elle s\'installera '
+                  '${updater.installer.later}.',
                 ),
               ),
             ),
@@ -97,7 +98,9 @@ Future<void> showUpdateDialog(
     ),
   );
   try {
+    // Windows ferme l'app ici ; Android ouvre son installateur par-dessus.
     await updater.installNow(update);
+    navigator.pop();
   } on Object catch (e) {
     // Toute erreur, pas seulement une Exception : la fenêtre de progression
     // ne se ferme pas seule, elle bloquerait l'app.

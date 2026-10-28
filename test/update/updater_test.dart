@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:couchplay/update/android_installer.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,6 +46,8 @@ final class _FakeInstaller implements Installer {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('isNewer', () {
     test('compare chaque numéro, pas le texte', () {
       expect(isNewer('0.1.10', '0.1.9'), isTrue);
@@ -77,6 +81,16 @@ void main() {
           'browser_download_url': 'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/couchplay-0.1.1-windows-setup.exe',
           'size': 20,
         },
+        {
+          'name': 'couchplay-0.1.1-android-armv7.apk',
+          'browser_download_url': 'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/couchplay-0.1.1-android-armv7.apk',
+          'size': 28,
+        },
+        {
+          'name': 'couchplay-0.1.1-android-arm64.apk',
+          'browser_download_url': 'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/couchplay-0.1.1-android-arm64.apk',
+          'size': 31,
+        },
       ],
     };
 
@@ -98,6 +112,19 @@ void main() {
       )!;
       expect(update.asset.path, endsWith('-windows-portable.zip'));
       expect(update.size, 30);
+    });
+
+    test('Android : l\'APK de son architecture', () {
+      Update? forAbi(Abi abi) => updateFrom(
+        release(),
+        current: '0.1.0',
+        suffix: androidAssetSuffix(abi)!,
+      );
+      expect(forAbi(Abi.androidArm64)!.asset.path, endsWith('-arm64.apk'));
+      expect(forAbi(Abi.androidArm64)!.size, 31);
+      expect(forAbi(Abi.androidArm)!.asset.path, endsWith('-armv7.apk'));
+      // Pas d'APK publié pour un émulateur x86_64 : pas de mise à jour.
+      expect(androidAssetSuffix(Abi.androidX64), isNull);
     });
 
     test('rien si la version n\'est pas plus récente', () {
@@ -274,6 +301,73 @@ void main() {
         await expectLater(subject.prepare(update), throwsA(anything));
       }
       expect(adapter.calls, 2);
+    });
+  });
+
+  group('AndroidInstaller', () {
+    late Directory work;
+    late List<String> calls;
+    const channel = MethodChannel('couchplay/update');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+    setUp(() {
+      work = Directory.systemTemp.createTempSync('couchplay-apk');
+      calls = [];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        return null;
+      });
+    });
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+      if (work.existsSync()) work.deleteSync(recursive: true);
+    });
+
+    AndroidInstaller installer() =>
+        AndroidInstaller(assetSuffix: '-android-arm64.apk', workDir: work);
+
+    /// Comme après un téléchargement « Plus tard » de la 0.2.1.
+    Future<void> prepare() async {
+      final apk = File('${work.path}/couchplay.apk')..writeAsStringSync('apk');
+      await installer().prepared(
+        Update(version: '0.2.1', notes: '', asset: Uri(), size: 3),
+        apk,
+      );
+    }
+
+    test(
+      'remise à plus tard : l\'installateur s\'ouvre au démarrage',
+      () async {
+        await prepare();
+        expect(await installer().installPending('0.2.0'), isTrue);
+        expect(calls, ['install']);
+      },
+    );
+
+    test('déjà installée : rien, et le dossier est vidé', () async {
+      await prepare();
+      expect(await installer().installPending('0.2.1'), isFalse);
+      expect(calls, isEmpty);
+      expect(work.existsSync(), isFalse);
+    });
+
+    test('téléchargement inachevé (sans version) : rien', () async {
+      File('${work.path}/couchplay.apk').writeAsStringSync('ap');
+      expect(await installer().installPending('0.2.0'), isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('APK effacé avec le cache : rien', () async {
+      await prepare();
+      File('${work.path}/couchplay.apk').deleteSync();
+      expect(await installer().installPending('0.2.0'), isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('« Mettre à jour » ouvre l\'installateur', () async {
+      await installer().installNow();
+      expect(calls, ['install']);
     });
   });
 

@@ -140,7 +140,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// Version de l'app et, sous Windows, recherche d'une mise à jour.
+/// Version de l'app et, dans une version publiée, recherche d'une mise à jour.
 class _VersionTile extends ConsumerStatefulWidget {
   const _VersionTile();
 

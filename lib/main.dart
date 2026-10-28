@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -13,6 +14,7 @@ import 'accounts/account_store.dart';
 import 'app.dart';
 import 'server/cloudflare_dns.dart';
 import 'settings/settings.dart';
+import 'update/android_installer.dart';
 import 'update/updater.dart';
 import 'update/windows_installer.dart';
 
@@ -49,11 +51,21 @@ Future<void> main() async {
 }
 
 /// L'installation des mises à jour, pour une version release qui a un
-/// fichier publié : installée ou portable sous Windows.
+/// fichier publié : installée ou portable sous Windows, APK de son
+/// architecture sous Android.
 Future<Installer?> _installer() async {
   if (!kReleaseMode) return null;
   if (Platform.isWindows) {
     return WindowsInstaller.forApp(File(Platform.resolvedExecutable).parent);
+  }
+  if (Platform.isAndroid) {
+    final suffix = androidAssetSuffix(Abi.current());
+    if (suffix == null) return null;
+    final cache = await getTemporaryDirectory();
+    return AndroidInstaller(
+      assetSuffix: suffix,
+      workDir: Directory('${cache.path}/update'),
+    );
   }
   return null;
 }

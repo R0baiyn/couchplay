@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Seul fichier que l'app expose : l'APK d'une mise à jour, pour l'installateur
+     d'Android (MainActivity.kt). -->
+<paths>
+    <cache-path name="update" path="update/" />
+</paths>

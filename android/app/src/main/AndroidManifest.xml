@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Mises à jour : ouvrir l'installateur sur l'APK téléchargé. Android
+         demande à l'utilisateur de l'autoriser la première fois. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- TV : ni écran tactile ni interface TV exigés, l'app s'installe
          aussi sur téléphone et tablette. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
@@ -35,6 +38,16 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- L'APK d'une mise à jour, prêté à l'installateur d'Android. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.update"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths"/>
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
