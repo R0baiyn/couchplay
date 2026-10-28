@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,21 @@ class CouchPlayApp extends ConsumerWidget {
 
   static final _navigator = GlobalKey<NavigatorState>();
 
+  /// Télécommande : ↑ ↓ passent d'un élément à l'autre, même depuis un champ
+  /// de texte, où Android les garde sinon pour le curseur (le champ d'une
+  /// ligne n'en a pas l'usage). Placés sous les raccourcis de texte de
+  /// l'app, ils passent avant eux.
+  static const _remoteKeys = <ShortcutActivator, Intent>{
+    SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(
+      TraversalDirection.up,
+      ignoreTextFields: false,
+    ),
+    SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(
+      TraversalDirection.down,
+      ignoreTextFields: false,
+    ),
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(
@@ -43,16 +59,22 @@ class CouchPlayApp extends ConsumerWidget {
       // Échap revient en arrière partout, comme le bouton retour (clavier,
       // télécommande). Placé au-dessus du Navigator, ce raccourci reçoit la
       // touche en dernier : un menu ou un champ qui la gère passe avant.
-      builder: (context, child) => CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              _navigator.currentState?.maybePop(),
-        },
-        // Encoche, caméra et boutons du téléphone : rien ne passe dessous,
-        // surtout en paysage où ils sont sur les côtés. Le haut est géré par
-        // les barres d'application.
-        child: SafeArea(top: false, child: child!),
-      ),
+      builder: (context, child) {
+        final app = CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.escape): () =>
+                _navigator.currentState?.maybePop(),
+          },
+          // Encoche, caméra et boutons du téléphone : rien ne passe dessous,
+          // surtout en paysage où ils sont sur les côtés. Le haut est géré
+          // par les barres d'application.
+          child: SafeArea(top: false, child: child!),
+        );
+        // Sur ordinateur, ↑ ↓ gardent leur rôle dans un champ (début, fin).
+        return defaultTargetPlatform == TargetPlatform.android
+            ? Shortcuts(shortcuts: _remoteKeys, child: app)
+            : app;
+      },
       home: home,
     );
   }

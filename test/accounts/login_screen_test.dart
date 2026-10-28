@@ -7,11 +7,15 @@ import 'package:couchplay/accounts/login_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/server/server_client.dart';
+import 'package:couchplay/settings/settings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import '../support/fake_server.dart';
 
@@ -21,10 +25,14 @@ void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   Future<ProviderContainer> pumpApp(WidgetTester tester) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    final settings = await tester.runAsync(SettingsStore.open);
     final store = await tester.runAsync(AccountStore.open);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          settingsStoreProvider.overrideWithValue(settings!),
           accountStoreProvider.overrideWithValue(store!),
           accountFilesProvider.overrideWithValue(
             AccountFiles(Directory.systemTemp.createTempSync('couchplay_')),
@@ -39,7 +47,8 @@ void main() {
             ),
           ),
         ],
-        child: const MaterialApp(home: HomeGate()),
+        // L'app entière : ses raccourcis (télécommande) comptent.
+        child: const CouchPlayApp(home: HomeGate()),
       ),
     );
     return ProviderScope.containerOf(tester.element(find.byType(HomeGate)));
@@ -73,6 +82,26 @@ void main() {
 
     expect(find.text('Ajouter un compte'), findsOneWidget);
     expect(find.text(defaultUserAgent), findsOneWidget);
+  });
+
+  testWidgets('télécommande : ↓ et ↑ passent d\'un champ à l\'autre', (
+    tester,
+  ) async {
+    server = FakeAdapter.replying(activeAccountJson);
+    await pumpApp(tester);
+    final fields = find.byType(EditableText);
+    bool focusedAt(int index) =>
+        tester.widget<EditableText>(fields.at(index)).focusNode.hasFocus;
+
+    await tester.tap(fields.at(0));
+    await tester.pump();
+    expect(focusedAt(0), isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    expect(focusedAt(1), isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+    expect(focusedAt(0), isTrue);
   });
 
   testWidgets('hôte invalide : refusé avant tout appel réseau', (tester) async {
