@@ -26,6 +26,7 @@ est lue.
 import argparse
 import json
 import mimetypes
+import os
 import re
 import threading
 import time
@@ -241,7 +242,16 @@ def principal():
         str(f.get('stream_id')): str(f.get('name') or '')
         for f in Requete.listes['get_vod_streams']
     }
-    serveur = ThreadingHTTPServer(('0.0.0.0', a.port), Requete)
+    # Sous Windows, SO_REUSEADDR laisse un second serveur écouter le même
+    # port sans erreur, et l'ancien garde les connexions : sans lui, le
+    # lancement échoue si un faux serveur tourne déjà.
+    ThreadingHTTPServer.allow_reuse_address = os.name != 'nt'
+    try:
+        serveur = ThreadingHTTPServer(('0.0.0.0', a.port), Requete)
+    except OSError:
+        raise SystemExit(f'Le port {a.port} est déjà pris : un faux serveur '
+                         'tourne peut-être encore.')
+
     print(f'Catalogue : {a.donnees}')
     print(f'Vidéo : {a.video or "aucune, les flux répondent 404"}')
     print(f'Vidéo des films SD et HD : {a.video_hd or "la même"}')
