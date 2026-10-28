@@ -36,6 +36,7 @@ def principal():
         video.write_bytes(bytes(range(256)) * 80_000)
         faux.Requete.donnees = ICI.parent / 'test' / 'fixtures'
         faux.Requete.video = video
+        faux.Requete.video_hd = video
         serveur = faux.ThreadingHTTPServer(('localhost', 0), faux.Requete)
         threading.Thread(target=serveur.serve_forever, daemon=True).start()
         port = serveur.server_address[1]
