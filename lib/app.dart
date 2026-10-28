@@ -10,6 +10,7 @@ import 'search/search_index.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'settings/settings.dart';
+import 'settings/settings_screen.dart';
 
 class CouchPlayApp extends ConsumerWidget {
   const CouchPlayApp({super.key, required this.home});
@@ -99,8 +100,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   // les films ni les séries tant qu'on ne les ouvre pas. Ensuite, il garde son état.
   final _visited = {0};
 
-  /// Champ de chaque onglet qui en a un, pour Ctrl+F.
-  final _fields = {1: FocusNode(), 2: FocusNode(), _searchTab: FocusNode()};
+  /// Pour Ctrl+F : le champ de la recherche, la barre de filtre des films et
+  /// des séries (qui s'ouvre d'abord sur téléphone).
+  final _searchField = FocusNode();
+  final _catalogs = {
+    1: GlobalKey<CatalogScreenState>(),
+    2: GlobalKey<CatalogScreenState>(),
+  };
 
   ProviderSubscription<Object?>? _searchIndex;
 
@@ -123,9 +129,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
     _searchIndex?.close();
-    for (final node in _fields.values) {
-      node.dispose();
-    }
+    _searchField.dispose();
     super.dispose();
   }
 
@@ -141,7 +145,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   /// Après la reconstruction : un onglet tout juste créé n'a pas encore
   /// attaché son champ.
   void _focusField() => WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (mounted) _fields[_index]?.requestFocus();
+    if (!mounted) return;
+    if (_index == _searchTab) {
+      _searchField.requestFocus();
+    } else {
+      _catalogs[_index]?.currentState?.focusFilter();
+    }
   });
 
   /// `true` : touche prise ; sur ordinateur, son caractère (« / ») n'est
@@ -163,7 +172,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ?.findAncestorWidgetOfExactType<EditableText>() ==
             null;
     if (!ctrlF && !slash) return false;
-    if (_fields.containsKey(_index)) {
+    if (_index != 0) {
       _focusField();
     } else {
       _select(_searchTab);
@@ -177,9 +186,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   Widget _tab(int index) => switch (index) {
     0 => const HomeScreen(),
-    1 => CatalogScreen(kind: ContentKind.movies, filterFocus: _fields[1]),
-    2 => CatalogScreen(kind: ContentKind.series, filterFocus: _fields[2]),
-    _ => SearchScreen(focusNode: _fields[_searchTab]),
+    1 => CatalogScreen(key: _catalogs[1], kind: ContentKind.movies),
+    2 => CatalogScreen(key: _catalogs[2], kind: ContentKind.series),
+    _ => SearchScreen(focusNode: _searchField),
   };
 
   @override
@@ -193,7 +202,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               : const SizedBox.shrink(),
       ],
     );
-    if (MediaQuery.sizeOf(context).width >= 720) {
+    if (MediaQuery.sizeOf(context).width >= railMinWidth) {
       return Scaffold(
         body: Row(
           children: [
@@ -201,6 +210,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               selectedIndex: _index,
               onDestinationSelected: _select,
               labelType: NavigationRailLabelType.all,
+              // Les réglages, tout en bas du rail.
+              trailingAtBottom: true,
+              trailing: const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: SettingsButton(inRail: true),
+              ),
+
               destinations: [
                 for (final (icon, selected, label) in _tabs)
                   NavigationRailDestination(

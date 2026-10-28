@@ -779,4 +779,61 @@ void main() {
     await settle(tester);
     expect(find.text('Nouveauté (2026)'), findsOneWidget);
   });
+
+  testWidgets('téléphone : la loupe ouvre le filtre à la place du titre', (
+    tester,
+  ) async {
+    await pumpApp(tester, size: const Size(400, 800));
+    expect(find.byType(SearchBar), findsNothing);
+    // Pas de rail : les réglages restent dans l'en-tête.
+    expect(find.byTooltip('Réglages'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Filtrer'));
+    await settle(tester);
+    expect(find.byType(SearchBar), findsOneWidget);
+    expect(find.byTooltip('Actualiser'), findsNothing);
+    await tester.enterText(find.byType(EditableText), 'prince');
+    await tester.pump();
+    expect(find.text('Le Prince d\'Égypte (1998)'), findsOneWidget);
+    expect(find.text('Libre (2024)'), findsNothing);
+
+    // Fermer vide le filtre et rend le titre et les boutons.
+    await tester.tap(find.byTooltip('Fermer le filtre'));
+    await settle(tester);
+    expect(find.byType(SearchBar), findsNothing);
+    expect(find.byTooltip('Actualiser'), findsOneWidget);
+    expect(find.text('Libre (2024)'), findsOneWidget);
+
+    // Ctrl+F l'ouvre aussi, le curseur dedans.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await settle(tester);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus,
+      isTrue,
+    );
+  });
+
+  testWidgets('grand écran : réglages en bas du rail, filtre dans l\'en-tête', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final settings = find.byTooltip('Réglages');
+    expect(settings, findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(NavigationRail), matching: settings),
+      findsOneWidget,
+    );
+    // Sous les onglets, en bas de l'écran.
+    expect(
+      tester.getTopLeft(settings).dy,
+      greaterThan(tester.getTopLeft(find.text('Recherche')).dy),
+    );
+    expect(tester.getBottomLeft(settings).dy, greaterThan(800 - 100));
+
+    final bar = find.byType(SearchBar);
+    expect(bar, findsOneWidget);
+    expect(tester.getSize(bar).width, 320);
+  });
 }

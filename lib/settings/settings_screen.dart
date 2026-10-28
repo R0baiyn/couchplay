@@ -7,18 +7,28 @@ import '../catalog/catalog_settings_screen.dart';
 import 'settings.dart';
 
 /// Roue des réglages, en haut à droite des onglets.
+/// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
+/// réglages en bas de ce rail plutôt que dans l'en-tête de chaque onglet.
+const railMinWidth = 720.0;
+
 class SettingsButton extends StatelessWidget {
-  const SettingsButton({super.key});
+  const SettingsButton({super.key, this.inRail = false});
+
+  /// Bouton du rail ; sinon, celui de l'en-tête, caché quand le rail est là.
+  final bool inRail;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: 'Réglages',
-    icon: const Icon(Icons.settings),
-    onPressed: () => Navigator.push(
-      context,
-      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      !inRail && MediaQuery.sizeOf(context).width >= railMinWidth
+      ? const SizedBox.shrink()
+      : IconButton(
+          tooltip: 'Réglages',
+          icon: const Icon(Icons.settings),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+          ),
+        );
 }
 
 /// Réglages de l'app.

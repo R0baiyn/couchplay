@@ -29,24 +29,27 @@ void openDetails(BuildContext context, CatalogEntry entry) => Navigator.push(
 /// choisie. Catégories en panneau latéral sur grand écran ; sur téléphone,
 /// un bouton dans un en-tête qui se replie au défilement ouvre leur liste.
 ///
-/// Un champ « Filtrer » réduit la grille aux titres qui contiennent les mots
-/// tapés, dans la catégorie affichée seulement.
+/// « Filtrer » réduit la grille aux titres qui contiennent les mots tapés,
+/// dans la catégorie affichée seulement : une barre à droite de l'en-tête
+/// sur grand écran ; sur téléphone, une loupe qui remplace le titre par la
+/// barre.
 class CatalogScreen extends ConsumerStatefulWidget {
-  const CatalogScreen({super.key, required this.kind, this.filterFocus});
+  const CatalogScreen({super.key, required this.kind});
 
   final ContentKind kind;
 
-  /// Focus du champ « Filtrer », pour Ctrl+F (voir `HomeShell`).
-  final FocusNode? filterFocus;
-
   @override
-  ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
+  ConsumerState<CatalogScreen> createState() => CatalogScreenState();
 }
 
-class _CatalogScreenState extends ConsumerState<CatalogScreen> {
+class CatalogScreenState extends ConsumerState<CatalogScreen> {
   String? _selectedId;
   var _refreshing = false;
   final _filter = TextEditingController();
+  final _filterFocus = FocusNode();
+
+  /// Barre de filtre ouverte à la place du titre (écran étroit).
+  var _filtering = false;
 
   /// Texte du filtre seul : bouger le curseur ne refiltre pas la grille.
   final _query = ValueNotifier('');
@@ -61,10 +64,8 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   String get _title => _kind == ContentKind.movies ? 'Films' : 'Séries';
 
-  /// Bouton de la catégorie et champ « Filtrer » dans l'en-tête : 48 de
-  /// haut chacun, plus la marge.
+  /// Bouton de la catégorie sous le titre : 48 de haut, plus la marge.
   static const _pickerHeight = 56.0;
-  static const _filterHeight = 56.0;
 
   static const _progress = PreferredSize(
     preferredSize: Size.fromHeight(4),
@@ -74,13 +75,29 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   @override
   void dispose() {
     _filter.dispose();
+    _filterFocus.dispose();
     _query.dispose();
     super.dispose();
   }
 
+  /// Ctrl+F (voir `HomeShell`) : ouvre la barre si besoin, curseur dedans.
+  void focusFilter() {
+    setState(() => _filtering = true);
+    // Après la reconstruction : la barre vient peut-être d'apparaître.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _filterFocus.requestFocus();
+    });
+  }
+
+  void _closeFilter() => setState(() {
+    _filtering = false;
+    _filter.clear();
+  });
+
   /// Une autre catégorie repart sans filtre.
   void _select(String id) => setState(() {
     _selectedId = id;
+    _filtering = false;
     _filter.clear();
   });
 
@@ -144,7 +161,12 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     if (id != null && id != selectedId && mounted) _select(id);
   }
 
-  List<Widget> _actions(AsyncValue<Object?> categories, Category? selected) => [
+  List<Widget> _actions(
+    AsyncValue<Object?> categories,
+    Category? selected, {
+    Widget? filter,
+  }) => [
+    ?filter,
     IconButton(
       tooltip: 'Actualiser',
       icon: const Icon(Icons.refresh),
@@ -155,35 +177,29 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     const SettingsButton(),
   ];
 
-  Widget _filterField() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 48),
-        child: ValueListenableBuilder(
-          valueListenable: _filter,
-          builder: (context, value, _) => TextField(
-            controller: _filter,
-            focusNode: widget.filterFocus,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Filtrer cette catégorie',
-              prefixIcon: const Icon(Icons.filter_list),
-              border: const OutlineInputBorder(),
-              contentPadding: EdgeInsets.zero,
-              suffixIcon: value.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Effacer',
-                      icon: const Icon(Icons.clear),
-                      onPressed: _filter.clear,
-                    ),
-            ),
-          ),
-        ),
+  /// Barre « Filtrer » : [leading] la ferme sur écran étroit, sinon une
+  /// loupe ; la croix efface le texte.
+  Widget _filterBar({Widget? leading}) => SearchBar(
+    controller: _filter,
+    focusNode: _filterFocus,
+    hintText: 'Filtrer',
+    textInputAction: TextInputAction.search,
+    elevation: const WidgetStatePropertyAll(0),
+    constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
+    leading: leading ?? const Icon(Icons.search),
+    trailing: [
+      ValueListenableBuilder(
+        valueListenable: _query,
+        builder: (context, text, _) => text.isEmpty
+            ? const SizedBox.shrink()
+            : IconButton(
+                tooltip: 'Effacer',
+                icon: const Icon(Icons.clear),
+                onPressed: _filter.clear,
+              ),
       ),
-    ),
+    ],
   );
 
   @override
@@ -202,20 +218,22 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
     // Barre fixe classique, quand il n'y a pas de grille sous laquelle
     // replier l'en-tête (chargement, erreur, grand écran).
+    // Sur grand écran, le filtre est une barre de largeur fixe, à droite,
+    // près des boutons.
     Widget plain(Widget body, {bool withFilter = false}) => Scaffold(
       appBar: AppBar(
         title: Text(_title),
-        actions: _actions(categories, selected),
-        bottom: withFilter
-            ? PreferredSize(
-                preferredSize: Size.fromHeight(
-                  _filterHeight + (_refreshing ? 4 : 0),
-                ),
-                child: Column(
-                  children: [_filterField(), if (_refreshing) _progress],
-                ),
-              )
-            : (_refreshing ? _progress : null),
+        actions: _actions(
+          categories,
+          selected,
+          filter: withFilter
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(width: 320, child: _filterBar()),
+                )
+              : null,
+        ),
+        bottom: _refreshing ? _progress : null,
       ),
       body: body,
     );
@@ -281,10 +299,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               withFilter: true,
             );
           }
-          // Écran étroit : titre, boutons, catégorie et filtre forment un
-          // en-tête qui se replie quand on descend et revient dès qu'on
-          // remonte, pour laisser la hauteur aux affiches. La catégorie se
-          // choisit dans la liste complète, en panneau du bas.
+          // Écran étroit : titre, boutons et catégorie forment un en-tête
+          // qui se replie quand on descend et revient dès qu'on remonte,
+          // pour laisser la hauteur aux affiches. La catégorie se choisit
+          // dans la liste complète, en panneau du bas ; la loupe remplace le
+          // titre et les boutons par la barre de filtre, sur toute la ligne.
           return Scaffold(
             body: _CategoryItems(
               key: key,
@@ -295,11 +314,28 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               header: SliverAppBar(
                 floating: true,
                 snap: true,
-                title: Text(_title),
-                actions: _actions(categories, current),
+                title: _filtering
+                    ? _filterBar(
+                        leading: IconButton(
+                          tooltip: 'Fermer le filtre',
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: _closeFilter,
+                        ),
+                      )
+                    : Text(_title),
+                actions: _filtering
+                    ? null
+                    : [
+                        IconButton(
+                          tooltip: 'Filtrer',
+                          icon: const Icon(Icons.search),
+                          onPressed: focusFilter,
+                        ),
+                        ..._actions(categories, current),
+                      ],
                 bottom: PreferredSize(
                   preferredSize: Size.fromHeight(
-                    _pickerHeight + _filterHeight + (_refreshing ? 4 : 0),
+                    _pickerHeight + (_refreshing ? 4 : 0),
                   ),
                   child: Column(
                     children: [
@@ -319,7 +355,6 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                           onPressed: () => _pickCategory(visible, current.id),
                         ),
                       ),
-                      _filterField(),
                       if (_refreshing) _progress,
                     ],
                   ),
