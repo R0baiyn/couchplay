@@ -7,6 +7,8 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/accounts_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
+import 'package:couchplay/catalog/catalog_repository.dart';
+
 import 'package:couchplay/search/search_index.dart';
 
 import 'package:couchplay/server/server_client.dart';
@@ -28,9 +30,11 @@ Account _account(String id) => Account(
 );
 
 /// Index qui ne finit jamais de charger : aucune requête en vol.
-class _PendingIndex extends SearchIndexNotifier {
+class _PendingIndex extends CatalogIndexNotifier {
+  _PendingIndex(super.kind);
+
   @override
-  Future<SearchIndex> build() => Completer<SearchIndex>().future;
+  Future<Loaded<KindIndex>> build() => Completer<Loaded<KindIndex>>().future;
 }
 
 void main() {
@@ -63,7 +67,7 @@ void main() {
           accountFilesProvider.overrideWithValue(files),
           // Sans objet ici : l'index de recherche, chargé en arrière-plan
           // derrière l'accueil, laisserait des requêtes en vol.
-          searchIndexProvider.overrideWith(_PendingIndex.new),
+          catalogIndexProvider.overrideWith2(_PendingIndex.new),
           serverClientFactoryProvider.overrideWithValue(
             (account) => ServerClient(
               host: account.host,

@@ -91,8 +91,8 @@ class _EntryTile extends ConsumerWidget {
     final versions =
         (movie
             ? ref.watch(
-                searchIndexProvider.select(
-                  (i) => i.value?.movies.entryOf(entry.item.id)?.versions,
+                catalogIndexProvider(ContentKind.movies).select(
+                  (i) => i.value?.value.entryOf(entry.item.id)?.versions,
                 ),
               )
             : null) ??

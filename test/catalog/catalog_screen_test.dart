@@ -14,6 +14,7 @@ import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/search/search_screen.dart';
 
+import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/settings/settings.dart';
 import 'package:dio/dio.dart';
@@ -102,16 +103,16 @@ void main() {
       ),
     );
     await settle(tester);
-    // L'index de recherche se charge en arrière-plan, sans roue visible :
-    // attendu ici, pour qu'aucune requête ne reste en vol à la fin du test.
+    // Les index des films et des séries se chargent en arrière-plan, sans
+    // roue visible : attendus ici, pour qu'aucune requête ne reste en vol à
+    // la fin du test.
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeShell)),
     );
-    for (
-      var i = 0;
-      i < 100 && container.read(searchIndexProvider).isLoading;
-      i++
-    ) {
+    bool loading() => ContentKind.values.any(
+      (kind) => container.read(catalogIndexProvider(kind)).isLoading,
+    );
+    for (var i = 0; i < 100 && loading(); i++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 30)),
       );
@@ -122,6 +123,22 @@ void main() {
       await tester.tap(find.text('Films'));
       await settle(tester);
     }
+  }
+
+  /// Liste des catégories du grand écran : défile jusqu'à [name] (vers le
+  /// haut avec [up]), l'ouvre.
+  Future<void> openCategory(
+    WidgetTester tester,
+    String name, {
+    bool up = false,
+  }) async {
+    await tester.scrollUntilVisible(
+      find.text(name),
+      up ? -200 : 200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text(name));
+    await settle(tester);
   }
 
   testWidgets('Films : catégories françaises, grille, puis fiche', (
@@ -408,7 +425,25 @@ void main() {
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (
     tester,
   ) async {
-    // Assez bas pour que la grille de test (8 affiches) défile sous l'en-tête.
+    // Assez de films dans « FR · Drame » pour que sa grille défile sous
+    // l'en-tête, sur un écran bas.
+    final routes = server;
+    final films = jsonDecode(_fixture('vod_streams')) as List<Object?>
+      ..addAll([
+        for (var i = 0; i < 30; i++)
+          {
+            'stream_id': 5000 + i,
+            'name': 'Drame $i (${1990 + i})',
+            'category_id': '118',
+            'container_extension': 'mkv',
+          },
+      ]);
+    server = FakeAdapter((options) async {
+      if (options.uri.queryParameters['action'] == 'get_vod_streams') {
+        return ResponseBody.fromString(jsonEncode(films), 200);
+      }
+      return routes.fetch(options, null, null);
+    });
     await pumpApp(tester, size: const Size(400, 600));
 
     expect(find.byType(NavigationBar), findsOneWidget);
@@ -484,6 +519,8 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
+    // Une catégorie de deux films : Libre, puis The King Tide.
+    await openCategory(tester, 'FR · FILMS HD');
 
     // Tab jusqu'à la première affiche (après les onglets et les catégories),
     // puis flèche droite : la seconde.
@@ -504,7 +541,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(AppBar),
-        matching: find.text('Le Prince d\'Égypte (1998)'),
+        matching: find.text('The King Tide (2024)'),
       ),
       findsOneWidget,
     );
@@ -552,8 +589,8 @@ void main() {
     await settle(tester);
     expect(
       fake.calls,
-      before + 3,
-      reason: 'catégories, liste de la catégorie et liste complète, une fois',
+      before + 2,
+      reason: 'catégories et liste complète, une fois chacune',
     );
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('Libre (2024)'), findsOneWidget);
@@ -605,20 +642,21 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
+    // Libre et The King Tide.
+    await openCategory(tester, 'FR · FILMS HD');
     final field = find.byType(TextField);
     expect(field, findsOneWidget);
 
-    await tester.enterText(field, 'prince');
+    await tester.enterText(field, 'king');
     await tester.pump();
-    expect(find.text('Le Prince d\'Égypte (1998)'), findsOneWidget);
+    expect(find.text('The King Tide (2024)'), findsOneWidget);
     expect(find.text('Libre (2024)'), findsNothing);
 
     await tester.enterText(field, 'zzz');
     await tester.pump();
     expect(find.textContaining('Rien ne correspond à « zzz »'), findsOneWidget);
 
-    await tester.tap(find.text('FR · Drame'));
-    await settle(tester);
+    await openCategory(tester, 'Films 4K', up: true);
     expect(find.text('Libre (2024)'), findsOneWidget);
   });
 
@@ -674,18 +712,20 @@ void main() {
     expect(find.byType(SearchScreen), findsNothing);
   });
 
-  testWidgets('pastilles : cœur après un favori, coche pour un film vu', (
+  testWidgets('pastilles : cœur et coche, même d\'une autre catégorie', (
     tester,
   ) async {
+    // Vue : la version HD VF, rangée dans « FR · FILMS HD ». La grille de
+    // « Films 4K » n'a que la 4K, mais marque quand même le film.
     File('${root.path}/accounts/compte/library.json')
       ..createSync(recursive: true)
       ..writeAsStringSync(
         jsonEncode({
           'version': 1,
           'progress': {
-            'movie:122716': {
-              'name': 'Le Prince d\'Égypte (1998)',
-              'extension': 'mkv',
+            'movie:144014': {
+              'name': 'Libre (2024) HD VF',
+              'extension': 'mp4',
               'position': 5000,
               'duration': 5000,
               'watched': true,
@@ -698,9 +738,17 @@ void main() {
     expect(find.byIcon(Icons.check), findsOneWidget);
     expect(find.byIcon(Icons.favorite), findsNothing);
 
+    // La fiche propose la HD VF, déjà vue : c'est elle qui va dans la liste.
     await tester.tap(find.text('Libre (2024)'));
     await settle(tester);
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'HD VF'))
+          .selected,
+      isTrue,
+    );
     await tester.tap(find.byTooltip('Ajouter à ma liste'));
+
     await settle(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
@@ -792,9 +840,9 @@ void main() {
     await settle(tester);
     expect(find.byType(SearchBar), findsOneWidget);
     expect(find.byTooltip('Actualiser'), findsNothing);
-    await tester.enterText(find.byType(EditableText), 'prince');
+    await tester.enterText(find.byType(EditableText), 'zzz');
     await tester.pump();
-    expect(find.text('Le Prince d\'Égypte (1998)'), findsOneWidget);
+    expect(find.textContaining('Rien ne correspond à « zzz »'), findsOneWidget);
     expect(find.text('Libre (2024)'), findsNothing);
 
     // Fermer vide le filtre et rend le titre et les boutons.

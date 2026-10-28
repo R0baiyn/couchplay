@@ -7,6 +7,7 @@ import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
 import '../catalog/status_views.dart';
 import '../catalog/versions.dart';
+import '../server/models.dart';
 import '../settings/settings_screen.dart';
 import 'search_index.dart';
 
@@ -31,8 +32,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _timer;
   var _query = '';
 
-  // Derniers résultats, refaits seulement si l'index ou la recherche change.
-  SearchIndex? _index;
+  // Derniers résultats, refaits seulement si un index ou la recherche change.
+  KindIndex? _moviesIndex;
+  KindIndex? _seriesIndex;
   String? _searched;
   var _movies = const <CatalogEntry>[];
   var _series = const <CatalogEntry>[];
@@ -56,8 +58,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final index = ref.watch(searchIndexProvider);
+    final movies = ref.watch(catalogIndexProvider(ContentKind.movies));
+    final series = ref.watch(catalogIndexProvider(ContentKind.series));
     final words = queryWords(_query);
+    // Fini : chargé, ou en échec sans rien à montrer.
+    bool settled(AsyncValue<Object?> index) =>
+        index.hasValue || (index.hasError && !index.isLoading);
     final theme = Theme.of(context);
 
     Widget message(String text) => Center(
@@ -70,22 +76,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final Widget body;
     if (words.isEmpty) {
       body = message('Tape quelques lettres d\'un film ou d\'une série.');
-    } else if (index.value case final value?) {
-      if (!identical(value, _index) || _query != _searched) {
-        _index = value;
-        _searched = _query;
-        _movies = search(value.movies.entries, _query);
-        _series = search(value.series.entries, _query);
+    } else if (settled(movies) && settled(series)) {
+      // Un type en échec n'empêche pas de chercher dans l'autre.
+      final moviesIndex = movies.value?.value;
+      final seriesIndex = series.value?.value;
+      if (moviesIndex == null && seriesIndex == null) {
+        body = ErrorView(
+          error: movies.error ?? series.error!,
+          onRetry: () {
+            ref.invalidate(catalogIndexProvider(ContentKind.movies));
+            ref.invalidate(catalogIndexProvider(ContentKind.series));
+          },
+        );
+      } else {
+        if (!identical(moviesIndex, _moviesIndex) ||
+            !identical(seriesIndex, _seriesIndex) ||
+            _query != _searched) {
+          _moviesIndex = moviesIndex;
+          _seriesIndex = seriesIndex;
+          _searched = _query;
+          _movies = search(moviesIndex?.entries ?? const [], _query);
+          _series = search(seriesIndex?.entries ?? const [], _query);
+        }
+        body = _movies.isEmpty && _series.isEmpty
+            ? message('Aucun résultat pour « ${_query.trim()} ».')
+            // Clé par recherche : une nouvelle recherche repart en haut.
+            : _Results(key: ValueKey(_query), movies: _movies, series: _series);
       }
-      body = _movies.isEmpty && _series.isEmpty
-          ? message('Aucun résultat pour « ${_query.trim()} ».')
-          // Clé par recherche : une nouvelle recherche repart en haut.
-          : _Results(key: ValueKey(_query), movies: _movies, series: _series);
-    } else if (index case AsyncError(:final error)) {
-      body = ErrorView(
-        error: error,
-        onRetry: () => ref.invalidate(searchIndexProvider),
-      );
     } else {
       body = Center(
         child: Column(
@@ -132,7 +149,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         // Place gardée, pour que l'en-tête ne saute pas.
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
-          child: index.isLoading && index.hasValue
+          child:
+              (movies.isLoading && movies.hasValue) ||
+                  (series.isLoading && series.hasValue)
               ? const LinearProgressIndicator()
               : const SizedBox.shrink(),
         ),

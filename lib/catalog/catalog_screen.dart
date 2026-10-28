@@ -101,20 +101,16 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
     _filter.clear();
   });
 
-  /// Catégories et grille affichée ensemble, puis la liste complète de la
-  /// recherche (un nouveau film y apparaît, et parmi les versions) ; l'écran
-  /// garde ses données (et la grille sa position) pendant le rechargement.
-  Future<void> _refresh(String? categoryId) async {
+  /// Catégories, puis la liste complète du type, d'où viennent la grille, la
+  /// recherche et les versions : deux requêtes. L'écran garde ses données
+  /// (et la grille sa position) pendant le rechargement.
+  Future<void> _refresh() async {
     setState(() => _refreshing = true);
     try {
-      await Future.wait([
-        ref.read(categoriesProvider(_kind).notifier).refresh(),
-        if (categoryId != null)
-          ref.read(itemsProvider((_kind, categoryId)).notifier).refresh(),
-      ]);
+      await ref.read(categoriesProvider(_kind).notifier).refresh();
       // Après les catégories : l'index, qui en dépend, ne se refait qu'une
       // fois avec les nouvelles.
-      await ref.read(searchIndexProvider.notifier).refresh(_kind);
+      await ref.read(catalogIndexProvider(_kind).notifier).refresh();
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }
@@ -170,9 +166,7 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
     IconButton(
       tooltip: 'Actualiser',
       icon: const Icon(Icons.refresh),
-      onPressed: categories.isLoading || _refreshing
-          ? null
-          : () => _refresh(selected?.id),
+      onPressed: categories.isLoading || _refreshing ? null : _refresh,
     ),
     const SettingsButton(),
   ];
@@ -421,8 +415,7 @@ class _CategoryItems extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final provider = itemsProvider((kind, categoryId));
-    final loaded = ref.watch(provider);
+    final loaded = ref.watch(itemsProvider((kind, categoryId)));
     // Seules les affiches suivent la frappe ; l'en-tête, et le champ qu'il
     // contient, restent les mêmes widgets.
     return FocusTraversalGroup(
@@ -431,7 +424,12 @@ class _CategoryItems extends ConsumerWidget {
         builder: (context, text, _) => CustomScrollView(
           slivers: [
             ?header,
-            ..._content(loaded, text, onRetry: () => ref.invalidate(provider)),
+            ..._content(
+              loaded,
+              text,
+              // Réessayer refait l'index : la grille en dépend.
+              onRetry: () => ref.invalidate(catalogIndexProvider(kind)),
+            ),
           ],
         ),
       ),
@@ -439,23 +437,19 @@ class _CategoryItems extends ConsumerWidget {
   }
 
   List<Widget> _content(
-    AsyncValue<Loaded<List<CatalogEntry>>> loaded,
+    AsyncValue<Loaded<List<CatalogEntry>>?> loaded,
     String query, {
     required VoidCallback onRetry,
   }) {
     Widget fill(Widget child) =>
         SliverFillRemaining(hasScrollBody: false, child: child);
+    // La grille déjà là d'abord : pendant que l'index se refait
+    // (« Actualiser », filtre changé), elle reste affichée.
     return switch (loaded) {
-      AsyncValue(isLoading: true) => [
-        fill(const Center(child: CircularProgressIndicator())),
-      ],
-      AsyncError(:final error) => [
-        fill(ErrorView(error: error, onRetry: onRetry)),
-      ],
-      AsyncData(:final value) when value.value.isEmpty => [
+      AsyncValue(value: final value?) when value.value.isEmpty => [
         fill(const Center(child: Text('Cette catégorie est vide.'))),
       ],
-      AsyncData(:final value) => switch (search(value.value, query)) {
+      AsyncValue(value: final value?) => switch (search(value.value, query)) {
         final entries when entries.isEmpty => [
           fill(
             Center(
@@ -476,7 +470,11 @@ class _CategoryItems extends ConsumerWidget {
           ),
         ],
       },
-      _ => const <Widget>[],
+      AsyncError(:final error) when !loaded.isLoading => [
+        fill(ErrorView(error: error, onRetry: onRetry)),
+      ],
+      // Chargement, ou catégorie pas encore dans l'index (valeur `null`).
+      _ => [fill(const Center(child: CircularProgressIndicator()))],
     };
   }
 }

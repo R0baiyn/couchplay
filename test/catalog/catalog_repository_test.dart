@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:couchplay/catalog/catalog_cache.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
+import 'package:couchplay/search/search_index.dart';
+
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
@@ -138,29 +140,12 @@ void main() {
     expect(File('${dir.path}/movies_categories.json').existsSync(), isFalse);
   });
 
-  test('liste d\'une catégorie : demandée et mise en cache à part', () async {
+  test('un id inutilisable comme nom de fichier : pas de cache', () async {
     server = FakeAdapter.replying(
-      File('test/fixtures/series.json').readAsStringSync(),
+      File('test/fixtures/vod_info.json').readAsStringSync(),
     );
-    final loaded = await repository().items(ContentKind.series, '1793');
-    expect(loaded.value.first.item.name, 'Vikings');
-    expect(
-      server.last!.uri.queryParameters,
-      containsPair('action', 'get_series'),
-    );
-    expect(
-      server.last!.uri.queryParameters,
-      containsPair('category_id', '1793'),
-    );
-    expect(File('${dir.path}/series_list_1793.json').existsSync(), isTrue);
-  });
-
-  test('un id de catégorie inutilisable comme nom : pas de cache', () async {
-    server = FakeAdapter.replying(
-      File('test/fixtures/vod_streams.json').readAsStringSync(),
-    );
-    final loaded = await repository().items(ContentKind.movies, '../x');
-    expect(loaded.value, isNotEmpty);
+    final movie = await repository().movie('../x');
+    expect(movie.details.name, isNotEmpty);
     expect(
       dir.listSync().whereType<File>().map((f) => f.path),
       isNot(contains(endsWith('.json'))),
@@ -182,7 +167,7 @@ void main() {
 
   // Régression : avec un vrai client http, la fonction de décodage envoyée à
   // l'isolate ne doit pas emporter le client (objet impossible à envoyer).
-  test('liste d\'une catégorie avec un vrai serveur http local', () async {
+  test('liste complète avec un vrai serveur http local', () async {
     final http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(http.close);
     final body = File('test/fixtures/vod_streams.json').readAsStringSync();
@@ -204,9 +189,10 @@ void main() {
       CatalogCache(dir, serverKey: serverKey),
     );
 
-    final loaded = await repository.items(ContentKind.movies, '148');
-    expect(loaded.value.first.title, 'Libre (2024)');
-    final again = await repository.items(ContentKind.movies, '148');
+    final parse = indexParser(ContentKind.movies, {'148'});
+    final loaded = await repository.all(ContentKind.movies, parse);
+    expect(loaded.value.entriesIn('148')!.first.title, 'Libre (2024)');
+    final again = await repository.all(ContentKind.movies, parse);
     expect(again.savedAt, isNotNull, reason: 'relu depuis le cache');
   });
 }

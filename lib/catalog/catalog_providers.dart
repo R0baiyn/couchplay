@@ -8,7 +8,6 @@ import '../accounts/server_session.dart';
 import '../server/models.dart';
 import 'catalog_cache.dart';
 import 'catalog_repository.dart';
-import 'versions.dart';
 
 /// Catalogue du compte actif ; change avec le compte ou ses accès.
 final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
@@ -58,29 +57,6 @@ final class CategoriesNotifier extends AsyncNotifier<Loaded<List<Category>>> {
   Future<void> refresh() => _refreshWith(
     ref,
     (repository) => repository.categories(kind, refresh: true),
-    (value) => state = value,
-  );
-}
-
-/// Films ou séries d'une catégorie.
-final itemsProvider = AsyncNotifierProvider.autoDispose
-    .family<ItemsNotifier, Loaded<List<CatalogEntry>>, (ContentKind, String)>(
-      ItemsNotifier.new,
-      retry: noRetry,
-    );
-
-final class ItemsNotifier extends AsyncNotifier<Loaded<List<CatalogEntry>>> {
-  ItemsNotifier(this.key);
-
-  final (ContentKind, String) key;
-
-  @override
-  Future<Loaded<List<CatalogEntry>>> build() =>
-      ref.watch(catalogRepositoryProvider).items(key.$1, key.$2);
-
-  Future<void> refresh() => _refreshWith(
-    ref,
-    (repository) => repository.items(key.$1, key.$2, refresh: true),
     (value) => state = value,
   );
 }

@@ -4,7 +4,6 @@ import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
 import 'catalog_cache.dart';
-import 'versions.dart';
 
 /// Résultat d'un chargement du catalogue.
 final class Loaded<T> {
@@ -48,24 +47,10 @@ final class CatalogRepository {
     refresh: refresh,
   );
 
-  /// Affiches d'une catégorie, versions d'un même film regroupées.
-  Future<Loaded<List<CatalogEntry>>> items(
-    ContentKind kind,
-    String categoryId, {
-    bool refresh = false,
-  }) => _load(
-    '${kind.name}_list_$categoryId',
-    () => _client.fetch(kind.listAction, {'category_id': categoryId}),
-    switch (kind) {
-      ContentKind.movies => _parseMovies,
-      ContentKind.series => _parseSeries,
-    },
-    refresh: refresh,
-  );
-
-  /// Tous les films ou toutes les séries en une requête, pour la recherche,
-  /// gardés aussi longtemps que les catégories. [parse] en fait l'index dans
-  /// l'isolate de décodage (mêmes contraintes que pour `_load`).
+  /// Tous les films ou toutes les séries en une requête, gardés aussi
+  /// longtemps que les catégories : les grilles de chaque catégorie et la
+  /// recherche en sont tirées, sans requête par catégorie. [parse] en fait
+  /// l'index dans l'isolate de décodage (mêmes contraintes que pour `_load`).
   Future<Loaded<T>> all<T>(
     ContentKind kind,
     T Function(String) parse, {
@@ -143,12 +128,6 @@ final class CatalogRepository {
     return Loaded(await _decodeAndStore(text, parse, path));
   }
 }
-
-List<CatalogEntry> _parseMovies(String text) =>
-    entriesOf(parseCatalogItems(text, ContentKind.movies));
-
-List<CatalogEntry> _parseSeries(String text) =>
-    entriesOf(parseCatalogItems(text, ContentKind.series));
 
 // Fonctions de premier niveau : ce qu'elles envoient à l'isolate se limite
 // à leurs paramètres.

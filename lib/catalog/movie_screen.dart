@@ -39,9 +39,8 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
     final id = widget.entry.item.id;
     final versions =
         (ref.watch(
-                  searchIndexProvider.select(
-                    (i) => i.value?.movies.entryOf(id),
-                  ),
+                  catalogIndexProvider(ContentKind.movies)
+                      .select((i) => i.value?.value.entryOf(id)),
                 ) ??
                 widget.entry)
             .versions;

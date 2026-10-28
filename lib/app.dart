@@ -74,8 +74,9 @@ class HomeGate extends ConsumerWidget {
 /// droite) : barre en bas sur écran étroit, rail sur le côté sur grand écran
 /// (règle 9).
 ///
-/// Une fois l'accueil affiché, l'index de recherche se charge en arrière-plan
-/// et reste chargé tant que cet écran existe. Ctrl+F ou / place le curseur
+/// Une fois l'accueil affiché, l'index des films et celui des séries (d'où
+/// viennent les grilles, la recherche et les versions) se chargent en
+/// arrière-plan et restent chargés tant que cet écran existe. Ctrl+F ou / place le curseur
 /// dans le champ de l'onglet : « Filtrer » des films et des séries, sinon la
 /// recherche.
 class HomeShell extends ConsumerStatefulWidget {
@@ -108,7 +109,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     2: GlobalKey<CatalogScreenState>(),
   };
 
-  ProviderSubscription<Object?>? _searchIndex;
+  final _indexes = <ProviderSubscription<Object?>>[];
 
   @override
   void initState() {
@@ -119,8 +120,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Après la première image : l'accueil s'affiche avant que le gros
     // chargement commence.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _searchIndex = ref.listenManual(searchIndexProvider, (_, _) {});
+      if (!mounted) return;
+      for (final kind in ContentKind.values) {
+        _indexes.add(ref.listenManual(catalogIndexProvider(kind), (_, _) {}));
       }
     });
   }
@@ -128,7 +130,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
-    _searchIndex?.close();
+    for (final index in _indexes) {
+      index.close();
+    }
     _searchField.dispose();
     super.dispose();
   }

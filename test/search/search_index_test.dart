@@ -139,6 +139,20 @@ void main() {
         expect(index.entryOf('144016'), same(libre));
         // Film d'une catégorie arabe : masqué par défaut.
         expect(index.entryOf('19181'), isNull);
+
+        // Grilles : chaque catégorie, avec ses seules versions.
+        List<String>? names(String category) => [
+          for (final entry in index.entriesIn(category) ?? <CatalogEntry>[])
+            for (final version in entry.versions) version.name,
+        ];
+        expect(names('148'), [
+          'Libre (2024) HD VF',
+          'The King Tide (2024) HD VF',
+        ]);
+        expect(names('619'), ['Libre (2024) 4K']);
+        // Visible mais vide ; masquée : inconnue de l'index.
+        expect(index.entriesIn('118'), isEmpty);
+        expect(index.entriesIn('614'), isNull);
         expect(File('${dir.path}/movies_all.json').existsSync(), isTrue);
 
         final again = await repository(server)
