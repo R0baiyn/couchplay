@@ -98,7 +98,9 @@ Future<void> showUpdateDialog(
   );
   try {
     await updater.installNow(update);
-  } on Exception catch (e) {
+  } on Object catch (e) {
+    // Toute erreur, pas seulement une Exception : la fenêtre de progression
+    // ne se ferme pas seule, elle bloquerait l'app.
     log('Mise à jour', error: e.runtimeType);
     navigator.pop();
     final cancelled = e is DioException && CancelToken.isCancel(e);
