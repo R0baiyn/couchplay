@@ -21,26 +21,41 @@ final class LibraryStore {
   Library load() {
     // Lecture synchrone : quelques dizaines de Ko, nécessaires avant
     // d'afficher l'accueil.
-    try {
-      final text = file.readAsStringSync();
-      if (text.trim().isEmpty) return const Library();
-      return Library.fromJson(jsonDecode(text));
-    } on PathNotFoundException {
-      return const Library();
-    } on Exception {
-      // JSON invalide, mais aussi texte mal encodé ou fichier verrouillé :
-      // jamais écrasé sans trace par la prochaine écriture.
-      log('Bibliothèque illisible, mise de côté en library.json.bak');
+    for (var attempt = 1; ; attempt++) {
       try {
-        file.renameSync('${file.path}.bak');
-      } on FileSystemException catch (e) {
-        // Fichier verrouillé (antivirus, synchronisation) : on n'écrit plus
-        // rien jusqu'au prochain lancement, plutôt que de l'écraser.
-        _readOnly = true;
-        log('Bibliothèque non mise de côté', error: e.osError?.errorCode);
+        final text = file.readAsStringSync();
+        if (text.trim().isEmpty) return const Library();
+        return Library.fromJson(jsonDecode(text));
+      } on PathNotFoundException {
+        return const Library();
+      } on FileSystemException {
+        // Verrou passager : sous Windows, une écriture de l'app (renommage
+        // du fichier temporaire) ou un antivirus bloque la lecture quelques
+        // millisecondes. Ce n'est pas un fichier illisible.
+        if (attempt < 5) {
+          sleep(const Duration(milliseconds: 20));
+          continue;
+        }
+        return _setAside();
+      } on Exception {
+        return _setAside();
       }
-      return const Library();
     }
+  }
+
+  /// JSON invalide, texte mal encodé ou fichier toujours verrouillé : jamais
+  /// écrasé sans trace par la prochaine écriture.
+  Library _setAside() {
+    log('Bibliothèque illisible, mise de côté en library.json.bak');
+    try {
+      file.renameSync('${file.path}.bak');
+    } on FileSystemException catch (e) {
+      // Fichier verrouillé (antivirus, synchronisation) : on n'écrit plus
+      // rien jusqu'au prochain lancement, plutôt que de l'écraser.
+      _readOnly = true;
+      log('Bibliothèque non mise de côté', error: e.osError?.errorCode);
+    }
+    return const Library();
   }
 
   Future<void>? _pending;

@@ -1,11 +1,24 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final _t0 = DateTime.utc(2026, 11, 2, 20);
+
+/// Verrouille le fichier, le signale, puis le libère 40 ms plus tard.
+void _holdLock((String, SendPort) args) {
+  final (path, locked) = args;
+  final lock = File(path).openSync(mode: FileMode.append)
+    ..lockSync(FileLock.exclusive);
+  locked.send(null);
+  sleep(const Duration(milliseconds: 40));
+  lock
+    ..unlockSync()
+    ..closeSync();
+}
 
 const _movie = PlayItem.movie(id: '1', extension: 'mkv', name: 'Inception');
 
@@ -267,6 +280,22 @@ void main() {
       final kept = bak.existsSync() ? bak : file;
       expect(kept.readAsStringSync(), original);
     }, skip: !Platform.isWindows);
+
+    test(
+      'verrou passager (écriture en cours) : relu, pas mis de côté',
+      () async {
+        await LibraryStore(file)
+            .save(const Library().withProgress(_progress(_movie)));
+        // Un autre isolate tient le fichier 40 ms, comme le renommage d'une
+        // écriture : load() attend sans bloquer l'isolate qui le libère.
+        final locked = ReceivePort();
+        await Isolate.spawn(_holdLock, (file.path, locked.sendPort));
+        await locked.first;
+        expect(LibraryStore(file).load().progress.keys, ['movie:1']);
+        expect(File('${file.path}.bak').existsSync(), isFalse);
+      },
+      skip: !Platform.isWindows,
+    );
 
     test('mal encodé : mis de côté aussi, jamais écrasé', () async {
       // UTF-16 avec BOM, comme un fichier réenregistré par un éditeur.
