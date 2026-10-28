@@ -3,11 +3,45 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:couchplay/update/updater.dart';
+import 'package:couchplay/update/windows_installer.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_server.dart';
+
+/// Installation simulée : retient ce qui lui est confié.
+final class _FakeInstaller implements Installer {
+  _FakeInstaller(this.workDir, {this.pending = false});
+
+  @override
+  final Directory workDir;
+
+  /// Réponse de [installPending].
+  final bool pending;
+
+  /// Contenu de chaque fichier préparé.
+  final received = <String>[];
+
+  @override
+  String get assetSuffix => '-windows-portable.zip';
+
+  @override
+  String get later => 'plus tard';
+
+  @override
+  String get packageName => 'update.zip';
+
+  @override
+  Future<void> prepared(Update update, File package) async =>
+      received.add(await package.readAsString());
+
+  @override
+  Future<void> installNow() async {}
+
+  @override
+  Future<bool> installPending(String current) async => pending;
+}
 
 void main() {
   group('isNewer', () {
@@ -46,8 +80,10 @@ void main() {
       ],
     };
 
+    const setup = '-windows-setup.exe';
+
     test('installée : l\'installateur', () {
-      final update = updateFrom(release(), current: '0.1.0', portable: false)!;
+      final update = updateFrom(release(), current: '0.1.0', suffix: setup)!;
       expect(update.version, '0.1.1');
       expect(update.notes, '- Nouvelle icône');
       expect(update.asset.path, endsWith('-windows-setup.exe'));
@@ -55,13 +91,17 @@ void main() {
     });
 
     test('portable : le zip', () {
-      final update = updateFrom(release(), current: '0.1.0', portable: true)!;
+      final update = updateFrom(
+        release(),
+        current: '0.1.0',
+        suffix: '-windows-portable.zip',
+      )!;
       expect(update.asset.path, endsWith('-windows-portable.zip'));
-      expect(update.portable, isTrue);
+      expect(update.size, 30);
     });
 
     test('rien si la version n\'est pas plus récente', () {
-      expect(updateFrom(release(), current: '0.1.1', portable: false), isNull);
+      expect(updateFrom(release(), current: '0.1.1', suffix: setup), isNull);
     });
 
     test('rien si le fichier vient d\'un autre hôte', () {
@@ -69,37 +109,39 @@ void main() {
       for (final asset in json['assets'] as List) {
         (asset as Map)['browser_download_url'] = 'https://example.com/x.exe';
       }
-      expect(updateFrom(json, current: '0.1.0', portable: false), isNull);
+      expect(updateFrom(json, current: '0.1.0', suffix: setup), isNull);
     });
 
     test('réponse inattendue : rien, sans exception', () {
-      expect(updateFrom(null, current: '0.1.0', portable: false), isNull);
+      expect(updateFrom(null, current: '0.1.0', suffix: setup), isNull);
       expect(
-        updateFrom({'tag_name': 'v9.0.0'}, current: '0.1.0', portable: false),
+        updateFrom({'tag_name': 'v9.0.0'}, current: '0.1.0', suffix: setup),
         isNull,
       );
     });
   });
 
-  group('forApp', () {
+  group('WindowsInstaller.forApp', () {
     late Directory app;
     setUp(() => app = Directory.systemTemp.createTempSync('couchplay-app'));
     tearDown(() => app.deleteSync(recursive: true));
 
-    Updater? updater() => Updater.forApp(version: '0.1.0', appDir: app);
+    WindowsInstaller? installer() => WindowsInstaller.forApp(app);
 
     test('marqueur du zip : portable', () {
       File('${app.path}\\portable').createSync();
-      expect(updater()?.portable, isTrue);
+      expect(installer()?.portable, isTrue);
+      expect(installer()?.assetSuffix, '-windows-portable.zip');
     });
 
     test('désinstalleur d\'Inno Setup : installée', () {
       File('${app.path}\\unins000.exe').createSync();
-      expect(updater()?.portable, isFalse);
+      expect(installer()?.portable, isFalse);
+      expect(installer()?.assetSuffix, '-windows-setup.exe');
     });
 
     test('ni l\'un ni l\'autre (build local) : pas de mise à jour', () {
-      expect(updater(), isNull);
+      expect(installer(), isNull);
     });
   });
 
@@ -120,16 +162,22 @@ void main() {
       notes: '',
       asset: Uri.parse('https://github.com/R0baiyn/couchplay/x.zip'),
       size: 3,
-      portable: true,
     );
+
+    late _FakeInstaller installer;
 
     Updater updater(FakeAdapter adapter) => Updater(
       version: '0.1.0',
-      portable: true,
-      appDir: work,
-      workDir: Directory('${work.path}\\update'),
+      installer: installer = _FakeInstaller(
+        Directory('${work.path}${Platform.pathSeparator}update'),
+      ),
       adapter: adapter,
     );
+
+    test('fichier complet : confié à l\'installation', () async {
+      await updater(FakeAdapter.replying('abc')).prepare(update);
+      expect(installer.received, ['abc']);
+    });
 
     test('une redirection vers un autre hôte est refusée', () async {
       final adapter = FakeAdapter(
@@ -229,21 +277,37 @@ void main() {
     });
   });
 
-  test('hors ligne : pas de mise à jour au démarrage, sans erreur', () async {
-    final container = ProviderContainer(
-      overrides: [
-        updaterProvider.overrideWithValue(
-          Updater(
-            version: '0.1.0',
-            portable: false,
-            appDir: Directory.systemTemp,
-            adapter: FakeAdapter.failing(DioExceptionType.connectionError),
-          ),
-        ),
-      ],
+  group('au démarrage', () {
+    Future<Update?> startup(Updater updater) {
+      final container = ProviderContainer(
+        overrides: [updaterProvider.overrideWithValue(updater)],
+      );
+      addTearDown(container.dispose);
+      return container.read(startupUpdateProvider.future);
+    }
+
+    test('hors ligne : pas de mise à jour, sans erreur', () async {
+      final updater = Updater(
+        version: '0.1.0',
+        installer: _FakeInstaller(Directory.systemTemp),
+        adapter: FakeAdapter.failing(DioExceptionType.connectionError),
+      );
+      expect(await startup(updater), isNull);
+    });
+
+    test(
+      'une mise à jour remise à plus tard s\'installe, sans vérifier',
+      () async {
+        final adapter = FakeAdapter.replying('{}');
+        final updater = Updater(
+          version: '0.1.0',
+          installer: _FakeInstaller(Directory.systemTemp, pending: true),
+          adapter: adapter,
+        );
+        expect(await startup(updater), isNull);
+        expect(adapter.calls, 0);
+      },
     );
-    addTearDown(container.dispose);
-    expect(await container.read(startupUpdateProvider.future), isNull);
   });
 
   test('téléchargement : HTTPS chez GitHub seulement', () {

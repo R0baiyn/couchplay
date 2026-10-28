@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -7,17 +6,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../logging.dart';
-import 'hidden_process.dart';
 
 /// Une version publiée plus récente que celle de l'app, et le fichier à
-/// télécharger pour cette variante (installée ou portable).
+/// télécharger pour cette variante (installée, portable, APK d'une
+/// architecture).
 final class Update {
   const Update({
     required this.version,
     required this.notes,
     required this.asset,
     required this.size,
-    required this.portable,
   });
 
   /// Sans le `v` du tag : `0.1.1`.
@@ -30,9 +28,6 @@ final class Update {
   /// Taille annoncée par GitHub, en octets : un téléchargement d'une autre
   /// taille est refusé.
   final int size;
-
-  /// Zip portable, sinon installateur.
-  final bool portable;
 }
 
 /// Numéros d'une version : `v0.1.10+3` donne `[0, 1, 10]`. `null` si le
@@ -67,16 +62,16 @@ bool isAllowedDownload(Uri url) =>
     url.scheme == 'https' && downloadHosts.contains(url.host);
 
 /// La mise à jour proposée par une réponse de `releases/latest`, si elle est
-/// plus récente que [current] et contient le fichier de cette variante.
+/// plus récente que [current] et contient le fichier de cette variante, dont
+/// le nom finit par [suffix].
 Update? updateFrom(
   Object? json, {
   required String current,
-  required bool portable,
+  required String suffix,
 }) {
   if (json is! Map) return null;
   final tag = json['tag_name'];
   if (tag is! String || !isNewer(tag, current)) return null;
-  final suffix = portable ? '-windows-portable.zip' : '-windows-setup.exe';
   final assets = json['assets'];
   for (final asset in assets is List ? assets : const []) {
     if (asset is! Map) continue;
@@ -94,30 +89,49 @@ Update? updateFrom(
       notes: notes is String ? notes.trim() : '',
       asset: url,
       size: size,
-      portable: portable,
     );
   }
   return null;
 }
 
-/// Vérifie les GitHub Releases du dépôt public (sans jeton) et installe une
-/// mise à jour.
-///
-/// L'installation se fait toujours après la fermeture de l'app : un script,
-/// lancé détaché, attend la fin du processus, lance
-/// l'installateur en silencieux ou copie le zip extrait par-dessus le
-/// dossier de l'app, puis relance l'app si on le lui a demandé.
+/// Ce qui change d'une plateforme à l'autre : le fichier de la release à
+/// prendre, et son installation.
+abstract interface class Installer {
+  /// Fin du nom du fichier de cette variante : `-windows-setup.exe`…
+  String get assetSuffix;
+
+  /// Quand s'installe une mise à jour remise à plus tard : la fin de « elle
+  /// s'installera … ».
+  String get later;
+
+  /// Dossier du téléchargement, vidé avant chaque préparation.
+  Directory get workDir;
+
+  /// Nom fixe du fichier téléchargé dans [workDir] : rien de la réponse de
+  /// GitHub n'arrive dans un chemin.
+  String get packageName;
+
+  /// [package], le fichier de [update], est téléchargé et vérifié : le
+  /// prépare pour qu'il s'installe plus tard.
+  Future<void> prepared(Update update, File package);
+
+  /// Installe tout de suite la mise à jour préparée.
+  Future<void> installNow();
+
+  /// Au démarrage, installe une mise à jour préparée lors d'une session
+  /// précédente, si elle est plus récente que [current] : `true` si
+  /// l'installation est lancée.
+  Future<bool> installPending(String current);
+}
+
+/// Vérifie les GitHub Releases du dépôt public (sans jeton), télécharge le
+/// fichier de la variante de l'app, puis le confie à son [Installer].
 final class Updater {
   Updater({
     required this.version,
-    required this.portable,
-    required this.appDir,
-    Directory? workDir,
+    required this.installer,
     HttpClientAdapter? adapter,
-  }) : workDir =
-           workDir ??
-           Directory('${Directory.systemTemp.path}\\couchplay-update'),
-       _dio = Dio(
+  }) : _dio = Dio(
          BaseOptions(
            connectTimeout: const Duration(seconds: 10),
            receiveTimeout: const Duration(seconds: 30),
@@ -125,18 +139,6 @@ final class Updater {
          ),
        ) {
     if (adapter != null) _dio.httpClientAdapter = adapter;
-  }
-
-  /// Pour l'app dont l'exe est dans [appDir], d'après ce qu'il y a à côté :
-  /// le marqueur `portable` du zip, ou le désinstalleur d'Inno Setup de
-  /// l'installation. Ni l'un ni l'autre (un build local, une copie) : `null`,
-  /// pas de mise à jour, qui installerait la version publiée ailleurs puis
-  /// relancerait cette copie inchangée.
-  static Updater? forApp({required String version, required Directory appDir}) {
-    bool has(String name) => File('${appDir.path}\\$name').existsSync();
-    final portable = has('portable');
-    if (!portable && !has('unins000.exe')) return null;
-    return Updater(version: version, portable: portable, appDir: appDir);
   }
 
   /// Dépôt R0baiyn/couchplay désigné par son identifiant, qui ne change
@@ -150,16 +152,7 @@ final class Updater {
   /// Version de l'app en cours.
   final String version;
 
-  /// Zip portable (fichier `portable` à côté de l'exe), sinon installation.
-  final bool portable;
-
-  /// Dossier de l'exe, remplacé par la version portable.
-  final Directory appDir;
-
-  /// Téléchargement et script : vidé à chaque nouvelle préparation. Chemins
-  /// avec `\` : le script les passe à `robocopy`, qui lit `/` comme une
-  /// option.
-  final Directory workDir;
+  final Installer installer;
 
   final Dio _dio;
 
@@ -182,16 +175,20 @@ final class Updater {
         responseType: ResponseType.json,
       ),
     );
-    return updateFrom(response.data, current: version, portable: portable);
+    return updateFrom(
+      response.data,
+      current: version,
+      suffix: installer.assetSuffix,
+    );
   }
 
   // Une préparation par version : « Plus tard » puis « Mettre à jour »
   // n'installe pas deux fois. Un échec se retente au prochain appel.
-  final _prepared = <String, Future<Directory>>{};
+  final _prepared = <String, Future<void>>{};
 
-  /// Télécharge [update] et lance le script qui l'installera à la fermeture
-  /// de l'app, sans la relancer.
-  Future<Directory> prepare(Update update) =>
+  /// Télécharge [update] et le prépare pour qu'il s'installe plus tard
+  /// (voir [Installer.later]).
+  Future<void> prepare(Update update) =>
       _prepared[update.version] ??= _prepare(update)
         ..then<void>(
           (_) {},
@@ -201,36 +198,25 @@ final class Updater {
           },
         );
 
-  /// Prépare [update] si ce n'est pas fait, demande la relance au script,
-  /// puis ferme l'app : l'installation commence aussitôt.
+  /// Prépare [update] si ce n'est pas fait, puis l'installe tout de suite.
   Future<void> installNow(Update update) async {
     await prepare(update);
-    await _file('relaunch').create();
-    exit(0);
+    await installer.installNow();
   }
 
-  /// Noms fixes : rien de la réponse de GitHub n'arrive dans un chemin.
-  File _file(String name) => File('${workDir.path}\\$name');
+  /// Au démarrage : voir [Installer.installPending].
+  Future<bool> installPending() => installer.installPending(version);
 
-  Future<Directory> _prepare(Update update) async {
+  Future<void> _prepare(Update update) async {
+    final workDir = installer.workDir;
     if (await workDir.exists()) await workDir.delete(recursive: true);
     await workDir.create(recursive: true);
-    final package = _file(update.portable ? 'update.zip' : 'update.exe');
+    final package = File(
+      '${workDir.path}${Platform.pathSeparator}${installer.packageName}',
+    );
     await _download(update, package);
-    final script = _file('install.cmd');
-    // Fins de ligne Windows, quelles que soient celles du fichier source.
-    await script.writeAsString(LineSplitter.split(installScript).join('\r\n'));
-    // Chaque chemin est un argument séparé, jamais inséré dans le texte du
-    // script.
-    startHiddenScript(script.path, [
-      '$pid',
-      package.path,
-      appDir.path,
-      Platform.resolvedExecutable,
-      _file('relaunch').path,
-    ]);
-    log('Mise à jour ${update.version} prête, installée à la fermeture');
-    return workDir;
+    await installer.prepared(update, package);
+    log('Mise à jour ${update.version} prête');
   }
 
   /// Suit les redirections à la main : chaque étape doit rester en HTTPS
@@ -292,60 +278,23 @@ final class Updater {
   }
 }
 
-/// Script d'installation, en `.cmd`, sans dépendre de la politique
-/// d'exécution de PowerShell. Ses outils sont fournis avec Windows 10 et 11,
-/// et appelés par leur chemin : un autre `find` ou `tar` dans le PATH (celui
-/// de Git, par exemple) n'est jamais pris.
-///
-/// Arguments : PID de l'app, paquet (`.zip` ou `.exe`), dossier de l'app,
-/// exe à relancer, fichier qui demande la relance. L'app est attendue toutes
-/// les 3 s : après « Plus tard », le script peut attendre des heures. Avec
-/// relance, l'installateur montre sa progression (`/SILENT`) : l'utilisateur
-/// voit que ça avance. L'app est relancée même si l'extraction échoue (elle
-/// reste dans sa version). À la fin, seul un dossier nommé
-/// `couchplay-update` est effacé.
-///
-/// Portable : seul `data\flutter_assets` est remis en miroir, un nom propre
-/// à Flutter ; le reste est seulement recopié. Le zip a pu être extrait au
-/// milieu d'autres fichiers (Bureau, Téléchargements, avec peut-être un
-/// dossier `data` à soi), jamais effacés.
-const installScript = r'''
-@echo off
-setlocal
-set "bin=%SystemRoot%\System32"
-:wait
-"%bin%\tasklist.exe" /fi "PID eq %~1" /fi "IMAGENAME eq %~nx4" /nh > "%~dp2pid.txt"
-"%bin%\find.exe" " %~1 " "%~dp2pid.txt" >nul && ("%bin%\ping.exe" -n 4 127.0.0.1 >nul & goto wait)
-if /i "%~x2"==".zip" (
-  mkdir "%~dp2files"
-  "%bin%\tar.exe" -xf "%~2" -C "%~dp2files" || goto relaunch
-  "%bin%\robocopy.exe" "%~dp2files\data\flutter_assets" "%~3\data\flutter_assets" /mir /r:5 /w:1 >nul
-  "%bin%\robocopy.exe" "%~dp2files" "%~3" /e /r:5 /w:1 >nul
-) else if exist "%~5" (
-  start "" /wait "%~2" /SILENT /SUPPRESSMSGBOXES /NORESTART
-) else (
-  start "" /wait "%~2" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-)
-:relaunch
-if exist "%~5" start "" "%~4"
-for %%d in ("%~dp2.") do if /i "%%~nxd"=="couchplay-update" rd /s /q "%%~fd"
-''';
-
 /// Version de l'app (`pubspec.yaml`), fournie par `main()`.
 final appVersionProvider = Provider<String>(
   (ref) => throw UnimplementedError('appVersionProvider doit être surchargé'),
 );
 
-/// Absent hors de Windows et en debug : `main()` le fournit pour une
-/// version release sous Windows.
+/// Absent en debug, et pour une app sans fichier publié (build local sous
+/// Windows, émulateur Android) : `main()` le fournit sinon.
 final updaterProvider = Provider<Updater?>((ref) => null);
 
-/// Vérification au démarrage. Une erreur réseau ou GitHub donne `null` :
-/// l'app continue sans mise à jour.
+/// Au démarrage : une mise à jour remise à plus tard s'installe d'abord,
+/// sinon on vérifie s'il y en a une. Une erreur réseau ou GitHub donne
+/// `null` : l'app continue sans mise à jour.
 final startupUpdateProvider = FutureProvider<Update?>((ref) async {
   final updater = ref.watch(updaterProvider);
   if (updater == null) return null;
   try {
+    if (await updater.installPending()) return null;
     return await updater.check();
   } on Exception catch (e) {
     log('Vérification des mises à jour', error: e.runtimeType);

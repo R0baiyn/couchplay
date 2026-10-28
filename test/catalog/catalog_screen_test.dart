@@ -19,6 +19,7 @@ import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/settings/settings.dart';
 import 'package:couchplay/update/updater.dart';
+import 'package:couchplay/update/windows_installer.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -214,8 +215,7 @@ void main() {
         updaterProvider.overrideWithValue(
           Updater(
             version: '0.1.0',
-            portable: false,
-            appDir: root,
+            installer: WindowsInstaller(portable: false, appDir: root),
             adapter: FakeAdapter.failing(DioExceptionType.connectionError),
           ),
         ),
@@ -233,7 +233,6 @@ void main() {
         notes: '',
         asset: Uri.parse('https://github.com/x.exe'),
         size: 1,
-        portable: false,
       ),
     );
     await settle(tester);

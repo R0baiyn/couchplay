@@ -14,17 +14,19 @@ import 'app.dart';
 import 'server/cloudflare_dns.dart';
 import 'settings/settings.dart';
 import 'update/updater.dart';
+import 'update/windows_installer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Toutes les connexions HTTP de l'app résolvent les noms par Cloudflare.
   HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
-  final (settings, accounts, support, package) = await (
+  final (settings, accounts, support, package, installer) = await (
     SettingsStore.open(),
     AccountStore.open(),
     getApplicationSupportDirectory(),
     PackageInfo.fromPlatform(),
+    _installer(),
   ).wait;
   final files = AccountFiles(Directory('${support.path}/accounts'));
   // En tâche de fond : ne retarde pas le premier rendu.
@@ -36,15 +38,22 @@ Future<void> main() async {
         accountStoreProvider.overrideWithValue(accounts),
         accountFilesProvider.overrideWithValue(files),
         appVersionProvider.overrideWithValue(package.version),
-        if (Platform.isWindows && kReleaseMode)
+        if (installer != null)
           updaterProvider.overrideWithValue(
-            Updater.forApp(
-              version: package.version,
-              appDir: File(Platform.resolvedExecutable).parent,
-            ),
+            Updater(version: package.version, installer: installer),
           ),
       ],
       child: const CouchPlayApp(home: HomeGate()),
     ),
   );
+}
+
+/// L'installation des mises à jour, pour une version release qui a un
+/// fichier publié : installée ou portable sous Windows.
+Future<Installer?> _installer() async {
+  if (!kReleaseMode) return null;
+  if (Platform.isWindows) {
+    return WindowsInstaller.forApp(File(Platform.resolvedExecutable).parent);
+  }
+  return null;
 }
