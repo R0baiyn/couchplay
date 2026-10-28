@@ -59,6 +59,8 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   /// recherche et les versions : deux requêtes. L'écran garde ses données
   /// (et la grille sa position) pendant le rechargement.
   Future<void> _refresh() async {
+    // Tirer la grille pendant un rechargement ne le relance pas.
+    if (_refreshing) return;
     setState(() => _refreshing = true);
     try {
       await ref.read(categoriesProvider(_kind).notifier).refresh();
@@ -198,6 +200,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       kind: _kind,
                       categoryId: current.id,
                       onOpen: _open,
+                      onRefresh: _refresh,
                     ),
                   ),
                 ],
@@ -214,6 +217,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               kind: _kind,
               categoryId: current.id,
               onOpen: _open,
+              onRefresh: _refresh,
               header: SliverAppBar(
                 floating: true,
                 snap: true,
@@ -284,19 +288,23 @@ class _CategoryList extends StatelessWidget {
   }
 }
 
-/// Grille d'une catégorie, avec son éventuel en-tête repliable.
+/// Grille d'une catégorie, avec son éventuel en-tête repliable. La tirer
+/// vers le bas l'actualise (toucher) ; « Actualiser » fait de même à la
+/// souris et à la télécommande.
 class _CategoryItems extends ConsumerWidget {
   const _CategoryItems({
     super.key,
     required this.kind,
     required this.categoryId,
     required this.onOpen,
+    required this.onRefresh,
     this.header,
   });
 
   final ContentKind kind;
   final String categoryId;
   final ValueChanged<CatalogEntry> onOpen;
+  final RefreshCallback onRefresh;
 
   /// En-tête qui défile avec la grille (écran étroit).
   final Widget? header;
@@ -305,15 +313,20 @@ class _CategoryItems extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final loaded = ref.watch(itemsProvider((kind, categoryId)));
     return FocusTraversalGroup(
-      child: CustomScrollView(
-        slivers: [
-          ?header,
-          ..._content(
-            loaded,
-            // Réessayer refait l'index : la grille en dépend.
-            onRetry: () => ref.invalidate(catalogIndexProvider(kind)),
-          ),
-        ],
+      child: RefreshIndicator(
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          // Une catégorie courte ou vide se tire aussi.
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            ?header,
+            ..._content(
+              loaded,
+              // Réessayer refait l'index : la grille en dépend.
+              onRetry: () => ref.invalidate(catalogIndexProvider(kind)),
+            ),
+          ],
+        ),
       ),
     );
   }

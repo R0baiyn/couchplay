@@ -681,6 +681,25 @@ void main() {
     expect(find.text('Libre (2024)'), findsOneWidget);
   });
 
+  testWidgets('tirer la grille vers le bas l\'actualise (toucher)', (
+    tester,
+  ) async {
+    await pumpApp(tester, size: const Size(400, 800));
+    final fake = server as FakeAdapter;
+    final before = fake.calls;
+
+    await tester.fling(find.text('Libre (2024)'), const Offset(0, 400), 1000);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await settle(tester);
+    expect(
+      fake.calls,
+      before + 2,
+      reason: 'catégories et liste complète, une fois chacune',
+    );
+    expect(find.text('Libre (2024)'), findsOneWidget);
+  });
+
   testWidgets('retour : d\'un onglet vers l\'Accueil, puis quitte', (
     tester,
   ) async {
