@@ -1,0 +1,65 @@
+name: release
+
+# Un tag v* publie la release Windows (zip portable et installateur).
+# Lancé à la main, il vérifie seulement que tout se construit.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.8
+          channel: stable
+          cache: true
+
+      - name: Version
+        id: version
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Le tag $env:GITHUB_REF_NAME ne correspond pas à la version $version de pubspec.yaml"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build windows --release
+
+      - name: Installateur
+        run: |
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --no-progress -y
+            $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe" | Select-Object -First 1
+          }
+          & $iscc.FullName /DAppVersion=${{ steps.version.outputs.version }} "/O$PWD\dist" windows\installer.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Zip portable
+        run: |
+          $release = 'build\windows\x64\runner\Release'
+          New-Item -ItemType File "$release\portable" | Out-Null
+          Compress-Archive -Path "$release\*" -DestinationPath "dist\couchplay-${{ steps.version.outputs.version }}-windows-portable.zip"
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Le checkout ne garde pas le message du tag annoté : les notes en viennent.
+          git fetch --force origin "refs/tags/${env:GITHUB_REF_NAME}:refs/tags/${env:GITHUB_REF_NAME}"
+          gh release create $env:GITHUB_REF_NAME (Get-ChildItem dist).FullName --title "CouchPlay $env:GITHUB_REF_NAME" --notes-from-tag

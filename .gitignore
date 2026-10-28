@@ -54,3 +54,6 @@ probe/
 android/key.properties
 *.jks
 *.keystore
+
+# Installateur et zip construits en local
+/dist/
