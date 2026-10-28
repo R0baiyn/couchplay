@@ -1,7 +1,7 @@
 """Faux serveur de catalogue, pour essayer l'app sans solliciter le vrai.
 
 Lancement : python -I tools/faux-serveur.py [--port 8080] [--donnees DIR]
-            [--video FICHIER] [--video-hd FICHIER]
+            [--video FICHIER] [--video-hd FICHIER] [--max-par-categorie N]
 
 Dans l'app : hôte http://localhost:8080 (PC) ou http://<IP du PC>:8080
 (téléphone), mot de passe quelconque. Le nom d'utilisateur choisit le
@@ -208,6 +208,18 @@ class Requete(BaseHTTPRequestHandler):
         self.wfile.write(corps)
 
 
+def premiers_par_categorie(entrees: list, n: int) -> list:
+    """Les n premières entrées de chaque catégorie, dans leur ordre."""
+    vues: dict[str, int] = {}
+    gardees = []
+    for e in entrees:
+        cle = str(e.get('category_id'))
+        if vues.get(cle, 0) < n:
+            vues[cle] = vues.get(cle, 0) + 1
+            gardees.append(e)
+    return gardees
+
+
 def principal():
     sondes = RACINE / 'probe'
     arguments = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -231,13 +243,25 @@ def principal():
         if (sondes / 'mire-720p.mkv').is_file()
         else None,
     )
+    # L'émulateur Android TV perd quelques octets sur les gros transferts :
+    # les listes complètes (8 Mo) y échouent, quelques centaines de Ko
+    # passent presque toujours.
+    arguments.add_argument(
+        '--max-par-categorie',
+        type=int,
+        metavar='N',
+        help='ne garder que les N premiers titres de chaque catégorie',
+    )
     a = arguments.parse_args()
     Requete.donnees = a.donnees
     Requete.video = a.video
     Requete.video_hd = a.video_hd
     for action in ('get_vod_streams', 'get_series'):
         fichier = a.donnees / FICHIERS[action]
-        Requete.listes[action] = json.loads(fichier.read_text(encoding='utf-8'))
+        entrees = json.loads(fichier.read_text(encoding='utf-8'))
+        if a.max_par_categorie is not None:
+            entrees = premiers_par_categorie(entrees, a.max_par_categorie)
+        Requete.listes[action] = entrees
     Requete.noms_films = {
         str(f.get('stream_id')): str(f.get('name') or '')
         for f in Requete.listes['get_vod_streams']

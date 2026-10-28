@@ -30,6 +30,12 @@ def api(port, utilisateur, action=''):
 
 
 def principal():
+    entrees = [{'category_id': c, 'n': i} for i, c in enumerate('aabaab')]
+    assert faux.premiers_par_categorie(entrees, 2) == [
+        entrees[0], entrees[1], entrees[2], entrees[5]
+    ]
+    assert faux.premiers_par_categorie(entrees, 0) == []
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as dossier:
         # Assez gros pour qu'un flux non lu reste ouvert côté serveur.
         video = Path(dossier) / 'mire.mkv'
