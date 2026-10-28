@@ -17,9 +17,15 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      # Actions figées par SHA : un tag déplacé ne peut pas changer ce qui
+      # tourne ici avec le droit de publier une release.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Le jeton n'est pas laissé dans .git/config pour les étapes
+          # suivantes ; le dépôt est public, le fetch du tag s'en passe.
+          persist-credentials: false
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.8
           channel: stable
@@ -34,19 +40,17 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - run: flutter pub get
+      # Versions et empreintes exactes de pubspec.lock, sinon échec.
+      - run: flutter pub get --enforce-lockfile
       - run: flutter analyze
       - run: flutter test
       - run: flutter build windows --release
 
       - name: Installateur
         run: |
-          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $iscc) {
-            choco install innosetup --no-progress -y
-            $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe" | Select-Object -First 1
-          }
-          & $iscc.FullName /DAppVersion=${{ steps.version.outputs.version }} "/O$PWD\dist" windows\installer.iss
+          choco install innosetup --version 6.7.1 --allow-downgrade --no-progress -y
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=${{ steps.version.outputs.version }} "/O$PWD\dist" windows\installer.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Zip portable
