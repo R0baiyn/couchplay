@@ -17,7 +17,6 @@ import 'package:couchplay/search/search_screen.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
-import 'package:couchplay/settings/settings.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
 import 'package:dio/dio.dart';
@@ -27,8 +26,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import '../support/fake_server.dart';
 import '../support/settle.dart';
@@ -74,9 +71,6 @@ void main() {
     // Comme au lancement de l'app : le dossier du compte existe.
     Directory('${root.path}/accounts/compte').createSync(recursive: true);
     FlutterSecureStorage.setMockInitialValues({});
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-    final settings = await tester.runAsync(SettingsStore.open);
     final store = await tester.runAsync(() async {
       final store = await AccountStore.open();
       await store.save(
@@ -96,7 +90,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          settingsStoreProvider.overrideWithValue(settings!),
           appVersionProvider.overrideWithValue('0.1.0'),
           accountStoreProvider.overrideWithValue(store!),
           accountFilesProvider.overrideWithValue(

@@ -13,7 +13,6 @@ import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
 import 'app.dart';
 import 'server/cloudflare_dns.dart';
-import 'settings/settings.dart';
 import 'update/android_installer.dart';
 import 'update/updater.dart';
 import 'update/windows_installer.dart';
@@ -23,8 +22,7 @@ Future<void> main() async {
   // Toutes les connexions HTTP de l'app résolvent les noms par Cloudflare.
   HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
-  final (settings, accounts, support, package, installer) = await (
-    SettingsStore.open(),
+  final (accounts, support, package, installer) = await (
     AccountStore.open(),
     getApplicationSupportDirectory(),
     PackageInfo.fromPlatform(),
@@ -36,7 +34,6 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        settingsStoreProvider.overrideWithValue(settings),
         accountStoreProvider.overrideWithValue(accounts),
         accountFilesProvider.overrideWithValue(files),
         appVersionProvider.overrideWithValue(package.version),

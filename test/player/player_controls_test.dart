@@ -1,14 +1,10 @@
 import 'package:couchplay/app.dart';
 import 'package:couchplay/player/player_controls.dart';
-import 'package:couchplay/settings/settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 /// Lecteur sans libmpv : en lecture, aucun flux, chaque appel compté.
 class _FakePlayer implements Player {
@@ -42,23 +38,17 @@ void main() {
 
   /// Dans l'app entière : ses réglages de navigation (télécommande) comptent.
   Future<void> pumpControls(WidgetTester tester) async {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-    final settings = await tester.runAsync(SettingsStore.open);
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [settingsStoreProvider.overrideWithValue(settings!)],
-        child: CouchPlayApp(
-          home: Scaffold(
-            body: PlayerControls(
-              player: player,
-              title: 'Libre',
-              fill: false,
-              onToggleFill: () {},
-              fullscreen: null,
-              onToggleFullscreen: () {},
-              onExit: () {},
-            ),
+      CouchPlayApp(
+        home: Scaffold(
+          body: PlayerControls(
+            player: player,
+            title: 'Libre',
+            fill: false,
+            onToggleFill: () {},
+            fullscreen: null,
+            onToggleFullscreen: () {},
+            onExit: () {},
           ),
         ),
       ),

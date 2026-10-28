@@ -7,15 +7,12 @@ import 'package:couchplay/accounts/login_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/server/server_client.dart';
-import 'package:couchplay/settings/settings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import '../support/fake_server.dart';
 
@@ -25,14 +22,10 @@ void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   Future<ProviderContainer> pumpApp(WidgetTester tester) async {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-    final settings = await tester.runAsync(SettingsStore.open);
     final store = await tester.runAsync(AccountStore.open);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          settingsStoreProvider.overrideWithValue(settings!),
           accountStoreProvider.overrideWithValue(store!),
           accountFilesProvider.overrideWithValue(
             AccountFiles(Directory.systemTemp.createTempSync('couchplay_')),

@@ -6,7 +6,6 @@ import '../accounts/accounts_screen.dart';
 import '../catalog/catalog_settings_screen.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
-import 'settings.dart';
 
 /// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
 /// réglages en bas de ce rail plutôt que dans l'en-tête de chaque onglet :
@@ -62,18 +61,11 @@ class SettingsButton extends StatelessWidget {
 }
 
 /// Réglages de l'app.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  static const _themeLabels = {
-    ThemePreference.system: 'Comme le système',
-    ThemePreference.light: 'Clair',
-    ThemePreference.dark: 'Sombre',
-  };
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = ref.watch(themePreferenceProvider);
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
       body: ListView(
@@ -111,25 +103,6 @@ class SettingsScreen extends ConsumerWidget {
               MaterialPageRoute<void>(
                 builder: (_) => const CatalogSettingsScreen(),
               ),
-            ),
-          ),
-          const Divider(),
-          const ListTile(title: Text('Thème')),
-          RadioGroup<ThemePreference>(
-            groupValue: theme,
-            onChanged: (value) {
-              if (value != null) {
-                ref.read(themePreferenceProvider.notifier).set(value);
-              }
-            },
-            child: Column(
-              children: [
-                for (final value in ThemePreference.values)
-                  RadioListTile<ThemePreference>(
-                    value: value,
-                    title: Text(_themeLabels[value]!),
-                  ),
-              ],
             ),
           ),
           const Divider(),

@@ -10,18 +10,16 @@ import 'library/home_screen.dart';
 import 'search/search_index.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
-import 'settings/settings.dart';
 import 'settings/settings_screen.dart';
 import 'update/update_dialog.dart';
 import 'update/updater.dart';
 
-class CouchPlayApp extends ConsumerWidget {
+/// L'app, toujours en thème sombre : une salle de cinéma, pas un bureau.
+class CouchPlayApp extends StatelessWidget {
   const CouchPlayApp({super.key, required this.home});
 
   final Widget home;
 
-  // Construits une seule fois : MaterialApp ne recalcule rien au changement de thème.
-  static final _light = ThemeData(colorSchemeSeed: Colors.deepPurple);
   static final _dark = ThemeData(
     colorSchemeSeed: Colors.deepPurple,
     brightness: Brightness.dark,
@@ -45,16 +43,11 @@ class CouchPlayApp extends ConsumerWidget {
   };
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(
-      themePreferenceProvider.select((theme) => theme.themeMode),
-    );
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CouchPlay',
       debugShowCheckedModeBanner: false,
-      theme: _light,
-      darkTheme: _dark,
-      themeMode: themeMode,
+      theme: _dark,
       navigatorKey: _navigator,
       // Échap revient en arrière partout, comme le bouton retour (clavier,
       // télécommande). Placé au-dessus du Navigator, ce raccourci reçoit la
