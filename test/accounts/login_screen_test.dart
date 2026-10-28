@@ -93,8 +93,7 @@ void main() {
     bool focusedAt(int index) =>
         tester.widget<EditableText>(fields.at(index)).focusNode.hasFocus;
 
-    await tester.tap(fields.at(0));
-    await tester.pump();
+    // Le premier champ a le focus dès l'ouverture : rien à toucher (TV).
     expect(focusedAt(0), isTrue);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();

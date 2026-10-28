@@ -699,6 +699,21 @@ void main() {
     expect(find.text('Libre (2024)'), findsOneWidget);
   });
 
+  testWidgets('télécommande : au lancement, une flèche donne le focus', (
+    tester,
+  ) async {
+    await pumpApp(tester, openMovies: false);
+    // Rien n'a le focus tant qu'on n'a pas appuyé (pas de toucher sur TV).
+    final primary = FocusManager.instance.primaryFocus;
+    expect(primary is FocusScopeNode || primary == null, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    final focused = FocusManager.instance.primaryFocus;
+    expect(focused, isNot(isA<FocusScopeNode>()));
+    expect(focused?.context, isNotNull);
+  });
+
   testWidgets('retour : d\'un onglet vers l\'Accueil, puis quitte', (
     tester,
   ) async {
