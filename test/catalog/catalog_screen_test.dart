@@ -125,16 +125,11 @@ void main() {
     }
   }
 
-  /// Liste des catégories du grand écran : défile jusqu'à [name] (vers le
-  /// haut avec [up]), l'ouvre.
-  Future<void> openCategory(
-    WidgetTester tester,
-    String name, {
-    bool up = false,
-  }) async {
+  /// Liste des catégories du grand écran : défile jusqu'à [name], l'ouvre.
+  Future<void> openCategory(WidgetTester tester, String name) async {
     await tester.scrollUntilVisible(
       find.text(name),
-      up ? -200 : 200,
+      200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.tap(find.text(name));
@@ -638,28 +633,6 @@ void main() {
     expect(find.text('Aucun résultat pour « zzz ».'), findsOneWidget);
   });
 
-  testWidgets('Filtrer : la grille de la catégorie, vidé en changeant', (
-    tester,
-  ) async {
-    await pumpApp(tester);
-    // Libre et The King Tide.
-    await openCategory(tester, 'FR · FILMS HD');
-    final field = find.byType(TextField);
-    expect(field, findsOneWidget);
-
-    await tester.enterText(field, 'king');
-    await tester.pump();
-    expect(find.text('The King Tide (2024)'), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsNothing);
-
-    await tester.enterText(field, 'zzz');
-    await tester.pump();
-    expect(find.textContaining('Rien ne correspond à « zzz »'), findsOneWidget);
-
-    await openCategory(tester, 'Films 4K', up: true);
-    expect(find.text('Libre (2024)'), findsOneWidget);
-  });
-
   testWidgets('Fiche : versions, la meilleure d\'abord, favori de la choisie', (
     tester,
   ) async {
@@ -686,19 +659,12 @@ void main() {
     expect(container.read(libraryProvider).favorites.keys, ['movie:144014']);
   });
 
-  testWidgets('« / » : le champ de l\'onglet ; rien sur une fiche', (
+  testWidgets('« / » : la recherche depuis les films ; rien sur une fiche', (
     tester,
   ) async {
     await pumpApp(tester);
-    final filter = find.byType(EditableText);
-    bool focused() => tester.widget<EditableText>(filter).focusNode.hasFocus;
-    expect(focused(), isFalse);
-
-    // Hors d'un champ, « / » y place le curseur.
-    await tester.sendKeyEvent(LogicalKeyboardKey.slash, character: '/');
-    await settle(tester);
-    expect(focused(), isTrue);
-    expect(find.byType(SearchScreen), findsNothing);
+    // Pas de champ dans les films : chercher passe par l'onglet Recherche.
+    expect(find.byType(EditableText), findsNothing);
 
     // Sur une fiche, Ctrl+F et « / » ne font rien.
     await tester.tap(find.text('Libre (2024)'));
@@ -710,6 +676,19 @@ void main() {
     await settle(tester);
     expect(find.byType(MovieScreen), findsOneWidget);
     expect(find.byType(SearchScreen), findsNothing);
+
+    // Revenu aux films, « / » ouvre la recherche, le curseur dans son champ.
+    await tester.pageBack();
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.slash, character: '/');
+    await settle(tester);
+    expect(find.byType(SearchScreen), findsOneWidget);
+    final field = find.descendant(
+      of: find.byType(SearchScreen),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+    expect(tester.widget<EditableText>(field).controller.text, isEmpty);
   });
 
   testWidgets('pastilles : cœur et coche, même d\'une autre catégorie', (
@@ -828,42 +807,18 @@ void main() {
     expect(find.text('Nouveauté (2026)'), findsOneWidget);
   });
 
-  testWidgets('téléphone : la loupe ouvre le filtre à la place du titre', (
+  testWidgets('téléphone : titre et boutons dans l\'en-tête, sans filtre', (
     tester,
   ) async {
     await pumpApp(tester, size: const Size(400, 800));
-    expect(find.byType(SearchBar), findsNothing);
     // Pas de rail : les réglages restent dans l'en-tête.
     expect(find.byTooltip('Réglages'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Filtrer'));
-    await settle(tester);
-    expect(find.byType(SearchBar), findsOneWidget);
-    expect(find.byTooltip('Actualiser'), findsNothing);
-    await tester.enterText(find.byType(EditableText), 'zzz');
-    await tester.pump();
-    expect(find.textContaining('Rien ne correspond à « zzz »'), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsNothing);
-
-    // Fermer vide le filtre et rend le titre et les boutons.
-    await tester.tap(find.byTooltip('Fermer le filtre'));
-    await settle(tester);
-    expect(find.byType(SearchBar), findsNothing);
     expect(find.byTooltip('Actualiser'), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsOneWidget);
-
-    // Ctrl+F l'ouvre aussi, le curseur dedans.
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    await settle(tester);
-    expect(
-      tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus,
-      isTrue,
-    );
+    expect(find.byTooltip('Filtrer'), findsNothing);
+    expect(find.byType(EditableText), findsNothing);
   });
 
-  testWidgets('grand écran : réglages en bas du rail, filtre dans l\'en-tête', (
+  testWidgets('grand écran : réglages en bas du rail', (
     tester,
   ) async {
     await pumpApp(tester);
@@ -879,9 +834,6 @@ void main() {
       greaterThan(tester.getTopLeft(find.text('Recherche')).dy),
     );
     expect(tester.getBottomLeft(settings).dy, greaterThan(800 - 100));
-
-    final bar = find.byType(SearchBar);
-    expect(bar, findsOneWidget);
-    expect(tester.getSize(bar).width, 320);
   });
+
 }

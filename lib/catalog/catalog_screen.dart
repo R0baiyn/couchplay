@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,37 +27,19 @@ void openDetails(BuildContext context, CatalogEntry entry) => Navigator.push(
 /// Onglet Films ou Séries : catégories visibles, puis la grille de celle
 /// choisie. Catégories en panneau latéral sur grand écran ; sur téléphone,
 /// un bouton dans un en-tête qui se replie au défilement ouvre leur liste.
-///
-/// « Filtrer » réduit la grille aux titres qui contiennent les mots tapés,
-/// dans la catégorie affichée seulement : une barre à droite de l'en-tête
-/// sur grand écran ; sur téléphone, une loupe qui remplace le titre par la
-/// barre.
+/// Chercher un titre passe par l'onglet Recherche.
 class CatalogScreen extends ConsumerStatefulWidget {
   const CatalogScreen({super.key, required this.kind});
 
   final ContentKind kind;
 
   @override
-  ConsumerState<CatalogScreen> createState() => CatalogScreenState();
+  ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
 }
 
-class CatalogScreenState extends ConsumerState<CatalogScreen> {
+class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   String? _selectedId;
   var _refreshing = false;
-  final _filter = TextEditingController();
-  final _filterFocus = FocusNode();
-
-  /// Barre de filtre ouverte à la place du titre (écran étroit).
-  var _filtering = false;
-
-  /// Texte du filtre seul : bouger le curseur ne refiltre pas la grille.
-  final _query = ValueNotifier('');
-
-  @override
-  void initState() {
-    super.initState();
-    _filter.addListener(() => _query.value = _filter.text);
-  }
 
   ContentKind get _kind => widget.kind;
 
@@ -72,34 +53,7 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
     child: LinearProgressIndicator(),
   );
 
-  @override
-  void dispose() {
-    _filter.dispose();
-    _filterFocus.dispose();
-    _query.dispose();
-    super.dispose();
-  }
-
-  /// Ctrl+F (voir `HomeShell`) : ouvre la barre si besoin, curseur dedans.
-  void focusFilter() {
-    setState(() => _filtering = true);
-    // Après la reconstruction : la barre vient peut-être d'apparaître.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _filterFocus.requestFocus();
-    });
-  }
-
-  void _closeFilter() => setState(() {
-    _filtering = false;
-    _filter.clear();
-  });
-
-  /// Une autre catégorie repart sans filtre.
-  void _select(String id) => setState(() {
-    _selectedId = id;
-    _filtering = false;
-    _filter.clear();
-  });
+  void _select(String id) => setState(() => _selectedId = id);
 
   /// Catégories, puis la liste complète du type, d'où viennent la grille, la
   /// recherche et les versions : deux requêtes. L'écran garde ses données
@@ -157,12 +111,7 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
     if (id != null && id != selectedId && mounted) _select(id);
   }
 
-  List<Widget> _actions(
-    AsyncValue<Object?> categories,
-    Category? selected, {
-    Widget? filter,
-  }) => [
-    ?filter,
+  List<Widget> _actions(AsyncValue<Object?> categories) => [
     IconButton(
       tooltip: 'Actualiser',
       icon: const Icon(Icons.refresh),
@@ -170,31 +119,6 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
     ),
     const SettingsButton(),
   ];
-
-  /// Barre « Filtrer » : [leading] la ferme sur écran étroit, sinon une
-  /// loupe ; la croix efface le texte.
-  Widget _filterBar({Widget? leading}) => SearchBar(
-    controller: _filter,
-    focusNode: _filterFocus,
-    hintText: 'Filtrer',
-    textInputAction: TextInputAction.search,
-    elevation: const WidgetStatePropertyAll(0),
-    constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
-    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
-    leading: leading ?? const Icon(Icons.search),
-    trailing: [
-      ValueListenableBuilder(
-        valueListenable: _query,
-        builder: (context, text, _) => text.isEmpty
-            ? const SizedBox.shrink()
-            : IconButton(
-                tooltip: 'Effacer',
-                icon: const Icon(Icons.clear),
-                onPressed: _filter.clear,
-              ),
-      ),
-    ],
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -212,21 +136,10 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
 
     // Barre fixe classique, quand il n'y a pas de grille sous laquelle
     // replier l'en-tête (chargement, erreur, grand écran).
-    // Sur grand écran, le filtre est une barre de largeur fixe, à droite,
-    // près des boutons.
-    Widget plain(Widget body, {bool withFilter = false}) => Scaffold(
+    Widget plain(Widget body) => Scaffold(
       appBar: AppBar(
         title: Text(_title),
-        actions: _actions(
-          categories,
-          selected,
-          filter: withFilter
-              ? Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: SizedBox(width: 320, child: _filterBar()),
-                )
-              : null,
-        ),
+        actions: _actions(categories),
         bottom: _refreshing ? _progress : null,
       ),
       body: body,
@@ -284,49 +197,28 @@ class CatalogScreenState extends ConsumerState<CatalogScreen> {
                       key: key,
                       kind: _kind,
                       categoryId: current.id,
-                      query: _query,
                       onOpen: _open,
                     ),
                   ),
                 ],
               ),
-              withFilter: true,
             );
           }
           // Écran étroit : titre, boutons et catégorie forment un en-tête
           // qui se replie quand on descend et revient dès qu'on remonte,
           // pour laisser la hauteur aux affiches. La catégorie se choisit
-          // dans la liste complète, en panneau du bas ; la loupe remplace le
-          // titre et les boutons par la barre de filtre, sur toute la ligne.
+          // dans la liste complète, en panneau du bas.
           return Scaffold(
             body: _CategoryItems(
               key: key,
               kind: _kind,
               categoryId: current.id,
-              query: _query,
               onOpen: _open,
               header: SliverAppBar(
                 floating: true,
                 snap: true,
-                title: _filtering
-                    ? _filterBar(
-                        leading: IconButton(
-                          tooltip: 'Fermer le filtre',
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: _closeFilter,
-                        ),
-                      )
-                    : Text(_title),
-                actions: _filtering
-                    ? null
-                    : [
-                        IconButton(
-                          tooltip: 'Filtrer',
-                          icon: const Icon(Icons.search),
-                          onPressed: focusFilter,
-                        ),
-                        ..._actions(categories, current),
-                      ],
+                title: Text(_title),
+                actions: _actions(categories),
                 bottom: PreferredSize(
                   preferredSize: Size.fromHeight(
                     _pickerHeight + (_refreshing ? 4 : 0),
@@ -392,22 +284,18 @@ class _CategoryList extends StatelessWidget {
   }
 }
 
-/// Grille d'une catégorie, réduite par le texte de [query], avec son
-/// éventuel en-tête repliable.
+/// Grille d'une catégorie, avec son éventuel en-tête repliable.
 class _CategoryItems extends ConsumerWidget {
   const _CategoryItems({
     super.key,
     required this.kind,
     required this.categoryId,
-    required this.query,
     required this.onOpen,
     this.header,
   });
 
   final ContentKind kind;
   final String categoryId;
-  final ValueListenable<String> query;
-
   final ValueChanged<CatalogEntry> onOpen;
 
   /// En-tête qui défile avec la grille (écran étroit).
@@ -416,29 +304,22 @@ class _CategoryItems extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final loaded = ref.watch(itemsProvider((kind, categoryId)));
-    // Seules les affiches suivent la frappe ; l'en-tête, et le champ qu'il
-    // contient, restent les mêmes widgets.
     return FocusTraversalGroup(
-      child: ValueListenableBuilder(
-        valueListenable: query,
-        builder: (context, text, _) => CustomScrollView(
-          slivers: [
-            ?header,
-            ..._content(
-              loaded,
-              text,
-              // Réessayer refait l'index : la grille en dépend.
-              onRetry: () => ref.invalidate(catalogIndexProvider(kind)),
-            ),
-          ],
-        ),
+      child: CustomScrollView(
+        slivers: [
+          ?header,
+          ..._content(
+            loaded,
+            // Réessayer refait l'index : la grille en dépend.
+            onRetry: () => ref.invalidate(catalogIndexProvider(kind)),
+          ),
+        ],
       ),
     );
   }
 
   List<Widget> _content(
-    AsyncValue<Loaded<List<CatalogEntry>>?> loaded,
-    String query, {
+    AsyncValue<Loaded<List<CatalogEntry>>?> loaded, {
     required VoidCallback onRetry,
   }) {
     Widget fill(Widget child) =>
@@ -449,27 +330,15 @@ class _CategoryItems extends ConsumerWidget {
       AsyncValue(value: final value?) when value.value.isEmpty => [
         fill(const Center(child: Text('Cette catégorie est vide.'))),
       ],
-      AsyncValue(value: final value?) => switch (search(value.value, query)) {
-        final entries when entries.isEmpty => [
-          fill(
-            Center(
-              child: Text(
-                'Rien ne correspond à « ${query.trim()} » '
-                'dans cette catégorie.',
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ],
-        final entries => [
-          if (value.offline)
-            SliverToBoxAdapter(child: OfflineBanner(savedAt: value.savedAt)),
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverPosterGrid(entries: entries, onOpen: onOpen),
-          ),
-        ],
-      },
+      AsyncValue(value: final value?) => [
+        if (value.offline)
+          SliverToBoxAdapter(child: OfflineBanner(savedAt: value.savedAt)),
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverPosterGrid(entries: value.value, onOpen: onOpen),
+        ),
+      ],
+
       AsyncError(:final error) when !loaded.isLoading => [
         fill(ErrorView(error: error, onRetry: onRetry)),
       ],

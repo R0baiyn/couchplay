@@ -76,9 +76,8 @@ class HomeGate extends ConsumerWidget {
 ///
 /// Une fois l'accueil affiché, l'index des films et celui des séries (d'où
 /// viennent les grilles, la recherche et les versions) se chargent en
-/// arrière-plan et restent chargés tant que cet écran existe. Ctrl+F ou / place le curseur
-/// dans le champ de l'onglet : « Filtrer » des films et des séries, sinon la
-/// recherche.
+/// arrière-plan et restent chargés tant que cet écran existe. Ctrl+F ou /
+/// ouvre la recherche, le curseur dans son champ.
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
@@ -101,13 +100,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   // les films ni les séries tant qu'on ne les ouvre pas. Ensuite, il garde son état.
   final _visited = {0};
 
-  /// Pour Ctrl+F : le champ de la recherche, la barre de filtre des films et
-  /// des séries (qui s'ouvre d'abord sur téléphone).
+  /// Pour Ctrl+F : le champ de la recherche.
   final _searchField = FocusNode();
-  final _catalogs = {
-    1: GlobalKey<CatalogScreenState>(),
-    2: GlobalKey<CatalogScreenState>(),
-  };
 
   final _indexes = <ProviderSubscription<Object?>>[];
 
@@ -142,20 +136,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       _index = index;
       _visited.add(index);
     });
-    // La recherche s'ouvre prête à taper.
-    if (index == _searchTab) _focusField();
-  }
-
-  /// Après la reconstruction : un onglet tout juste créé n'a pas encore
-  /// attaché son champ.
-  void _focusField() => WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    if (_index == _searchTab) {
-      _searchField.requestFocus();
-    } else {
-      _catalogs[_index]?.currentState?.focusFilter();
+    // La recherche s'ouvre prête à taper. Après la reconstruction : un
+    // onglet tout juste créé n'a pas encore attaché son champ.
+    if (index == _searchTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchField.requestFocus();
+      });
     }
-  });
+  }
 
   /// `true` : touche prise ; sur ordinateur, son caractère (« / ») n'est
   /// alors pas tapé.
@@ -176,11 +164,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ?.findAncestorWidgetOfExactType<EditableText>() ==
             null;
     if (!ctrlF && !slash) return false;
-    if (_index != 0) {
-      _focusField();
-    } else {
-      _select(_searchTab);
-    }
+    _select(_searchTab);
     return true;
   }
 
@@ -190,8 +174,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   Widget _tab(int index) => switch (index) {
     0 => const HomeScreen(),
-    1 => CatalogScreen(key: _catalogs[1], kind: ContentKind.movies),
-    2 => CatalogScreen(key: _catalogs[2], kind: ContentKind.series),
+    1 => const CatalogScreen(kind: ContentKind.movies),
+    2 => const CatalogScreen(kind: ContentKind.series),
+
     _ => SearchScreen(focusNode: _searchField),
   };
 
