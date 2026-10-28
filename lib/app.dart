@@ -121,9 +121,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         _indexes.add(ref.listenManual(catalogIndexProvider(kind), (_, _) {}));
       }
     });
+    // Déjà connue si l'accueil est recréé (reconnexion) : lue directement,
+    // pas de setState pendant initState.
+    _update = ref.read(startupUpdateProvider).value;
     ref.listenManual(startupUpdateProvider, (_, next) {
       if (next.value case final update?) setState(() => _update = update);
-    }, fireImmediately: true);
+    });
   }
 
   /// Mise à jour trouvée au démarrage, pas encore proposée : elle attend que
