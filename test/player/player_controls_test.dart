@@ -1,16 +1,24 @@
+import 'package:couchplay/app.dart';
 import 'package:couchplay/player/player_controls.dart';
+import 'package:couchplay/settings/settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 /// Lecteur sans libmpv : en lecture, aucun flux, chaque appel compté.
 class _FakePlayer implements Player {
   final calls = <Symbol>[];
 
   @override
-  final state = const PlayerState(playing: true);
+  final state = const PlayerState(
+    playing: true,
+    duration: Duration(minutes: 90),
+  );
 
   @override
   final PlayerStream stream = _NoStreams();
@@ -32,21 +40,31 @@ void main() {
 
   setUp(() => player = _FakePlayer());
 
-  Future<void> pumpControls(WidgetTester tester) => tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: PlayerControls(
-          player: player,
-          title: 'Libre',
-          fill: false,
-          onToggleFill: () {},
-          fullscreen: null,
-          onToggleFullscreen: () {},
-          onExit: () {},
+  /// Dans l'app entière : ses réglages de navigation (télécommande) comptent.
+  Future<void> pumpControls(WidgetTester tester) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    final settings = await tester.runAsync(SettingsStore.open);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [settingsStoreProvider.overrideWithValue(settings!)],
+        child: CouchPlayApp(
+          home: Scaffold(
+            body: PlayerControls(
+              player: player,
+              title: 'Libre',
+              fill: false,
+              onToggleFill: () {},
+              fullscreen: null,
+              onToggleFullscreen: () {},
+              onExit: () {},
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+    await tester.pump();
+  }
 
   String? focused() => FocusManager.instance.primaryFocus?.debugLabel;
 
@@ -70,6 +88,32 @@ void main() {
     expect(focused(), 'vidéo');
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     expect(player.calls.last, #seek);
+  });
+
+  testWidgets('télécommande : ↑ ↓ traversent la barre de progression', (
+    tester,
+  ) async {
+    await pumpControls(tester);
+    String? button() => FocusManager.instance.primaryFocus?.context
+        ?.findAncestorWidgetOfExactType<IconButton>()
+        ?.tooltip;
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    expect(button(), 'Pause');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    expect(button(), 'Avancer de 10 s');
+    // Le curseur de progression, juste au-dessus, puis la barre du haut, sans
+    // avancer dans la vidéo.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<Slider>(),
+      isNotNull,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(button(), 'Retour');
+    expect(player.calls, isNot(contains(#seek)));
   });
 
   testWidgets(

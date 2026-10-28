@@ -70,10 +70,16 @@ class CouchPlayApp extends ConsumerWidget {
           // par les barres d'application.
           child: SafeArea(top: false, child: child!),
         );
-        // Sur ordinateur, ↑ ↓ gardent leur rôle dans un champ (début, fin).
-        return defaultTargetPlatform == TargetPlatform.android
-            ? Shortcuts(shortcuts: _remoteKeys, child: app)
-            : app;
+        // Sur ordinateur, ↑ ↓ gardent leur rôle dans un champ (début, fin)
+        // et sur un curseur (volume).
+        if (defaultTargetPlatform != TargetPlatform.android) return app;
+        // Navigation de télécommande : un curseur ne garde que ← →, et ↑ ↓
+        // en sortent ; un bouton désactivé reste une étape, sans bloquer.
+        return MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(navigationMode: NavigationMode.directional),
+          child: Shortcuts(shortcuts: _remoteKeys, child: app),
+        );
       },
       home: home,
     );

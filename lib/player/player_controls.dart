@@ -193,6 +193,10 @@ class _PlayerControlsState extends State<PlayerControls> {
     return Focus(
       focusNode: _videoFocus,
       autofocus: true,
+      // Pas une étape des flèches : grande comme l'écran, l'image serait
+      // toujours « au-dessus » d'un bouton. Elle reprend le focus quand les
+      // contrôles se masquent.
+      skipTraversal: true,
       onKeyEvent: _onKey,
       child: MouseRegion(
         cursor: _visible ? MouseCursor.defer : SystemMouseCursors.none,
