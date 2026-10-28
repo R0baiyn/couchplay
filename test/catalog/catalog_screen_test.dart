@@ -516,7 +516,7 @@ void main() {
     await pumpApp(tester);
     expect(find.text('AR · ARABE أفلام عربية'), findsNothing);
 
-    await tester.tap(find.byTooltip('Réglages'));
+    await tester.tap(find.text('Réglages'));
     await settle(tester);
     await tester.tap(find.text('Catalogue'));
     await settle(tester);
@@ -819,7 +819,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    final settings = find.byTooltip('Réglages');
+    final settings = find.text('Réglages');
     expect(settings, findsOneWidget);
     expect(
       find.descendant(of: find.byType(NavigationRail), matching: settings),

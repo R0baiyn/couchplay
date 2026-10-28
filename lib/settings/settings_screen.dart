@@ -6,29 +6,56 @@ import '../accounts/accounts_screen.dart';
 import '../catalog/catalog_settings_screen.dart';
 import 'settings.dart';
 
-/// Roue des réglages, en haut à droite des onglets.
 /// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
 /// réglages en bas de ce rail plutôt que dans l'en-tête de chaque onglet.
 const railMinWidth = 720.0;
 
+/// Roue des réglages : en haut à droite des onglets, ou en bas du rail, avec
+/// son libellé comme les onglets.
 class SettingsButton extends StatelessWidget {
   const SettingsButton({super.key, this.inRail = false});
 
   /// Bouton du rail ; sinon, celui de l'en-tête, caché quand le rail est là.
   final bool inRail;
 
+  void _open(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+  );
+
   @override
-  Widget build(BuildContext context) =>
-      !inRail && MediaQuery.sizeOf(context).width >= railMinWidth
-      ? const SizedBox.shrink()
-      : IconButton(
-          tooltip: 'Réglages',
-          icon: const Icon(Icons.settings),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-          ),
-        );
+  Widget build(BuildContext context) {
+    if (!inRail) {
+      return MediaQuery.sizeOf(context).width >= railMinWidth
+          ? const SizedBox.shrink()
+          : IconButton(
+              tooltip: 'Réglages',
+              icon: const Icon(Icons.settings),
+              onPressed: () => _open(context),
+            );
+    }
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+    // Même allure qu'une destination du rail : icône, puis libellé dessous.
+    return InkWell(
+      onTap: () => _open(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 4,
+          children: [
+            Icon(Icons.settings_outlined, color: color),
+            Text(
+              'Réglages',
+              style: theme.textTheme.labelMedium?.copyWith(color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Réglages de l'app.
