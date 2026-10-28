@@ -38,17 +38,26 @@ class SettingsButton extends StatelessWidget {
     }
     final theme = Theme.of(context);
     final color = theme.colorScheme.onSurfaceVariant;
-    // Même allure qu'une destination du rail : icône, puis libellé dessous.
-    return InkWell(
+    // Même allure qu'une destination du rail : le focus et le survol ne
+    // surlignent que l'icône, dans sa pastille ; le libellé dessous se
+    // touche aussi.
+    return GestureDetector(
       onTap: () => _open(context),
-      borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           spacing: 4,
           children: [
-            Icon(Icons.settings_outlined, color: color),
+            InkWell(
+              onTap: () => _open(context),
+              customBorder: const StadiumBorder(),
+              child: SizedBox(
+                width: 56,
+                height: 32,
+                child: Icon(Icons.settings_outlined, color: color),
+              ),
+            ),
             Text(
               'Réglages',
               style: theme.textTheme.labelMedium?.copyWith(color: color),
