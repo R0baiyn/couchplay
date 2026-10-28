@@ -255,7 +255,9 @@ final class Updater {
 /// de Git, par exemple) n'est jamais pris.
 ///
 /// Arguments : PID de l'app, paquet (`.zip` ou `.exe`), dossier de l'app,
-/// exe à relancer, fichier qui demande la relance.
+/// exe à relancer, fichier qui demande la relance. Avec relance,
+/// l'installateur montre sa progression (`/SILENT`) : l'utilisateur voit que
+/// ça avance. À la fin, seul un dossier nommé `couchplay-update` est effacé.
 const installScript = r'''
 @echo off
 setlocal
@@ -267,12 +269,14 @@ if /i "%~x2"==".zip" (
   mkdir "%~dp2files"
   "%bin%\tar.exe" -xf "%~2" -C "%~dp2files" || goto clean
   "%bin%\robocopy.exe" "%~dp2files" "%~3" /e /r:5 /w:1 >nul
+) else if exist "%~5" (
+  start "" /wait "%~2" /SILENT /SUPPRESSMSGBOXES /NORESTART
 ) else (
   start "" /wait "%~2" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 )
 if exist "%~5" start "" "%~4"
 :clean
-rd /s /q "%~dp2"
+for %%d in ("%~dp2.") do if /i "%%~nxd"=="couchplay-update" rd /s /q "%%~fd"
 ''';
 
 /// Version de l'app (`pubspec.yaml`), fournie par `main()`.

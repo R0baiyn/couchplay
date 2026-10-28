@@ -45,13 +45,22 @@ Future<void> showUpdateDialog(
     ),
   );
   if (!context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
   if (now != true) {
-    // Fermer la fenêtre sans choisir vaut « Plus tard ».
+    // Fermer la fenêtre sans choisir vaut « Plus tard ». Le message dit quand
+    // on peut fermer l'app sans perdre le téléchargement.
     unawaited(
       updater
           .prepare(update)
           .then<void>(
-            (_) {},
+            (_) => messenger.showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Mise à jour prête : elle s\'installera à la fermeture de '
+                  'CouchPlay.',
+                ),
+              ),
+            ),
             onError: (Object e) =>
                 log('Préparation de la mise à jour', error: e.runtimeType),
           ),
@@ -59,7 +68,6 @@ Future<void> showUpdateDialog(
     return;
   }
   final navigator = Navigator.of(context);
-  final messenger = ScaffoldMessenger.of(context);
   unawaited(
     showDialog<void>(
       context: context,
