@@ -13,6 +13,7 @@ import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
 import 'app.dart';
 import 'server/cloudflare_dns.dart';
+import 'television.dart';
 import 'update/android_installer.dart';
 import 'update/updater.dart';
 import 'update/windows_installer.dart';
@@ -22,11 +23,12 @@ Future<void> main() async {
   // Toutes les connexions HTTP de l'app résolvent les noms par Cloudflare.
   HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
-  final (accounts, support, package, installer) = await (
+  final (accounts, support, package, installer, television) = await (
     AccountStore.open(),
     getApplicationSupportDirectory(),
     PackageInfo.fromPlatform(),
     _installer(),
+    isTelevision(),
   ).wait;
   final files = AccountFiles(Directory('${support.path}/accounts'));
   // En tâche de fond : ne retarde pas le premier rendu.
@@ -37,6 +39,7 @@ Future<void> main() async {
         accountStoreProvider.overrideWithValue(accounts),
         accountFilesProvider.overrideWithValue(files),
         appVersionProvider.overrideWithValue(package.version),
+        televisionProvider.overrideWithValue(television),
         if (installer != null)
           updaterProvider.overrideWithValue(
             Updater(version: package.version, installer: installer),
