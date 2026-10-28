@@ -49,7 +49,14 @@ void main() {
       'get_series_info': _fixture('series_info'),
     });
   });
-  tearDown(() => root.deleteSync(recursive: true));
+  tearDown(() {
+    try {
+      root.deleteSync(recursive: true);
+    } on FileSystemException {
+      // Une écriture de l'app encore en cours garde un fichier ouvert (sous
+      // Windows) : le dossier temporaire reste, sans effet sur les tests.
+    }
+  });
 
   Future<void> pumpApp(
     WidgetTester tester, {
@@ -125,6 +132,33 @@ void main() {
       await tester.tap(find.text('Films'));
       await settle(tester);
     }
+  }
+
+  /// Progression enregistrée dans `library.json`, relue jusqu'à ce que
+  /// [done] la valide. L'app écrit en fond : chaque `pump` fait avancer
+  /// l'écriture, et une lecture pendant le renommage du fichier temporaire
+  /// (refusée sous Windows) est simplement refaite.
+  Future<Map<Object?, Object?>> savedProgress(
+    WidgetTester tester,
+    bool Function(Map<Object?, Object?> progress) done,
+  ) async {
+    final file = File('${root.path}/accounts/compte/library.json');
+    var progress = <Object?, Object?>{};
+    for (var i = 0; i < 100 && !done(progress); i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      progress =
+          await tester.runAsync(() async {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            try {
+              final saved = jsonDecode(await file.readAsString()) as Map;
+              return saved['progress'] as Map<Object?, Object?>;
+            } on FileSystemException {
+              return progress;
+            }
+          }) ??
+          progress;
+    }
+    return progress;
   }
 
   /// Liste des catégories du grand écran : défile jusqu'à [name], l'ouvre.
@@ -306,7 +340,12 @@ void main() {
     await settle(tester);
     expect(seen, findsOneWidget);
 
-    // Nouveau lancement : toujours vu, et on peut l'annuler.
+    // Nouveau lancement, une fois l'écriture faite : toujours vu, et on peut
+    // l'annuler.
+    await savedProgress(
+      tester,
+      (progress) => progress.values.any((e) => (e as Map)['watched'] == true),
+    );
     await tester.pumpWidget(const SizedBox());
     await pumpApp(tester);
     await openVikings();
@@ -332,7 +371,7 @@ void main() {
       'duration': 2700,
       'updatedAt': date,
     };
-    final file = File('${root.path}/accounts/compte/library.json')
+    File('${root.path}/accounts/compte/library.json')
       ..createSync(recursive: true)
       ..writeAsStringSync(
         jsonEncode({
@@ -378,20 +417,11 @@ void main() {
     await settle(tester);
     expect(find.text('Libre (2024) HD VF'), findsNothing);
     expect(find.text('Vikings · S1E2'), findsOneWidget);
-    // L'écriture se fait en fond : sous Windows, une lecture pendant le
-    // renommage du fichier temporaire échoue. On relit jusqu'à la voir.
-    Map<Object?, Object?>? movie;
-    for (var i = 0; i < 50 && movie?['hidden'] != true; i++) {
-      movie = await tester.runAsync<Map<Object?, Object?>?>(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-        try {
-          final saved = jsonDecode(await file.readAsString()) as Map;
-          return (saved['progress'] as Map)['movie:144014'] as Map?;
-        } on FileSystemException {
-          return null;
-        }
-      });
-    }
+    final progress = await savedProgress(
+      tester,
+      (progress) => (progress['movie:144014'] as Map?)?['hidden'] == true,
+    );
+    final movie = progress['movie:144014'] as Map?;
     expect(movie?['position'], 754);
     expect(movie?['hidden'], isTrue);
   });
