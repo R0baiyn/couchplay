@@ -139,9 +139,12 @@ final class Updater {
     return Updater(version: version, portable: portable, appDir: appDir);
   }
 
+  /// Dépôt R0baiyn/couchplay désigné par son identifiant, qui ne change
+  /// jamais : si le compte ou le dépôt était renommé, personne ne pourrait
+  /// reprendre le nom pour publier des « mises à jour ».
   static final latest = Uri.https(
     'api.github.com',
-    '/repos/R0baiyn/couchplay/releases/latest',
+    '/repositories/1433672657/releases/latest',
   );
 
   /// Version de l'app en cours.
@@ -162,6 +165,12 @@ final class Updater {
 
   /// Avancement du téléchargement en cours, de 0 à 1.
   final progress = ValueNotifier<double>(0);
+
+  CancelToken? _cancel;
+
+  /// Arrête le téléchargement en cours : sa préparation échoue, et pourra
+  /// être relancée.
+  void cancel() => _cancel?.cancel();
 
   /// La mise à jour publiée, si elle est plus récente. Lève une exception
   /// si GitHub ne répond pas.
@@ -225,24 +234,47 @@ final class Updater {
   }
 
   /// Suit les redirections à la main : chaque étape doit rester en HTTPS
-  /// chez GitHub.
+  /// chez GitHub. Un fichier plus gros qu'annoncé est coupé dès qu'il
+  /// dépasse, sans attendre la fin.
   Future<void> _download(Update update, File file) async {
     progress.value = 0;
+    final cancel = _cancel = CancelToken();
+    var tooBig = false;
     var url = update.asset;
     for (var hop = 0; ; hop++) {
       if (hop > 5 || !isAllowedDownload(url)) {
         throw HttpException('Téléchargement refusé : ${url.host}');
       }
-      final response = await _dio.downloadUri(
-        url,
-        file.path,
-        options: Options(
-          followRedirects: false,
-          validateStatus: (status) => status != null && status < 400,
-        ),
-        onReceiveProgress: (received, _) =>
-            progress.value = (received / update.size).clamp(0, 1),
-      );
+      final Response<void> response;
+      try {
+        response = await _dio.downloadUri(
+          url,
+          file.path,
+          cancelToken: cancel,
+          options: Options(
+            followRedirects: false,
+            validateStatus: (status) => status != null && status < 400,
+          ),
+          onReceiveProgress: (received, _) {
+            if (received > update.size) {
+              tooBig = true;
+              cancel.cancel();
+            }
+            progress.value = (received / update.size).clamp(0, 1);
+          },
+        );
+      } on DioException catch (e) {
+        // Annulé : dio rend l'erreur tout de suite, mais ferme puis efface le
+        // fichier un peu après. On l'attend, pour qu'un nouvel essai puisse
+        // vider le dossier.
+        if (CancelToken.isCancel(e)) {
+          for (var i = 0; i < 50 && await file.exists(); i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        }
+        if (tooBig) throw HttpException('Plus gros que ${update.size} octets');
+        rethrow;
+      }
       final location = response.headers.value(HttpHeaders.locationHeader);
       if (response.statusCode case final status? when status >= 300) {
         if (location == null) throw HttpException('Redirection sans adresse');
@@ -274,7 +306,7 @@ const installScript = r'''
 setlocal
 set "bin=%SystemRoot%\System32"
 :wait
-"%bin%\tasklist.exe" /fi "PID eq %~1" /nh > "%~dp2pid.txt"
+"%bin%\tasklist.exe" /fi "PID eq %~1" /fi "IMAGENAME eq %~nx4" /nh > "%~dp2pid.txt"
 "%bin%\find.exe" " %~1 " "%~dp2pid.txt" >nul && ("%bin%\ping.exe" -n 2 127.0.0.1 >nul & goto wait)
 if /i "%~x2"==".zip" (
   mkdir "%~dp2files"

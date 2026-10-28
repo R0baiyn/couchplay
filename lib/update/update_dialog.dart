@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../logging.dart';
@@ -87,6 +88,10 @@ Future<void> showUpdateDialog(
               ],
             ),
           ),
+          actions: [
+            // Une connexion lente mais vivante ne bloque jamais l'app.
+            TextButton(onPressed: updater.cancel, child: const Text('Annuler')),
+          ],
         ),
       ),
     ),
@@ -96,9 +101,14 @@ Future<void> showUpdateDialog(
   } on Exception catch (e) {
     log('Mise à jour', error: e.runtimeType);
     navigator.pop();
+    final cancelled = e is DioException && CancelToken.isCancel(e);
     messenger.showSnackBar(
-      const SnackBar(
-        content: Text('La mise à jour a échoué. Réessaie plus tard.'),
+      SnackBar(
+        content: Text(
+          cancelled
+              ? 'Mise à jour annulée.'
+              : 'La mise à jour a échoué. Réessaie plus tard.',
+        ),
       ),
     );
   }

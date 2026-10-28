@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:couchplay/update/updater.dart';
 import 'package:dio/dio.dart';
@@ -136,6 +138,36 @@ void main() {
         throwsA(isA<HttpException>()),
       );
       expect(adapter.calls, 1);
+    });
+
+    test('plus gros qu\'annoncé : coupé sans attendre la fin', () async {
+      // 6 octets pour 3 annoncés, et le serveur ne termine jamais : seule la
+      // coupure fait aboutir le test.
+      final body = StreamController<Uint8List>()..add(Uint8List(6));
+      addTearDown(body.close);
+      await expectLater(
+        updater(FakeAdapter((_) async => ResponseBody(body.stream, 200)))
+            .prepare(update),
+        throwsA(isA<HttpException>()),
+      );
+    });
+
+    test('« Annuler » arrête un téléchargement qui traîne', () async {
+      // Le serveur envoie un octet puis plus rien, sans fermer.
+      final body = StreamController<Uint8List>()..add(Uint8List(1));
+      addTearDown(body.close);
+      final subject = updater(
+        FakeAdapter((_) async => ResponseBody(body.stream, 200)),
+      );
+      final done = subject.prepare(update);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      subject.cancel();
+      await expectLater(
+        done,
+        throwsA(
+          isA<DioException>().having(CancelToken.isCancel, 'annulé', true),
+        ),
+      );
     });
 
     test('un échec se retente au prochain appel', () async {
