@@ -152,6 +152,12 @@ class PosterTile extends StatefulWidget {
 }
 
 class _PosterTileState extends State<PosterTile> {
+  /// Cadre de focus autour de l'affiche, transparent sans focus.
+  static const _border = 3.0;
+
+  /// Marge autour du titre.
+  static const _titleMargin = 8.0;
+
   var _focused = false;
 
   @override
@@ -177,7 +183,7 @@ class _PosterTileState extends State<PosterTile> {
                   color: _focused
                       ? theme.colorScheme.primary
                       : Colors.transparent,
-                  width: 3,
+                  width: _border,
                 ),
               ),
               child: ClipRRect(
@@ -211,10 +217,15 @@ class _PosterTileState extends State<PosterTile> {
               ),
             ),
           ),
-          // Même marge dessus et dessous : le titre est centré entre
-          // l'affiche et le bas de la case, en retrait des bords du surlignage.
+          // Même écart entre l'image et le titre qu'entre le titre et le bas
+          // de la case : le cadre transparent compte déjà pour une part.
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(
+              _titleMargin,
+              _titleMargin - _border,
+              _titleMargin,
+              _titleMargin,
+            ),
             child: Text(
               widget.title,
               maxLines: 2,
