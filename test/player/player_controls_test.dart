@@ -3,6 +3,7 @@ import 'package:couchplay/player/player_controls.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -39,16 +40,18 @@ void main() {
   /// Dans l'app entière : ses réglages de navigation (télécommande) comptent.
   Future<void> pumpControls(WidgetTester tester) async {
     await tester.pumpWidget(
-      CouchPlayApp(
-        home: Scaffold(
-          body: PlayerControls(
-            player: player,
-            title: 'Libre',
-            fill: false,
-            onToggleFill: () {},
-            fullscreen: null,
-            onToggleFullscreen: () {},
-            onExit: () {},
+      ProviderScope(
+        child: CouchPlayApp(
+          home: Scaffold(
+            body: PlayerControls(
+              player: player,
+              title: 'Libre',
+              fill: false,
+              onToggleFill: () {},
+              fullscreen: null,
+              onToggleFullscreen: () {},
+              onExit: () {},
+            ),
           ),
         ),
       ),

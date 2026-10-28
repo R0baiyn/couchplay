@@ -12,6 +12,7 @@ import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'settings/settings_screen.dart';
 import 'update/update_dialog.dart';
+import 'television.dart';
 import 'update/updater.dart';
 
 /// L'app, toujours en thème sombre : une salle de cinéma, pas un bureau.
@@ -61,7 +62,7 @@ class CouchPlayApp extends StatelessWidget {
           // Encoche, caméra et boutons du téléphone : rien ne passe dessous,
           // surtout en paysage où ils sont sur les côtés. Le haut est géré
           // par les barres d'application.
-          child: SafeArea(top: false, child: child!),
+          child: SafeArea(top: false, child: TvArrowKeys(child: child!)),
         );
         // Sur ordinateur, ↑ ↓ gardent leur rôle dans un champ (début, fin)
         // et sur un curseur (volume).
@@ -126,6 +127,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   /// Pour Ctrl+F : le champ de la recherche.
   final _searchField = FocusNode();
 
+  /// Sur TV, le rail et l'onglet sont deux zones : ← au bord gauche de
+  /// l'onglet revient à l'onglet choisi du rail, → depuis le rail revient au
+  /// dernier élément visité de l'onglet, et les bouts du rail le gardent.
+  /// Sans elles, les flèches visent l'élément le plus proche à l'écran (le
+  /// bouton des réglages, une affiche coupée en haut).
+  final _rail = FocusScopeNode(debugLabel: 'rail');
+  final _content = FocusScopeNode(debugLabel: 'onglet');
+
   final _indexes = <ProviderSubscription<Object?>>[];
 
   @override
@@ -141,6 +150,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       for (final kind in ContentKind.values) {
         _indexes.add(ref.listenManual(catalogIndexProvider(kind), (_, _) {}));
       }
+      // Sur TV, on voit tout de suite où est le focus : sur l'onglet choisi.
+      if (ref.read(televisionProvider)) _focusTab();
     });
     // Déjà connue si l'accueil est recréé (reconnexion) : lue directement,
     // pas de setState pendant initState.
@@ -171,7 +182,59 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       index.close();
     }
     _searchField.dispose();
+    _rail.dispose();
+    _content.dispose();
     super.dispose();
+  }
+
+  static bool _isDown(KeyEvent event, LogicalKeyboardKey key) =>
+      event is! KeyUpEvent && event.logicalKey == key;
+
+  /// Les éléments que les flèches atteignent dans [scope], de haut en bas
+  /// puis de gauche à droite.
+  static List<FocusNode> _reachable(FocusScopeNode scope) =>
+      scope.traversalDescendants.where((node) => node.canRequestFocus).toList()
+        ..sort((a, b) {
+          final top = a.rect.top.compareTo(b.rect.top);
+          return top != 0 ? top : a.rect.left.compareTo(b.rect.left);
+        });
+
+  KeyEventResult _railKey(FocusNode _, KeyEvent event) {
+    if (!_isDown(event, LogicalKeyboardKey.arrowRight)) {
+      return KeyEventResult.ignored;
+    }
+    final last = _content.focusedChild;
+    if (last != null && last.canRequestFocus) {
+      last.requestFocus();
+    } else {
+      // Première visite : le contenu (une affiche) plutôt que les boutons
+      // de l'en-tête (« Actualiser », en haut à droite).
+      final reachable = _reachable(_content);
+      bool inHeader(FocusNode node) =>
+          node.context?.findAncestorWidgetOfExactType<AppBar>() != null;
+      (reachable.where((node) => !inHeader(node)).firstOrNull ??
+              reachable.firstOrNull)
+          ?.requestFocus();
+    }
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _contentKey(FocusNode _, KeyEvent event) {
+    if (!_isDown(event, LogicalKeyboardKey.arrowLeft)) {
+      return KeyEventResult.ignored;
+    }
+    final focused = FocusManager.instance.primaryFocus;
+    if (focused == null || !focused.focusInDirection(TraversalDirection.left)) {
+      _focusTab();
+    }
+    return KeyEventResult.handled;
+  }
+
+  /// L'onglet choisi, dans le rail.
+  void _focusTab() {
+    // Les onglets d'abord, de haut en bas, puis les réglages.
+    final tabs = _reachable(_rail);
+    if (_index < tabs.length) tabs[_index].requestFocus();
   }
 
   void _select(int index) {
@@ -249,31 +312,49 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ],
     );
     if (MediaQuery.sizeOf(context).width >= railMinWidth) {
+      final television = ref.watch(televisionProvider);
+      Widget zone(
+        FocusScopeNode node,
+        FocusOnKeyEventCallback onKey,
+        Widget child,
+      ) => television
+          // La zone elle-même n'est pas une étape des flèches, ses éléments si.
+          ? FocusScope(
+              node: node,
+              skipTraversal: true,
+              onKeyEvent: onKey,
+              child: child,
+            )
+          : child;
       return Scaffold(
         body: Row(
           children: [
-            NavigationRail(
-              selectedIndex: _index,
-              onDestinationSelected: _select,
-              labelType: NavigationRailLabelType.all,
-              // Les réglages, tout en bas du rail.
-              trailingAtBottom: true,
-              trailing: const Padding(
-                padding: EdgeInsets.only(bottom: 16),
-                child: SettingsButton(inRail: true),
-              ),
+            zone(
+              _rail,
+              _railKey,
+              NavigationRail(
+                selectedIndex: _index,
+                onDestinationSelected: _select,
+                labelType: NavigationRailLabelType.all,
+                // Les réglages, tout en bas du rail.
+                trailingAtBottom: true,
+                trailing: const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: SettingsButton(inRail: true),
+                ),
 
-              destinations: [
-                for (final (icon, selected, label) in _tabs)
-                  NavigationRailDestination(
-                    icon: Icon(icon),
-                    selectedIcon: Icon(selected),
-                    label: Text(label),
-                  ),
-              ],
+                destinations: [
+                  for (final (icon, selected, label) in _tabs)
+                    NavigationRailDestination(
+                      icon: Icon(icon),
+                      selectedIcon: Icon(selected),
+                      label: Text(label),
+                    ),
+                ],
+              ),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: body),
+            Expanded(child: zone(_content, _contentKey, body)),
           ],
         ),
       );

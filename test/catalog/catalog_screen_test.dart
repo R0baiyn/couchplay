@@ -17,6 +17,7 @@ import 'package:couchplay/search/search_screen.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
+import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/television.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
@@ -729,6 +730,113 @@ void main() {
       expect(find.text('Libre (2024)'), findsOneWidget);
     },
   );
+
+  group('TV, à la télécommande', () {
+    /// Une grille de 40 films dans « Films 4K », et l'app à la taille d'une
+    /// TV (960 × 540).
+    Future<void> pumpTv(WidgetTester tester) async {
+      final film = (jsonDecode(_fixture('vod_streams')) as List).first as Map;
+      server = FakeAdapter.routes({
+        '': activeAccountJson,
+        'get_vod_categories': _fixture('vod_categories'),
+        'get_vod_streams': jsonEncode([
+          for (var i = 0; i < 40; i++)
+            {
+              ...film,
+              'stream_id': 1000 + i,
+              'tmdb_id': 5000 + i,
+              'category_id': '619',
+              'name': 'Film $i (2020)',
+            },
+        ]),
+        'get_vod_info': _fixture('vod_info'),
+        'get_series_categories': _fixture('series_categories'),
+        'get_series': _fixture('series'),
+        'get_series_info': _fixture('series_info'),
+      });
+      await pumpApp(
+        tester,
+        size: const Size(960, 540),
+        openMovies: false,
+        overrides: [televisionProvider.overrideWithValue(true)],
+      );
+    }
+
+    /// Le premier texte sous l'élément qui a le focus.
+    String? focused() {
+      String? text;
+      void visit(Element element) {
+        if (text != null) return;
+        if (element.widget case Text(:final data)) text = data;
+        element.visitChildElements(visit);
+      }
+
+      final context = FocusManager.instance.primaryFocus?.context;
+      (context as Element?)?.visitChildElements(visit);
+      return text;
+    }
+
+    Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await settle(tester);
+    }
+
+    testWidgets('rail et onglet : deux zones, chacune garde sa place', (
+      tester,
+    ) async {
+      await pumpTv(tester);
+      expect(focused(), 'Accueil', reason: 'le focus se voit au lancement');
+
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(focused(), 'Films');
+      // Première entrée : la première affiche, pas « Actualiser ».
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(focused(), 'Film 0 (2020)');
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      final visited = focused();
+      expect(visited, isNot('Film 1 (2020)'), reason: 'une rangée plus bas');
+
+      // ← au bord gauche : l'onglet choisi, pas l'élément le plus proche.
+      await press(tester, LogicalKeyboardKey.arrowLeft);
+      await press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(focused(), 'Films');
+      // Le bas du rail le garde : pas de saut dans la grille.
+      for (var i = 0; i < 5; i++) {
+        await press(tester, LogicalKeyboardKey.arrowDown);
+      }
+      expect(find.byType(MovieScreen), findsNothing);
+      expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<SettingsButton>(),
+        isNotNull,
+        reason: 'le bouton des réglages, en bas du rail',
+      );
+      // → revient à la dernière affiche visitée.
+      await press(tester, LogicalKeyboardKey.arrowUp);
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(focused(), isNot(anyOf('Films', 'Recherche', 'Réglages')));
+      expect(focused(), startsWith('Film '));
+    });
+
+    testWidgets('fiche : ↓ sans rien dessous fait défiler la page', (
+      tester,
+    ) async {
+      await pumpTv(tester);
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.select);
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(find.byType(MovieScreen), findsOneWidget);
+      expect(focused(), 'Lecture');
+
+      final before = tester.getTopLeft(find.text('Lecture')).dy;
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      expect(focused(), 'Lecture', reason: 'le focus reste sur le bouton');
+      expect(tester.getTopLeft(find.text('Lecture')).dy, lessThan(before));
+    });
+  });
 
   testWidgets('retour : d\'un onglet vers l\'Accueil, puis quitte', (
     tester,
