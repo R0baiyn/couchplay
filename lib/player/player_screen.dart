@@ -15,6 +15,7 @@ import '../library/library.dart';
 import '../library/library_store.dart';
 import '../server/cloudflare_dns.dart';
 import '../server/models.dart';
+import '../television.dart';
 import 'playback.dart';
 import 'player_controls.dart';
 
@@ -423,6 +424,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 if (!_mobile) _setFullscreen(!_fullscreen);
               },
               onExit: _exit,
+              volume: !ref.watch(televisionProvider),
             ),
             if (_opening)
               const IgnorePointer(

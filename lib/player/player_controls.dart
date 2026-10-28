@@ -31,6 +31,7 @@ class PlayerControls extends StatefulWidget {
     required this.fullscreen,
     required this.onToggleFullscreen,
     required this.onExit,
+    this.volume = true,
   });
 
   final Player player;
@@ -44,6 +45,10 @@ class PlayerControls extends StatefulWidget {
   final bool? fullscreen;
   final VoidCallback onToggleFullscreen;
   final VoidCallback onExit;
+
+  /// Bouton et curseur du volume. Pas sur TV : la télécommande règle celui
+  /// de la TV, et le curseur retenait ← →.
+  final bool volume;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -336,7 +341,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             icon: const Icon(Icons.forward_10),
             onPressed: () => _seekBy(_step),
           ),
-          _VolumeButton(player: _player, onChanged: _show),
+          if (widget.volume) _VolumeButton(player: _player, onChanged: _show),
           const Spacer(),
           _TracksMenu(player: _player, onOpened: _show),
           IconButton(

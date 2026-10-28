@@ -38,7 +38,7 @@ void main() {
   setUp(() => player = _FakePlayer());
 
   /// Dans l'app entière : ses réglages de navigation (télécommande) comptent.
-  Future<void> pumpControls(WidgetTester tester) async {
+  Future<void> pumpControls(WidgetTester tester, {bool volume = true}) async {
     await tester.pumpWidget(
       ProviderScope(
         child: CouchPlayApp(
@@ -51,6 +51,7 @@ void main() {
               fullscreen: null,
               onToggleFullscreen: () {},
               onExit: () {},
+              volume: volume,
             ),
           ),
         ),
@@ -123,4 +124,12 @@ void main() {
       }
     },
   );
+
+  testWidgets('TV : pas de volume, la télécommande règle celui de la TV', (
+    tester,
+  ) async {
+    await pumpControls(tester, volume: false);
+    expect(find.byTooltip('Couper le son'), findsNothing);
+    expect(find.byType(Slider), findsOneWidget, reason: 'la progression seule');
+  });
 }
