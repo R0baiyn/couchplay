@@ -378,10 +378,22 @@ void main() {
     await settle(tester);
     expect(find.text('Libre (2024) HD VF'), findsNothing);
     expect(find.text('Vikings · S1E2'), findsOneWidget);
-    final saved = await tester.runAsync(file.readAsString);
-    final movie = (jsonDecode(saved!) as Map)['progress']['movie:144014'];
-    expect(movie['position'], 754);
-    expect(movie['hidden'], isTrue);
+    // L'écriture se fait en fond : sous Windows, une lecture pendant le
+    // renommage du fichier temporaire échoue. On relit jusqu'à la voir.
+    Map<Object?, Object?>? movie;
+    for (var i = 0; i < 50 && movie?['hidden'] != true; i++) {
+      movie = await tester.runAsync<Map<Object?, Object?>?>(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        try {
+          final saved = jsonDecode(await file.readAsString()) as Map;
+          return (saved['progress'] as Map)['movie:144014'] as Map?;
+        } on FileSystemException {
+          return null;
+        }
+      });
+    }
+    expect(movie?['position'], 754);
+    expect(movie?['hidden'], isTrue);
   });
 
   testWidgets('épisode fini : « Continuer » propose le suivant', (
