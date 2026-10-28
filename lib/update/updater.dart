@@ -298,32 +298,36 @@ final class Updater {
 /// de Git, par exemple) n'est jamais pris.
 ///
 /// Arguments : PID de l'app, paquet (`.zip` ou `.exe`), dossier de l'app,
-/// exe à relancer, fichier qui demande la relance. Avec relance,
-/// l'installateur montre sa progression (`/SILENT`) : l'utilisateur voit que
-/// ça avance. À la fin, seul un dossier nommé `couchplay-update` est effacé.
+/// exe à relancer, fichier qui demande la relance. L'app est attendue toutes
+/// les 3 s : après « Plus tard », le script peut attendre des heures. Avec
+/// relance, l'installateur montre sa progression (`/SILENT`) : l'utilisateur
+/// voit que ça avance. L'app est relancée même si l'extraction échoue (elle
+/// reste dans sa version). À la fin, seul un dossier nommé
+/// `couchplay-update` est effacé.
 ///
-/// Portable : `data\` est remis en miroir (il n'appartient qu'à l'app), la
-/// racine est seulement recopiée. Le zip a pu être extrait au milieu
-/// d'autres fichiers (Bureau, Téléchargements), jamais effacés.
+/// Portable : seul `data\flutter_assets` est remis en miroir, un nom propre
+/// à Flutter ; le reste est seulement recopié. Le zip a pu être extrait au
+/// milieu d'autres fichiers (Bureau, Téléchargements, avec peut-être un
+/// dossier `data` à soi), jamais effacés.
 const installScript = r'''
 @echo off
 setlocal
 set "bin=%SystemRoot%\System32"
 :wait
 "%bin%\tasklist.exe" /fi "PID eq %~1" /fi "IMAGENAME eq %~nx4" /nh > "%~dp2pid.txt"
-"%bin%\find.exe" " %~1 " "%~dp2pid.txt" >nul && ("%bin%\ping.exe" -n 2 127.0.0.1 >nul & goto wait)
+"%bin%\find.exe" " %~1 " "%~dp2pid.txt" >nul && ("%bin%\ping.exe" -n 4 127.0.0.1 >nul & goto wait)
 if /i "%~x2"==".zip" (
   mkdir "%~dp2files"
-  "%bin%\tar.exe" -xf "%~2" -C "%~dp2files" || goto clean
-  "%bin%\robocopy.exe" "%~dp2files\data" "%~3\data" /mir /r:5 /w:1 >nul
+  "%bin%\tar.exe" -xf "%~2" -C "%~dp2files" || goto relaunch
+  "%bin%\robocopy.exe" "%~dp2files\data\flutter_assets" "%~3\data\flutter_assets" /mir /r:5 /w:1 >nul
   "%bin%\robocopy.exe" "%~dp2files" "%~3" /e /r:5 /w:1 >nul
 ) else if exist "%~5" (
   start "" /wait "%~2" /SILENT /SUPPRESSMSGBOXES /NORESTART
 ) else (
   start "" /wait "%~2" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 )
+:relaunch
 if exist "%~5" start "" "%~4"
-:clean
 for %%d in ("%~dp2.") do if /i "%%~nxd"=="couchplay-update" rd /s /q "%%~fd"
 ''';
 

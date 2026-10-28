@@ -18,6 +18,9 @@ AppPublisher=CouchPlay
 AppPublisherURL=https://github.com/R0baiyn/couchplay
 DefaultDirName={autopf}\couchplay
 DisableProgramGroupPage=yes
+; Dossier imposé : [InstallDelete] y efface les DLL et data, il ne doit
+; jamais être un dossier existant choisi à la main.
+DisableDirPage=yes
 PrivilegesRequired=lowest
 OutputBaseFilename=couchplay-{#AppVersion}-windows-setup
 SetupIconFile=runner\resources\app_icon.ico
