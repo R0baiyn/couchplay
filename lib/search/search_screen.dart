@@ -9,6 +9,7 @@ import '../catalog/status_views.dart';
 import '../catalog/versions.dart';
 import '../server/models.dart';
 import '../settings/settings_screen.dart';
+import '../text_entry.dart';
 import 'search_index.dart';
 
 /// Onglet Recherche : tout le catalogue visible, films puis séries.
@@ -120,7 +121,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       appBar: AppBar(
         title: ValueListenableBuilder(
           valueListenable: _controller,
-          builder: (context, value, _) => TextField(
+          builder: (context, value, _) => TextEntry(
             controller: _controller,
             focusNode: widget.focusNode,
             autofocus: true,

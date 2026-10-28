@@ -17,6 +17,7 @@ import 'package:couchplay/search/search_screen.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
+import 'package:couchplay/television.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
 import 'package:dio/dio.dart';
@@ -706,6 +707,28 @@ void main() {
     expect(focused, isNot(isA<FocusScopeNode>()));
     expect(focused?.context, isNotNull);
   });
+
+  testWidgets(
+    'TV : la recherche se tape dans une fenêtre, sans clavier au passage',
+    (tester) async {
+      await pumpApp(
+        tester,
+        openMovies: false,
+        overrides: [televisionProvider.overrideWithValue(true)],
+      );
+      await tester.tap(find.text('Recherche'));
+      await settle(tester);
+      expect(find.byType(EditableText), findsNothing);
+
+      // La case de recherche a le focus ; OK ouvre la saisie.
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(EditableText), 'libre');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await settle(tester);
+      expect(find.text('Libre (2024)'), findsOneWidget);
+    },
+  );
 
   testWidgets('retour : d\'un onglet vers l\'Accueil, puis quitte', (
     tester,

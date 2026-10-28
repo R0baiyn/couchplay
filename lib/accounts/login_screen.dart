@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../server/server_client.dart';
+import '../text_entry.dart';
 import 'account.dart';
 import 'account_store.dart';
 import 'server_session.dart';
@@ -104,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: 16,
                 children: [
-                  TextFormField(
+                  TextEntry(
                     controller: _name,
                     autofocus: !editing,
                     textInputAction: TextInputAction.next,
@@ -113,7 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       hintText: 'Par exemple « Salon »',
                     ),
                   ),
-                  TextFormField(
+                  TextEntry(
                     controller: _host,
                     keyboardType: TextInputType.url,
                     textInputAction: TextInputAction.next,
@@ -124,7 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       hintText: 'http://serveur.com:8080',
                     ),
                   ),
-                  TextFormField(
+                  TextEntry(
                     controller: _username,
                     textInputAction: TextInputAction.next,
                     autocorrect: false,
@@ -134,7 +135,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     validator: _required,
                     decoration: const InputDecoration(labelText: 'Utilisateur'),
                   ),
-                  TextFormField(
+                  TextEntry(
                     controller: _password,
                     obscureText: _hidePassword,
                     textInputAction: TextInputAction.next,
@@ -162,11 +163,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                   ),
-                  TextFormField(
+                  TextEntry(
                     controller: _userAgent,
                     textInputAction: TextInputAction.done,
                     autocorrect: false,
-                    onFieldSubmitted: (_) => _submit(),
+                    onSubmitted: (_) => _submit(),
                     decoration: const InputDecoration(
                       labelText: 'User-Agent',
                       helperText: 'À changer seulement si le serveur refuse',

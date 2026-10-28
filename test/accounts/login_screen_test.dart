@@ -7,6 +7,7 @@ import 'package:couchplay/accounts/login_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/server/server_client.dart';
+import 'package:couchplay/television.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,11 +22,15 @@ void main() {
 
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
-  Future<ProviderContainer> pumpApp(WidgetTester tester) async {
+  Future<ProviderContainer> pumpApp(
+    WidgetTester tester, {
+    bool television = false,
+  }) async {
     final store = await tester.runAsync(AccountStore.open);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          televisionProvider.overrideWithValue(television),
           accountStoreProvider.overrideWithValue(store!),
           accountFilesProvider.overrideWithValue(
             AccountFiles(Directory.systemTemp.createTempSync('couchplay_')),
@@ -152,5 +157,84 @@ void main() {
     // Relu depuis le stockage, comme au lancement suivant.
     final reopened = await tester.runAsync(AccountStore.open);
     expect(reopened!.current.active, active);
+  });
+
+  testWidgets(
+    'TV : des cases sans clavier, OK ouvre la saisie, puis la suivante',
+    (tester) async {
+      server = FakeAdapter.replying(activeAccountJson);
+      final container = await pumpApp(tester, television: true);
+      // Le focus automatique se pose après la première image.
+      await tester.pump();
+      // Aucun champ éditable : le clavier à l'écran ne s'ouvre pas tout seul.
+      expect(find.byType(EditableText), findsNothing);
+
+      List<InputDecorator> fields() => tester
+          .widgetList<InputDecorator>(find.byType(InputDecorator))
+          .toList();
+      int focused() => fields().indexWhere((field) => field.isFocused);
+      expect(focused(), 0, reason: 'la première case a le focus');
+
+      // Les flèches passent d'une case à l'autre, sans rien ouvrir.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focused(), 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(focused(), 0);
+
+      /// OK sur la case qui a le focus, puis la valeur tapée et validée par le
+      /// clavier à l'écran.
+      Future<void> type(String value) async {
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(EditableText), value);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+      }
+
+      await type('Salon');
+      expect(find.text('Salon'), findsOneWidget);
+      expect(
+        focused(),
+        1,
+        reason: 'validée, la saisie passe à la case suivante',
+      );
+      await type('http://serveur.com:8080');
+      await type('moi');
+      await type('mdp');
+      expect(find.text('mdp'), findsNothing, reason: 'mot de passe masqué');
+
+      await tester.tap(find.text('Se connecter'));
+      for (var i = 0; i < 5; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      final active = container.read(activeAccountProvider)!;
+      expect(active.name, 'Salon');
+      expect(active.username, 'moi');
+      expect(active.password, 'mdp');
+    },
+  );
+
+  testWidgets('TV : « Annuler » ne change rien, un champ requis le dit', (
+    tester,
+  ) async {
+    server = FakeAdapter.replying(activeAccountJson);
+    await pumpApp(tester, television: true);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Salon');
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+    expect(find.text('Salon'), findsNothing);
+
+    await tester.tap(find.text('Se connecter'));
+    await tester.pump();
+    expect(find.text('Champ requis'), findsWidgets);
+    expect(server.calls, 0);
   });
 }
