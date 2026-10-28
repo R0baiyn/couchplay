@@ -37,6 +37,13 @@ Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+[InstallDelete]
+; Avant de copier une nouvelle version : les fichiers de l'ancienne qu'elle
+; ne livre plus ne restent pas. Le dossier {app} n'appartient qu'à l'app ;
+; le désinstalleur (unins000.*) est gardé.
+Type: files; Name: "{app}\*.dll"
+Type: filesandordirs; Name: "{app}\data"
+
 [Files]
 ; Le marqueur « portable » n'appartient qu'au zip.
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: "portable"; Flags: ignoreversion recursesubdirs createallsubdirs

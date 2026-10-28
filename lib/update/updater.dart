@@ -301,6 +301,10 @@ final class Updater {
 /// exe à relancer, fichier qui demande la relance. Avec relance,
 /// l'installateur montre sa progression (`/SILENT`) : l'utilisateur voit que
 /// ça avance. À la fin, seul un dossier nommé `couchplay-update` est effacé.
+///
+/// Portable : `data\` est remis en miroir (il n'appartient qu'à l'app), la
+/// racine est seulement recopiée. Le zip a pu être extrait au milieu
+/// d'autres fichiers (Bureau, Téléchargements), jamais effacés.
 const installScript = r'''
 @echo off
 setlocal
@@ -311,6 +315,7 @@ set "bin=%SystemRoot%\System32"
 if /i "%~x2"==".zip" (
   mkdir "%~dp2files"
   "%bin%\tar.exe" -xf "%~2" -C "%~dp2files" || goto clean
+  "%bin%\robocopy.exe" "%~dp2files\data" "%~3\data" /mir /r:5 /w:1 >nul
   "%bin%\robocopy.exe" "%~dp2files" "%~3" /e /r:5 /w:1 >nul
 ) else if exist "%~5" (
   start "" /wait "%~2" /SILENT /SUPPRESSMSGBOXES /NORESTART
