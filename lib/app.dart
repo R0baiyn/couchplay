@@ -206,6 +206,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget build(BuildContext context) {
     // Dépendance à la route : reconstruit quand l'accueil revient devant.
     if (ModalRoute.of(context)?.isCurrent ?? false) _offerUpdate();
+    // Retour (Android, télécommande, Échap) depuis un autre onglet : revient
+    // à l'Accueil. Seul l'Accueil quitte l'app.
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _select(0);
+      },
+      child: _shell(context),
+    );
+  }
+
+  Widget _shell(BuildContext context) {
     final body = IndexedStack(
       index: _index,
       children: [

@@ -681,6 +681,36 @@ void main() {
     expect(find.text('Libre (2024)'), findsOneWidget);
   });
 
+  testWidgets('retour : d\'un onglet vers l\'Accueil, puis quitte', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    // Bouton retour d'Android : le même chemin que le système.
+    Future<bool> back() async {
+      final handled = await tester.binding.handlePopRoute();
+      await settle(tester);
+      return handled;
+    }
+
+    NavigationRail rail() => tester.widget(find.byType(NavigationRail));
+    expect(rail().selectedIndex, 1);
+
+    // Une fiche se ferme d'abord.
+    await tester.tap(find.text('Libre (2024)'));
+    await settle(tester);
+    expect(find.byType(MovieScreen), findsOneWidget);
+    expect(await back(), isTrue);
+    expect(find.byType(MovieScreen), findsNothing);
+    expect(rail().selectedIndex, 1);
+
+    // Puis l'onglet Films ramène à l'Accueil, sans quitter.
+    expect(await back(), isTrue);
+    expect(rail().selectedIndex, 0);
+
+    // À l'Accueil, retour quitte l'app (le système reprend la main).
+    expect(await back(), isFalse);
+  });
+
   testWidgets('Recherche : films et séries, accents, rien trouvé, Ctrl+F', (
     tester,
   ) async {
