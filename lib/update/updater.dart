@@ -127,6 +127,18 @@ final class Updater {
     if (adapter != null) _dio.httpClientAdapter = adapter;
   }
 
+  /// Pour l'app dont l'exe est dans [appDir], d'après ce qu'il y a à côté :
+  /// le marqueur `portable` du zip, ou le désinstalleur d'Inno Setup de
+  /// l'installation. Ni l'un ni l'autre (un build local, une copie) : `null`,
+  /// pas de mise à jour, qui installerait la version publiée ailleurs puis
+  /// relancerait cette copie inchangée.
+  static Updater? forApp({required String version, required Directory appDir}) {
+    bool has(String name) => File('${appDir.path}\\$name').existsSync();
+    final portable = has('portable');
+    if (!portable && !has('unins000.exe')) return null;
+    return Updater(version: version, portable: portable, appDir: appDir);
+  }
+
   static final latest = Uri.https(
     'api.github.com',
     '/repos/R0baiyn/couchplay/releases/latest',
@@ -135,8 +147,7 @@ final class Updater {
   /// Version de l'app en cours.
   final String version;
 
-  /// Un fichier `portable` est posé à côté de l'exe du zip, pas de
-  /// l'installation.
+  /// Zip portable (fichier `portable` à côté de l'exe), sinon installation.
   final bool portable;
 
   /// Dossier de l'exe, remplacé par la version portable.

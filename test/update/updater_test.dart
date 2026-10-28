@@ -78,6 +78,28 @@ void main() {
     });
   });
 
+  group('forApp', () {
+    late Directory app;
+    setUp(() => app = Directory.systemTemp.createTempSync('couchplay-app'));
+    tearDown(() => app.deleteSync(recursive: true));
+
+    Updater? updater() => Updater.forApp(version: '0.1.0', appDir: app);
+
+    test('marqueur du zip : portable', () {
+      File('${app.path}\\portable').createSync();
+      expect(updater()?.portable, isTrue);
+    });
+
+    test('désinstalleur d\'Inno Setup : installée', () {
+      File('${app.path}\\unins000.exe').createSync();
+      expect(updater()?.portable, isFalse);
+    });
+
+    test('ni l\'un ni l\'autre (build local) : pas de mise à jour', () {
+      expect(updater(), isNull);
+    });
+  });
+
   group('prepare', () {
     late Directory work;
     setUp(() => work = Directory.systemTemp.createTempSync('couchplay-test'));

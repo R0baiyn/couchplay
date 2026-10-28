@@ -37,18 +37,14 @@ Future<void> main() async {
         accountFilesProvider.overrideWithValue(files),
         appVersionProvider.overrideWithValue(package.version),
         if (Platform.isWindows && kReleaseMode)
-          updaterProvider.overrideWithValue(_updater(package.version)),
+          updaterProvider.overrideWithValue(
+            Updater.forApp(
+              version: package.version,
+              appDir: File(Platform.resolvedExecutable).parent,
+            ),
+          ),
       ],
       child: const CouchPlayApp(home: HomeGate()),
     ),
-  );
-}
-
-Updater _updater(String version) {
-  final appDir = File(Platform.resolvedExecutable).parent;
-  return Updater(
-    version: version,
-    portable: File('${appDir.path}/portable').existsSync(),
-    appDir: appDir,
   );
 }
