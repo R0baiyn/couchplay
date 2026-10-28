@@ -27,6 +27,7 @@ class SliverPosterGrid extends StatelessWidget {
 
   static const maxTileWidth = 170.0;
   static const spacing = 12.0;
+
   /// Entre deux rangées, en plus de la marge sous chaque titre.
   static const rowSpacing = 8.0;
 

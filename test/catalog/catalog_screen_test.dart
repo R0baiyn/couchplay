@@ -818,9 +818,7 @@ void main() {
     expect(find.byType(EditableText), findsNothing);
   });
 
-  testWidgets('grand écran : réglages en bas du rail', (
-    tester,
-  ) async {
+  testWidgets('grand écran : réglages en bas du rail', (tester) async {
     await pumpApp(tester);
     final settings = find.text('Réglages');
     expect(settings, findsOneWidget);
@@ -835,5 +833,4 @@ void main() {
     );
     expect(tester.getBottomLeft(settings).dy, greaterThan(800 - 100));
   });
-
 }
