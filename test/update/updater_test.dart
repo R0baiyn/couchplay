@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:couchplay/update/updater.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_server.dart';
@@ -105,7 +106,14 @@ void main() {
   group('prepare', () {
     late Directory work;
     setUp(() => work = Directory.systemTemp.createTempSync('couchplay-test'));
-    tearDown(() => work.deleteSync(recursive: true));
+    tearDown(() {
+      try {
+        work.deleteSync(recursive: true);
+      } on FileSystemException {
+        // Fichier encore ouvert par un téléchargement annulé (Windows) : le
+        // dossier temporaire reste, sans effet sur les tests.
+      }
+    });
 
     final update = Update(
       version: '0.1.1',
@@ -160,7 +168,10 @@ void main() {
         FakeAdapter((_) async => ResponseBody(body.stream, 200)),
       );
       final done = subject.prepare(update);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      // Annuler une fois le premier octet reçu : le téléchargement a commencé.
+      for (var i = 0; i < 250 && subject.progress.value == 0; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
       subject.cancel();
       await expectLater(
         done,
@@ -168,6 +179,44 @@ void main() {
           isA<DioException>().having(CancelToken.isCancel, 'annulé', true),
         ),
       );
+    });
+
+    test('redirection GitHub suivie, puis fichier tronqué refusé', () async {
+      final adapter = FakeAdapter(
+        (options) async => options.uri.host == 'github.com'
+            ? ResponseBody.fromString(
+                '',
+                302,
+                headers: {
+                  'location': [
+                    'https://release-assets.githubusercontent.com/x',
+                  ],
+                },
+              )
+            : ResponseBody.fromString('ab', 200),
+      );
+      await expectLater(
+        updater(adapter).prepare(update),
+        throwsA(isA<HttpException>()),
+      );
+      expect(adapter.calls, 2);
+    });
+
+    test('une seule préparation par version', () async {
+      // Le serveur ne répond jamais : la préparation reste en cours.
+      final body = StreamController<Uint8List>();
+      addTearDown(body.close);
+      final adapter = FakeAdapter((_) async => ResponseBody(body.stream, 200));
+      final subject = updater(adapter);
+      final first = subject.prepare(update);
+      final second = subject.prepare(update);
+      expect(identical(first, second), isTrue);
+      for (var i = 0; i < 250 && adapter.calls == 0; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(adapter.calls, 1);
+      subject.cancel();
+      await expectLater(first, throwsA(isA<DioException>()));
     });
 
     test('un échec se retente au prochain appel', () async {
@@ -178,6 +227,23 @@ void main() {
       }
       expect(adapter.calls, 2);
     });
+  });
+
+  test('hors ligne : pas de mise à jour au démarrage, sans erreur', () async {
+    final container = ProviderContainer(
+      overrides: [
+        updaterProvider.overrideWithValue(
+          Updater(
+            version: '0.1.0',
+            portable: false,
+            appDir: Directory.systemTemp,
+            adapter: FakeAdapter.failing(DioExceptionType.connectionError),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    expect(await container.read(startupUpdateProvider.future), isNull);
   });
 
   test('téléchargement : HTTPS chez GitHub seulement', () {

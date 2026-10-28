@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,7 +11,6 @@ import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
 import 'package:couchplay/library/favorites_screen.dart';
-import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/search/search_screen.dart';
@@ -18,10 +18,12 @@ import 'package:couchplay/search/search_screen.dart';
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/settings/settings.dart';
+import 'package:couchplay/update/updater.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -62,6 +64,7 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(1280, 800),
     bool openMovies = true,
+    List<Override> overrides = const [],
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -107,6 +110,7 @@ void main() {
               adapter: server,
             ),
           ),
+          ...overrides,
         ],
         child: const CouchPlayApp(home: HomeGate()),
       ),
@@ -197,6 +201,49 @@ void main() {
     await settle(tester);
     expect(find.byType(MovieScreen), findsNothing);
     expect(find.text('Libre (2024)'), findsOneWidget);
+  });
+
+  testWidgets("la mise à jour attend que l'accueil soit devant", (
+    tester,
+  ) async {
+    final found = Completer<Update?>();
+    await pumpApp(
+      tester,
+      overrides: [
+        // Aucun bouton n'est touché : rien n'est téléchargé ni lancé.
+        updaterProvider.overrideWithValue(
+          Updater(
+            version: '0.1.0',
+            portable: false,
+            appDir: root,
+            adapter: FakeAdapter.failing(DioExceptionType.connectionError),
+          ),
+        ),
+        startupUpdateProvider.overrideWith((ref) => found.future),
+      ],
+    );
+    final offer = find.text('Version 0.1.1 disponible');
+    await tester.tap(find.text('Libre (2024)'));
+    await settle(tester);
+
+    // Trouvée pendant qu'une fiche est ouverte : rien par-dessus.
+    found.complete(
+      Update(
+        version: '0.1.1',
+        notes: '',
+        asset: Uri.parse('https://github.com/x.exe'),
+        size: 1,
+        portable: false,
+      ),
+    );
+    await settle(tester);
+    expect(find.byType(MovieScreen), findsOneWidget);
+    expect(offer, findsNothing);
+
+    // De retour sur l'accueil : proposée, une seule fois.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(offer, findsOneWidget);
   });
 
   testWidgets("un favori ajouté sur une fiche apparaît sur l'accueil", (
@@ -342,10 +389,9 @@ void main() {
 
     // Nouveau lancement, une fois l'écriture faite : toujours vu, et on peut
     // l'annuler.
-    await savedProgress(
-      tester,
-      (progress) => progress.values.any((e) => (e as Map)['watched'] == true),
-    );
+    bool watched(Map<Object?, Object?> progress) =>
+        progress.values.any((e) => (e as Map)['watched'] == true);
+    expect(watched(await savedProgress(tester, watched)), isTrue);
     await tester.pumpWidget(const SizedBox());
     await pumpApp(tester);
     await openVikings();
