@@ -8,13 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 final _t0 = DateTime.utc(2026, 11, 2, 20);
 
-/// Verrouille le fichier, le signale, puis le libère 40 ms plus tard.
+/// Verrouille le fichier, le signale, puis le libère 10 ms plus tard.
 void _holdLock((String, SendPort) args) {
   final (path, locked) = args;
   final lock = File(path).openSync(mode: FileMode.append)
     ..lockSync(FileLock.exclusive);
   locked.send(null);
-  sleep(const Duration(milliseconds: 40));
+  sleep(const Duration(milliseconds: 10));
   lock
     ..unlockSync()
     ..closeSync();
@@ -274,11 +274,9 @@ void main() {
       lock
         ..unlockSync()
         ..closeSync();
-      // Selon le système, le fichier a pu être mis de côté ou rester en
-      // place ; dans les deux cas, son contenu est intact.
-      final bak = File('${file.path}.bak');
-      final kept = bak.existsSync() ? bak : file;
-      expect(kept.readAsStringSync(), original);
+      // Un verrou n'est pas un fichier illisible : laissé en place, intact.
+      expect(File('${file.path}.bak').existsSync(), isFalse);
+      expect(file.readAsStringSync(), original);
     }, skip: !Platform.isWindows);
 
     test(
@@ -286,7 +284,7 @@ void main() {
       () async {
         await LibraryStore(file)
             .save(const Library().withProgress(_progress(_movie)));
-        // Un autre isolate tient le fichier 40 ms, comme le renommage d'une
+        // Un autre isolate tient le fichier 10 ms, comme le renommage d'une
         // écriture : load() attend sans bloquer l'isolate qui le libère.
         final locked = ReceivePort();
         await Isolate.spawn(_holdLock, (file.path, locked.sendPort));

@@ -28,23 +28,33 @@ final class LibraryStore {
         return Library.fromJson(jsonDecode(text));
       } on PathNotFoundException {
         return const Library();
-      } on FileSystemException {
-        // Verrou passager : sous Windows, une écriture de l'app (renommage
-        // du fichier temporaire) ou un antivirus bloque la lecture quelques
-        // millisecondes. Ce n'est pas un fichier illisible.
+      } on FileSystemException catch (e) {
+        // Texte mal encodé, entre autres : pas un verrou.
+        if (!_locked.contains(e.osError?.errorCode)) return _setAside();
+        // Verrou : sous Windows, une écriture de l'app (renommage du fichier
+        // temporaire) ou un antivirus bloque la lecture quelques
+        // millisecondes. Le fichier n'est pas illisible : on réessaie, puis
+        // on le laisse en place sans plus rien écrire jusqu'au prochain
+        // lancement.
         if (attempt < 5) {
           sleep(const Duration(milliseconds: 20));
           continue;
         }
-        return _setAside();
+        _readOnly = true;
+        log('Bibliothèque verrouillée, lue vide', error: e.osError?.errorCode);
+        return const Library();
       } on Exception {
         return _setAside();
       }
     }
   }
 
-  /// JSON invalide, texte mal encodé ou fichier toujours verrouillé : jamais
-  /// écrasé sans trace par la prochaine écriture.
+  /// Erreurs Windows d'un fichier ouvert ailleurs : partage refusé (32),
+  /// plage verrouillée (33).
+  static const _locked = {32, 33};
+
+  /// JSON invalide ou texte mal encodé : jamais écrasé sans trace par la
+  /// prochaine écriture.
   Library _setAside() {
     log('Bibliothèque illisible, mise de côté en library.json.bak');
     try {
