@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,9 +15,12 @@ import 'package:media_kit/media_kit.dart';
 ///   mouvement, sauf en pause ou quand la souris est sur les barres.
 /// - Toucher : un toucher affiche ou masque les contrôles, un double toucher
 ///   à gauche ou à droite recule ou avance de 10 s.
-/// - Clavier : Espace (pause), ← → (±10 s), ↑ ↓ (volume), F (plein écran),
-///   Échap (quitte le plein écran, puis le lecteur). Tab passe aux boutons ;
-///   là, les flèches passent d'un bouton à l'autre (télécommande).
+/// - Clavier : Espace ou Entrée (pause), ← → (±10 s), ↑ ↓ (volume), F (plein
+///   écran), Échap (quitte le plein écran, puis le lecteur). Tab passe aux
+///   boutons ; là, les flèches passent d'un bouton à l'autre.
+/// - Télécommande (Android) : OK (pause), ← → (±10 s), ↑ ↓ vont aux boutons,
+///   où les flèches passent de l'un à l'autre ; retour quitte le lecteur.
+///   Quand les contrôles se masquent, le focus revient sur l'image.
 class PlayerControls extends StatefulWidget {
   const PlayerControls({
     super.key,
@@ -53,6 +57,11 @@ class _PlayerControlsState extends State<PlayerControls> {
   var _overBars = false;
   Timer? _hideTimer;
 
+  /// L'image, qui reçoit les touches, et le bouton lecture, où ↑ ↓ mènent
+  /// sur Android (le volume est celui de l'appareil).
+  final _videoFocus = FocusNode(debugLabel: 'vidéo');
+  final _playFocus = FocusNode(debugLabel: 'lecture');
+
   Player get _player => widget.player;
 
   @override
@@ -64,6 +73,8 @@ class _PlayerControlsState extends State<PlayerControls> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _videoFocus.dispose();
+    _playFocus.dispose();
     super.dispose();
   }
 
@@ -81,11 +92,16 @@ class _PlayerControlsState extends State<PlayerControls> {
       _hideTimer = Timer(_hideAfter, _autoHide);
       return;
     }
-    setState(() => _visible = false);
+    _hide();
   }
 
+  /// Masque les contrôles. Un bouton qui avait le focus le rend à l'image :
+  /// les flèches y reprennent leur rôle (±10 s).
   void _hide() {
     _hideTimer?.cancel();
+    if (_videoFocus.hasFocus && !_videoFocus.hasPrimaryFocus) {
+      _videoFocus.requestFocus();
+    }
     setState(() => _visible = false);
   }
 
@@ -115,16 +131,26 @@ class _PlayerControlsState extends State<PlayerControls> {
     // Sur un bouton (Tab), flèches et Espace gardent leur rôle habituel :
     // passer d'un bouton à l'autre, activer le bouton.
     final onVideo = node.hasPrimaryFocus;
+    final vertical =
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown;
 
     if (onVideo && key == LogicalKeyboardKey.arrowLeft) {
       _seekBy(-_step);
     } else if (onVideo && key == LogicalKeyboardKey.arrowRight) {
       _seekBy(_step);
+    } else if (onVideo &&
+        vertical &&
+        defaultTargetPlatform == TargetPlatform.android) {
+      _playFocus.requestFocus();
     } else if (onVideo && key == LogicalKeyboardKey.arrowUp) {
       _volumeBy(5);
     } else if (onVideo && key == LogicalKeyboardKey.arrowDown) {
       _volumeBy(-5);
-    } else if ((onVideo && key == LogicalKeyboardKey.space) ||
+    } else if ((onVideo &&
+            (key == LogicalKeyboardKey.space ||
+                key == LogicalKeyboardKey.enter ||
+                key == LogicalKeyboardKey.select)) ||
         key == LogicalKeyboardKey.mediaPlayPause) {
       // Maintenue, la touche n'alterne pas sans fin.
       if (!repeat) _player.playOrPause();
@@ -165,6 +191,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: _videoFocus,
       autofocus: true,
       onKeyEvent: _onKey,
       child: MouseRegion(
@@ -285,6 +312,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             builder: (context, snapshot) {
               final playing = snapshot.data ?? false;
               return IconButton(
+                focusNode: _playFocus,
                 tooltip: playing ? 'Pause' : 'Lecture',
                 icon: Icon(playing ? Icons.pause : Icons.play_arrow),
                 onPressed: () {
