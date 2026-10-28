@@ -87,6 +87,10 @@ set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
 set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT Runtime)
 include(InstallRequiredSystemLibraries)
 
+# zlib.dll du paquet ANGLE de media_kit : liée au runtime debug et chargée
+# par aucun binaire (flutter et libmpv ont leur propre zlib). Pas livrée.
+list(FILTER PLUGIN_BUNDLED_LIBRARIES EXCLUDE REGEX "/zlib\\.dll$")
+
 if(PLUGIN_BUNDLED_LIBRARIES)
   install(FILES "${PLUGIN_BUNDLED_LIBRARIES}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
