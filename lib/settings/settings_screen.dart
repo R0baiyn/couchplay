@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../accounts/account_status_screen.dart';
 import '../accounts/accounts_screen.dart';
 import '../catalog/catalog_settings_screen.dart';
+import '../update/update_dialog.dart';
+import '../update/updater.dart';
 import 'settings.dart';
 
 /// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
@@ -129,8 +131,66 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const Divider(),
+          const _VersionTile(),
         ],
       ),
+    );
+  }
+}
+
+/// Version de l'app et, sous Windows, recherche d'une mise à jour.
+class _VersionTile extends ConsumerStatefulWidget {
+  const _VersionTile();
+
+  @override
+  ConsumerState<_VersionTile> createState() => _VersionTileState();
+}
+
+class _VersionTileState extends ConsumerState<_VersionTile> {
+  var _checking = false;
+
+  Future<void> _check(Updater updater) async {
+    setState(() => _checking = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final update = await updater.check();
+      if (!mounted) return;
+      if (update == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('CouchPlay est à jour.')),
+        );
+      } else {
+        await showUpdateDialog(context, updater, update);
+      }
+    } on Exception {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de vérifier les mises à jour.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final version = ref.watch(appVersionProvider);
+    final updater = ref.watch(updaterProvider);
+    return ListTile(
+      leading: const Icon(Icons.info_outline),
+      title: Text('Version $version'),
+      subtitle: updater == null
+          ? null
+          : const Text('Rechercher des mises à jour'),
+      trailing: _checking
+          ? const SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : null,
+      onTap: updater == null || _checking ? null : () => _check(updater),
     );
   }
 }

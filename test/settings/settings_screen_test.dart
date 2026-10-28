@@ -1,5 +1,6 @@
 import 'package:couchplay/settings/settings.dart';
 import 'package:couchplay/settings/settings_screen.dart';
+import 'package:couchplay/update/updater.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,7 +15,10 @@ void main() {
     final store = await tester.runAsync(SettingsStore.open);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [settingsStoreProvider.overrideWithValue(store!)],
+        overrides: [
+          settingsStoreProvider.overrideWithValue(store!),
+          appVersionProvider.overrideWithValue('0.1.0'),
+        ],
         child: const MaterialApp(home: SettingsScreen()),
       ),
     );
@@ -22,6 +26,12 @@ void main() {
       tester.element(find.byType(SettingsScreen)),
     );
   }
+
+  testWidgets('la version de l\'app est affichée', (tester) async {
+    await pumpSettings(tester);
+    await tester.scrollUntilVisible(find.text('Version 0.1.0'), 100);
+    expect(find.text('Version 0.1.0'), findsOneWidget);
+  });
 
   testWidgets('le thème « Comme le système » est coché par défaut', (
     tester,

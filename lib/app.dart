@@ -11,6 +11,8 @@ import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'settings/settings.dart';
 import 'settings/settings_screen.dart';
+import 'update/update_dialog.dart';
+import 'update/updater.dart';
 
 class CouchPlayApp extends ConsumerWidget {
   const CouchPlayApp({super.key, required this.home});
@@ -119,6 +121,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         _indexes.add(ref.listenManual(catalogIndexProvider(kind), (_, _) {}));
       }
     });
+    ref.listenManual(startupUpdateProvider, (_, next) {
+      if (next.value case final update?) setState(() => _update = update);
+    }, fireImmediately: true);
+  }
+
+  /// Mise à jour trouvée au démarrage, pas encore proposée : elle attend que
+  /// l'accueil soit devant, jamais par-dessus le lecteur ou une fiche.
+  Update? _update;
+
+  void _offerUpdate() {
+    final update = _update;
+    final updater = ref.read(updaterProvider);
+    if (update == null || updater == null) return;
+    _update = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showUpdateDialog(context, updater, update);
+    });
   }
 
   @override
@@ -182,6 +201,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Dépendance à la route : reconstruit quand l'accueil revient devant.
+    if (ModalRoute.of(context)?.isCurrent ?? false) _offerUpdate();
     final body = IndexedStack(
       index: _index,
       children: [

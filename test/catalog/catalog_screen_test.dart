@@ -10,6 +10,7 @@ import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
 import 'package:couchplay/library/favorites_screen.dart';
+import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/search/search_screen.dart';
@@ -85,6 +86,7 @@ void main() {
       ProviderScope(
         overrides: [
           settingsStoreProvider.overrideWithValue(settings!),
+          appVersionProvider.overrideWithValue('0.1.0'),
           accountStoreProvider.overrideWithValue(store!),
           accountFilesProvider.overrideWithValue(
             AccountFiles(Directory('${root.path}/accounts')),
