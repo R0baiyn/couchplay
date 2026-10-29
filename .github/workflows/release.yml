@@ -106,11 +106,16 @@ jobs:
 
       # Gradle n'installe pas le NDK tout seul : celui de Flutter 3.47.8
       # (flutter.ndkVersion), installé s'il manque au runner. L'outil peut
-      # dire « not found » et réussir quand même : le dossier fait foi.
+      # dire « not found » et réussir quand même : le dossier fait foi. Un
+      # téléchargement corrompu (« unknown archive ») se retente.
       - name: NDK
         run: |
           ndk="$ANDROID_HOME/ndk/28.2.13676358"
-          [ -d "$ndk" ] || "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" < /dev/null > /dev/null
+          for essai in 1 2 3; do
+            [ -d "$ndk" ] && exit 0
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" < /dev/null || true
+            sleep 10
+          done
           test -d "$ndk"
 
       # La clé ne vit que le temps du job, hors du dossier du dépôt ; un
