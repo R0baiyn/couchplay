@@ -359,6 +359,27 @@ void main() {
     expect(find.byType(MovieScreen), findsOneWidget);
   });
 
+  testWidgets('flèches : → depuis un épisode mène à son menu', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Séries'));
+    await settle(tester);
+    await tester.tap(find.text('Vikings'));
+    await settle(tester);
+    final firstEpisode = find.textContaining('1. Vikings - S01E01');
+    await tester.scrollUntilVisible(firstEpisode, 300);
+
+    Focus.of(tester.element(firstEpisode)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await settle(tester);
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<PopupMenuButton<bool>>()
+          ?.tooltip,
+      "Plus d'options",
+    );
+  });
+
   testWidgets('un épisode se marque vu ou non vu, et le reste', (tester) async {
     Future<void> openVikings() async {
       await tester.tap(find.text('Séries'));
