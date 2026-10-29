@@ -856,6 +856,10 @@ void main() {
       await press(tester, LogicalKeyboardKey.arrowDown);
       expect(focused(), 'Lecture', reason: 'le focus reste sur le bouton');
       expect(tester.getTopLeft(find.text('Lecture')).dy, lessThan(before));
+
+      // ↑ mène à la barre du haut, et la fiche remonte tout en haut.
+      await press(tester, LogicalKeyboardKey.arrowUp);
+      expect(tester.getTopLeft(find.text('Lecture')).dy, before);
     });
   });
 

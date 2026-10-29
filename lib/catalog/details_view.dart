@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../server/models.dart';
 import 'poster_grid.dart';
 
-/// En-tête des fiches film et série : image de fond si elle existe, affiche,
-/// titre et informations. Côte à côte sur grand écran, empilés sur mobile.
-/// Les champs absents ne sont pas affichés.
+/// En-tête des fiches film et série : un bandeau, l'image de fond derrière
+/// (si elle existe), l'affiche à gauche, titre, informations et résumé sur
+/// toute la largeur restante. Les champs absents ne sont pas affichés.
 class DetailsHeader extends StatelessWidget {
   const DetailsHeader({super.key, required this.details, this.action});
 
@@ -53,58 +53,93 @@ class DetailsHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 720;
-        final poster = SizedBox(
-          width: wide ? 220 : 140,
-          child: AspectRatio(
-            aspectRatio: 2 / 3,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: PosterImage(url: d.poster),
-            ),
-          ),
-        );
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (d.backdrop case final backdrop?)
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(context).height * 0.4,
-                ),
+        final content = Padding(
+          padding: EdgeInsets.all(wide ? 24 : 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: wide ? 24 : 16,
+            children: [
+              SizedBox(
+                width: wide ? 160 : 100,
                 child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: ShaderMask(
-                    // Fondu vers le fond de l'écran, en bas de l'image.
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.center,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.white, Colors.transparent],
-                    ).createShader(rect),
-                    blendMode: BlendMode.dstIn,
-                    child: PosterImage(url: backdrop),
+                  aspectRatio: 2 / 3,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: PosterImage(url: d.poster),
                   ),
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: wide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 24,
-                      children: [
-                        poster,
-                        Expanded(child: text),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 16,
-                      children: [poster, text],
-                    ),
+              Expanded(child: text),
+            ],
+          ),
+        );
+        final backdrop = d.backdrop;
+        if (backdrop == null) return content;
+        final surface = theme.colorScheme.surface;
+        // Image de fond derrière le bandeau, pas au-dessus : elle ne prend
+        // aucune hauteur.
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: ShaderMask(
+                // Fondu vers le fond de l'écran, en bas de l'image.
+                shaderCallback: (rect) => const LinearGradient(
+                  begin: Alignment.center,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.white, Colors.transparent],
+                ).createShader(rect),
+                blendMode: BlendMode.dstIn,
+                child: PosterImage(url: backdrop),
+              ),
             ),
+            // Voile : le texte reste lisible sur n'importe quelle image.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      surface.withValues(alpha: 0.92),
+                      surface.withValues(alpha: 0.6),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            content,
           ],
         );
       },
+    );
+  }
+}
+
+/// Barre du haut d'une fiche. Quand son focus arrive sur un de ses boutons
+/// (retour, favori), la fiche remonte tout en haut : sinon, descendue à la
+/// télécommande, elle y resterait.
+class DetailsAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const DetailsAppBar({super.key, required this.scroll, required this.child});
+
+  final ScrollController scroll;
+  final AppBar child;
+
+  @override
+  Size get preferredSize => child.preferredSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (focused) {
+        if (focused && scroll.hasClients) {
+          scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+      child: child,
     );
   }
 }

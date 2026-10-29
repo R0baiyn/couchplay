@@ -27,6 +27,14 @@ class MovieScreen extends ConsumerStatefulWidget {
 }
 
 class _MovieScreenState extends ConsumerState<MovieScreen> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   /// Version choisie à la main ; sinon [preferredVersion].
   String? _chosenId;
 
@@ -65,22 +73,26 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
     final poster = selected.poster ?? widget.entry.poster;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(selected.parsedName.display),
-        actions: [
-          FavoriteButton(
-            favoriteKey: 'movie:${selected.id}',
-            otherKeys: [
-              for (final v in versions)
-                if (v != selected) 'movie:${v.id}',
-            ],
-            name: selected.name,
-            poster: poster,
-          ),
-        ],
+      appBar: DetailsAppBar(
+        scroll: _scroll,
+        child: AppBar(
+          title: Text(selected.parsedName.display),
+          actions: [
+            FavoriteButton(
+              favoriteKey: 'movie:${selected.id}',
+              otherKeys: [
+                for (final v in versions)
+                  if (v != selected) 'movie:${v.id}',
+              ],
+              name: selected.name,
+              poster: poster,
+            ),
+          ],
+        ),
       ),
       body: switch (details) {
         _ when shown != null => SingleChildScrollView(
+          controller: _scroll,
           child: DetailsHeader(
             details: shown.details,
             action: Column(

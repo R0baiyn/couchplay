@@ -23,20 +23,30 @@ class SeriesScreen extends ConsumerStatefulWidget {
 
 class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   int? _season;
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = seriesDetailsProvider(widget.item.id);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.item.name),
-        actions: [
-          FavoriteButton(
-            favoriteKey: 'series:${widget.item.id}',
-            name: widget.item.name,
-            poster: widget.item.poster,
-          ),
-        ],
+      appBar: DetailsAppBar(
+        scroll: _scroll,
+        child: AppBar(
+          title: Text(widget.item.name),
+          actions: [
+            FavoriteButton(
+              favoriteKey: 'series:${widget.item.id}',
+              name: widget.item.name,
+              poster: widget.item.poster,
+            ),
+          ],
+        ),
       ),
       body: switch (ref.watch(provider)) {
         AsyncData(:final value) => _content(value),
@@ -57,6 +67,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         series.seasons.firstOrNull;
     final progress = ref.watch(libraryProvider.select((l) => l.progress));
     return CustomScrollView(
+      controller: _scroll,
       slivers: [
         SliverToBoxAdapter(child: DetailsHeader(details: series.details)),
         if (season == null)
