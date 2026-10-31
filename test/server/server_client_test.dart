@@ -115,6 +115,22 @@ void main() {
       );
     });
 
+    test('panne réseau : la cause système est affichée', () async {
+      final error = await errorOf(
+        FakeAdapter(
+          (options) async => throw DioException(
+            requestOptions: options,
+            type: DioExceptionType.connectionError,
+            error: const SocketException(
+              'Failed host lookup',
+              osError: OSError('Hôte inconnu', 11001),
+            ),
+          ),
+        ),
+      );
+      expect(error.toString(), 'Serveur injoignable (Hôte inconnu)');
+    });
+
     test('timeout : le serveur ne répond pas', () async {
       expect(
         await errorOf(FakeAdapter.failing(DioExceptionType.connectionTimeout)),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 
@@ -32,10 +33,15 @@ final class AccessDenied extends ServerException {
 }
 
 final class ServerUnreachable extends ServerException {
-  const ServerUnreachable();
+  const ServerUnreachable([this.details]);
+
+  /// Cause système (connexion refusée, réinitialisée, adresse introuvable…).
+  final String? details;
 
   @override
-  String get message => 'Serveur injoignable';
+  String get message => details == null
+      ? 'Serveur injoignable'
+      : 'Serveur injoignable ($details)';
 }
 
 final class TooManyRequests extends ServerException {
@@ -151,7 +157,14 @@ final class ServerClient {
         DioExceptionType.connectionTimeout ||
         DioExceptionType.sendTimeout ||
         DioExceptionType.receiveTimeout => const ServerTimeout(),
-        _ => const ServerUnreachable(),
+        // L'erreur système ne contient que l'hôte et le port, jamais l'URL.
+        _ => ServerUnreachable(switch (e.error) {
+          SocketException(:final message, :final osError) =>
+            osError?.message ?? message,
+          // Autre erreur : son seul type, son message peut citer l'URL.
+          final Object error => error.runtimeType.toString(),
+          null => null,
+        }),
       };
     }
 
