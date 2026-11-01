@@ -816,11 +816,11 @@ void main() {
       expect(focused(), 'Film 0 (2020)');
       await press(tester, LogicalKeyboardKey.arrowRight);
       await press(tester, LogicalKeyboardKey.arrowDown);
+      expect(focused(), isNot('Film 1 (2020)'), reason: 'une rangée plus bas');
+      await press(tester, LogicalKeyboardKey.arrowLeft);
       final visited = focused();
-      expect(visited, isNot('Film 1 (2020)'), reason: 'une rangée plus bas');
 
       // ← au bord gauche : l'onglet choisi, pas l'élément le plus proche.
-      await press(tester, LogicalKeyboardKey.arrowLeft);
       await press(tester, LogicalKeyboardKey.arrowLeft);
       expect(focused(), 'Films');
       // Le bas du rail le garde : pas de saut dans la grille.
@@ -837,8 +837,7 @@ void main() {
       // → revient à la dernière affiche visitée.
       await press(tester, LogicalKeyboardKey.arrowUp);
       await press(tester, LogicalKeyboardKey.arrowRight);
-      expect(focused(), isNot(anyOf('Films', 'Recherche', 'Réglages')));
-      expect(focused(), startsWith('Film '));
+      expect(focused(), visited);
     });
 
     testWidgets('retour depuis un onglet : le focus sur « Accueil »', (
