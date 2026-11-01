@@ -33,6 +33,15 @@ class MainActivity : FlutterActivity() {
                     return@setMethodCallHandler
                 }
                 val apk = File(cacheDir, "update/couchplay.apk")
+                // L'APK d'une autre app s'installerait à côté, sans la
+                // vérification de signature d'une mise à jour : refusé. Illisible,
+                // l'installateur d'Android le refusera de lui-même.
+                @Suppress("DEPRECATION")
+                val archive = packageManager.getPackageArchiveInfo(apk.path, 0)
+                if (archive != null && archive.packageName != packageName) {
+                    result.error("install", "APK d'une autre app", null)
+                    return@setMethodCallHandler
+                }
                 val uri = FileProvider.getUriForFile(this, "$packageName.update", apk)
                 try {
                     startActivity(
