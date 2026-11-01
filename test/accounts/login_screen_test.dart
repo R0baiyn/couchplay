@@ -204,6 +204,20 @@ void main() {
       await type('moi');
       await type('mdp');
       expect(find.text('mdp'), findsNothing, reason: 'mot de passe masqué');
+      expect(focused(), 4, reason: 'pas sur le bouton dans la case');
+
+      // Le mot de passe s'affiche depuis la fenêtre de saisie.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+      bool obscured() =>
+          tester.widget<EditableText>(find.byType(EditableText)).obscureText;
+      expect(obscured(), isTrue);
+      await tester.tap(find.text('Afficher'));
+      await tester.pump();
+      expect(obscured(), isFalse);
+      await tester.tap(find.text('Annuler'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Se connecter'));
       for (var i = 0; i < 5; i++) {

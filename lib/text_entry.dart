@@ -10,6 +10,10 @@ import 'television.dart';
 /// clavier à l'écran : OK ouvre une fenêtre de saisie ; validée, la valeur
 /// s'inscrit et le focus passe au champ suivant ([TextInputAction.next]),
 /// ou [onSubmitted] est appelé.
+///
+/// Sur TV, le `suffixIcon` de [decoration] n'est pas affiché : un bouton dans
+/// la case serait hors d'atteinte des flèches, et prendrait le focus au champ
+/// suivant. Un mot de passe s'affiche depuis la fenêtre de saisie.
 class TextEntry extends ConsumerWidget {
   const TextEntry({
     super.key,
@@ -120,8 +124,7 @@ class _TvEntryState extends State<_TvEntry> {
             return InputDecorator(
               decoration: _field.decoration.copyWith(
                 errorText: state.errorText,
-                suffixIcon:
-                    _field.decoration.suffixIcon ?? const Icon(Icons.edit),
+                suffixIcon: const Icon(Icons.edit),
               ),
               isFocused: _focused,
               isEmpty: text.isEmpty,
@@ -164,6 +167,7 @@ class _EntryDialog extends StatefulWidget {
 
 class _EntryDialogState extends State<_EntryDialog> {
   late final _controller = TextEditingController(text: widget.initial);
+  late var _obscure = widget.obscureText;
 
   @override
   void dispose() {
@@ -178,7 +182,7 @@ class _EntryDialogState extends State<_EntryDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
-        obscureText: widget.obscureText,
+        obscureText: _obscure,
         keyboardType: widget.keyboardType,
         autocorrect: widget.autocorrect,
         enableSuggestions: widget.enableSuggestions,
@@ -186,6 +190,12 @@ class _EntryDialogState extends State<_EntryDialog> {
         onSubmitted: (value) => Navigator.pop(context, value),
       ),
       actions: [
+        // Avec les autres boutons, pas dans le champ : les flèches y vont.
+        if (widget.obscureText)
+          TextButton(
+            onPressed: () => setState(() => _obscure = !_obscure),
+            child: Text(_obscure ? 'Afficher' : 'Masquer'),
+          ),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Annuler'),
