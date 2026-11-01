@@ -14,13 +14,16 @@ import '../support/fake_server.dart';
 
 /// Installation simulée : retient ce qui lui est confié.
 final class _FakeInstaller implements Installer {
-  _FakeInstaller(this.workDir, {this.pending = false});
+  _FakeInstaller(this.workDir, {this.pending = false, this.pendingError});
 
   @override
   final Directory workDir;
 
   /// Réponse de [installPending].
   final bool pending;
+
+  /// Levée par [installPending] à la place de sa réponse.
+  final Exception? pendingError;
 
   /// Contenu de chaque fichier préparé.
   final received = <String>[];
@@ -42,7 +45,10 @@ final class _FakeInstaller implements Installer {
   Future<void> installNow() async {}
 
   @override
-  Future<bool> installPending(String current) async => pending;
+  Future<bool> installPending(String current) async {
+    if (pendingError case final error?) throw error;
+    return pending;
+  }
 }
 
 void main() {
@@ -358,6 +364,19 @@ void main() {
       expect(calls, isEmpty);
     });
 
+    for (final version in ['', 'abc']) {
+      test(
+        'fichier version illisible (« $version ») : rien, dossier vidé',
+        () async {
+          File('${work.path}/couchplay.apk').writeAsStringSync('apk');
+          File('${work.path}/version').writeAsStringSync(version);
+          expect(await installer().installPending('0.2.0'), isFalse);
+          expect(calls, isEmpty);
+          expect(work.existsSync(), isFalse);
+        },
+      );
+    }
+
     test('APK effacé avec le cache : rien', () async {
       await prepare();
       File('${work.path}/couchplay.apk').deleteSync();
@@ -400,6 +419,21 @@ void main() {
         );
         expect(await startup(updater), isNull);
         expect(adapter.calls, 0);
+      },
+    );
+
+    test(
+      'installateur introuvable : pas de mise à jour, sans erreur',
+      () async {
+        final updater = Updater(
+          version: '0.1.0',
+          installer: _FakeInstaller(
+            Directory.systemTemp,
+            pendingError: PlatformException(code: 'install'),
+          ),
+          adapter: FakeAdapter.replying('{}'),
+        );
+        expect(await startup(updater), isNull);
       },
     );
   });
