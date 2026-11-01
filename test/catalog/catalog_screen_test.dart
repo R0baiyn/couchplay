@@ -841,6 +841,28 @@ void main() {
       expect(focused(), startsWith('Film '));
     });
 
+    testWidgets('retour depuis un onglet : le focus sur « Accueil »', (
+      tester,
+    ) async {
+      await pumpTv(tester);
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.select);
+      await press(tester, LogicalKeyboardKey.arrowRight);
+      expect(focused(), 'Film 0 (2020)');
+
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+      expect(focused(), 'Accueil', reason: 'depuis la grille');
+
+      // Depuis le rail aussi : le focus suit l'onglet choisi.
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      await press(tester, LogicalKeyboardKey.select);
+      expect(focused(), 'Films');
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+      expect(focused(), 'Accueil', reason: 'depuis le rail');
+    });
+
     testWidgets('fiche : ↓ sans rien dessous fait défiler la page', (
       tester,
     ) async {

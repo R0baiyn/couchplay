@@ -295,7 +295,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return PopScope(
       canPop: _index == 0,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _select(0);
+        if (didPop) return;
+        _select(0);
+        // Sur TV, le focus suit : l'onglet quitté est caché, il le perdrait.
+        if (ref.read(televisionProvider)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _focusTab();
+          });
+        }
       },
       child: _shell(context),
     );
