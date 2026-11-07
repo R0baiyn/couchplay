@@ -54,10 +54,7 @@ void main() {
     });
 
     test('début de titre d\'abord, puis l\'ordre de la liste', () {
-      expect(titles(search(entries, 'bad')), [
-        'Bad Boys (1995)',
-        'Going Bad',
-      ]);
+      expect(titles(search(entries, 'bad')), ['Bad Boys (1995)', 'Going Bad']);
     });
 
     test('n\'importe quelle version d\'un film', () {
@@ -135,7 +132,11 @@ void main() {
         );
         final index = loaded.value;
         final horizon = index.entryOf('144014')!;
-        expect(horizon.versions.map((v) => v.id), ['144016', '144015', '144014']);
+        expect(horizon.versions.map((v) => v.id), [
+          '144016',
+          '144015',
+          '144014',
+        ]);
         expect(index.entryOf('144016'), same(horizon));
         // Film d'une catégorie arabe : masqué par défaut.
         expect(index.entryOf('19181'), isNull);
