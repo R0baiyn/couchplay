@@ -89,6 +89,8 @@ jobs:
   android:
     needs: version
     runs-on: ubuntu-latest
+    # Les secrets de signature sont dans cet environnement, pas dans le dépôt.
+    environment: release
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
