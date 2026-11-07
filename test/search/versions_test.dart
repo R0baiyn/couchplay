@@ -14,16 +14,16 @@ void main() {
   group('entriesOf', () {
     test('même tmdb_id : une affiche, la meilleure version d\'abord', () {
       final entries = entriesOf([
-        movie('1', 'Libre (2024) HD VF', tmdb: '9'),
+        movie('1', 'Horizon (2024) HD VF', tmdb: '9'),
         movie('2', 'Autre'),
-        movie('3', 'Libre (2024) 4K', tmdb: '9'),
-        movie('4', 'Libre (2024) FHD VF', tmdb: '9'),
+        movie('3', 'Horizon (2024) 4K', tmdb: '9'),
+        movie('4', 'Horizon (2024) FHD VF', tmdb: '9'),
       ]);
       expect(names(entries), [
-        ['Libre (2024) 4K', 'Libre (2024) FHD VF', 'Libre (2024) HD VF'],
+        ['Horizon (2024) 4K', 'Horizon (2024) FHD VF', 'Horizon (2024) HD VF'],
         ['Autre'],
       ]);
-      expect(entries.first.title, 'Libre (2024)');
+      expect(entries.first.title, 'Horizon (2024)');
     });
 
     test('sans tmdb_id : même titre et même année', () {
@@ -46,24 +46,24 @@ void main() {
 
     test('titres différents d\'un même tmdb_id : regroupés', () {
       final entries = entriesOf([
-        movie('1', 'Acts of Vengeance SD', tmdb: '44'),
-        movie('2', 'Actes de Vengeance (2017) MULTI', tmdb: '44'),
+        movie('1', 'Acts of Clarity SD', tmdb: '44'),
+        movie('2', 'Actes de Clarté (2017) MULTI', tmdb: '44'),
       ]);
       expect(entries, hasLength(1));
     });
 
     test('sans année ni tmdb_id : pas de regroupement', () {
       final entries = entriesOf([
-        movie('1', 'Hamlet HD'),
-        movie('2', 'Hamlet SD'),
+        movie('1', 'Hameau HD'),
+        movie('2', 'Hameau SD'),
       ]);
       expect(entries, hasLength(2));
     });
 
     test('« Vostfr » en minuscules passe après le français, même SD', () {
       final entries = entriesOf([
-        movie('1', 'Parasite Vostfr', tmdb: '7'),
-        movie('2', 'Parasite SD', tmdb: '7'),
+        movie('1', 'Cocon Vostfr', tmdb: '7'),
+        movie('2', 'Cocon SD', tmdb: '7'),
       ]);
       expect(entries.single.item.id, '2');
     });

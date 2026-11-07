@@ -12,7 +12,7 @@ final class CatalogEntry {
   CatalogItem get item => versions.first;
   ContentKind get kind => item.kind;
 
-  /// Titre sans étiquettes : « Libre (2024) » pour toutes ses versions.
+  /// Titre sans étiquettes : « Horizon (2024) » pour toutes ses versions.
   String get title => item.parsedName.display;
 
   /// Affiche de la meilleure version qui en a une.
@@ -29,7 +29,7 @@ final class CatalogEntry {
 ///
 /// Même film : même `tmdb_id`, sinon même titre et même année (deux
 /// homonymes d'années différentes restent séparés ; sans année ni
-/// `tmdb_id`, pas de regroupement : deux « Hamlet » ne sont pas forcément
+/// `tmdb_id`, pas de regroupement : deux « Hameau » ne sont pas forcément
 /// le même). À n'appeler que sur des entrées de catégories visibles : sinon
 /// un film français se regroupe avec sa version espagnole. Les séries ne
 /// sont pas regroupées.

@@ -51,8 +51,8 @@ void main() {
   });
 
   test('asString garde le texte, convertit les nombres et ignore le vide', () {
-    expect(asString('Inception'), 'Inception');
-    expect(asString(' Inception '), ' Inception ');
+    expect(asString('Mirage'), 'Mirage');
+    expect(asString(' Mirage '), ' Mirage ');
     expect(asString(42), '42');
     expect(asString(42.0), '42');
     expect(asString(4.5), '4.5');

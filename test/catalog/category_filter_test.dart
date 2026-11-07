@@ -23,7 +23,7 @@ void main() {
       expect(categoryTag('Films 4K'), isNull);
       expect(categoryTag('UNKNOW - A Definir'), isNull);
       expect(categoryTag('TOP SPORTS'), isNull);
-      expect(categoryTag('Séries NETFLIX'), isNull);
+      expect(categoryTag('Séries PLATEFORME A'), isNull);
     });
 
     test('séries sans préfixe : la langue se lit dans le nom', () {
@@ -67,7 +67,7 @@ void main() {
           .apply(ContentKind.series, _fixture('series_categories'))
           .map((c) => c.name)
           .toList();
-      expect(visible, contains('Séries NETFLIX'));
+      expect(visible, contains('Séries PLATEFORME A'));
       expect(visible, contains('Séries ANIMÉES POUR ADUƖTES'));
       expect(visible, isNot(contains('Séries SUB-AR')));
       expect(visible, isNot(contains('Séries TURQUES')));

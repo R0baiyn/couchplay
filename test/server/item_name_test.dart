@@ -5,8 +5,8 @@ void main() {
   group('normalize', () {
     test('minuscules, accents français retirés', () {
       expect(
-        normalize('Le Fabuleux Destin d\'Amélie Poulain'),
-        'le fabuleux destin d amelie poulain',
+        normalize('Le Fabuleux Destin d\'Éloïse Marchand'),
+        'le fabuleux destin d eloise marchand',
       );
       expect(
         normalize('ÉTÉ çà œuvre Æon ÎÏÔÖÙÛÜ'),
@@ -27,9 +27,9 @@ void main() {
 
   group('ItemName.parse', () {
     test('étiquettes de qualité et de langue, année à part', () {
-      final name = ItemName.parse('Libre (2024) HD VF');
-      expect(name.display, 'Libre (2024)');
-      expect(name.text, 'libre');
+      final name = ItemName.parse('Horizon (2024) HD VF');
+      expect(name.display, 'Horizon (2024)');
+      expect(name.text, 'horizon');
       expect(name.year, 2024);
       expect(name.quality, 'HD');
       expect(name.language, 'VF');
@@ -37,16 +37,16 @@ void main() {
     });
 
     test('préfixe pays retiré', () {
-      final name = ItemName.parse('FR - Inception 4K');
-      expect(name.text, 'inception');
-      expect(name.display, 'Inception');
+      final name = ItemName.parse('FR - Mirage 4K');
+      expect(name.text, 'mirage');
+      expect(name.display, 'Mirage');
       expect(name.label, '4K');
       expect(ItemName.parse('FR · Drame').text, 'drame');
       expect(ItemName.parse('|FR| Titre').text, 'titre');
     });
 
     test('pas de préfixe inventé : codes inconnus ou sans séparateur', () {
-      expect(ItemName.parse('ABBA - Gold').text, 'abba gold');
+      expect(ItemName.parse('ZORA - Or').text, 'zora or');
       expect(ItemName.parse('IT (2017)').text, 'it');
     });
 
@@ -64,11 +64,11 @@ void main() {
     });
 
     test('année seulement entre parenthèses', () {
-      final name = ItemName.parse('Blade Runner 2049 (2017) FHD VOST');
-      expect(name.text, 'blade runner 2049');
+      final name = ItemName.parse('Orbite 2049 (2017) FHD VOST');
+      expect(name.text, 'orbite 2049');
       expect(name.year, 2017);
       expect(name.frenchAudio, isFalse);
-      expect(ItemName.parse('Blade Runner 2049').year, isNull);
+      expect(ItemName.parse('Orbite 2049').year, isNull);
     });
 
     test('rang : 4K, FHD, HD, sans étiquette, SD', () {
@@ -101,10 +101,10 @@ void main() {
     });
 
     test('version originale, même en minuscules', () {
-      final name = ItemName.parse('Parasite Vostfr');
+      final name = ItemName.parse('Cocon Vostfr');
       expect(name.language, 'VOSTFR');
       expect(name.frenchAudio, isFalse);
-      expect(name.text, 'parasite');
+      expect(name.text, 'cocon');
       expect(ItemName.parse('Dilwale (2015) SUBT AR').frenchAudio, isFalse);
     });
 

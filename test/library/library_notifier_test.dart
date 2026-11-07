@@ -52,7 +52,7 @@ void main() {
     final first = await container();
     await first
         .read(libraryProvider.notifier)
-        .toggleFavorite(key: 'movie:1', name: 'Inception');
+        .toggleFavorite(key: 'movie:1', name: 'Mirage');
     expect(first.read(libraryProvider).favorites.keys, ['movie:1']);
     first.dispose();
 
@@ -60,7 +60,7 @@ void main() {
     expect(second.read(libraryProvider).favorites.keys, ['movie:1']);
     await second
         .read(libraryProvider.notifier)
-        .toggleFavorite(key: 'movie:1', name: 'Inception');
+        .toggleFavorite(key: 'movie:1', name: 'Mirage');
     expect(second.read(libraryProvider).favorites, isEmpty);
   });
 
@@ -68,7 +68,7 @@ void main() {
     final c = await container();
     await c
         .read(libraryProvider.notifier)
-        .toggleFavorite(key: 'series:45', name: 'Vikings');
+        .toggleFavorite(key: 'series:45', name: 'Les Veilleurs');
 
     await c.read(accountsProvider.notifier).activate('b');
     expect(c.read(libraryProvider).favorites, isEmpty);

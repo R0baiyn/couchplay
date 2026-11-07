@@ -191,7 +191,7 @@ void main() {
 
     final parse = indexParser(ContentKind.movies, {'148'});
     final loaded = await repository.all(ContentKind.movies, parse);
-    expect(loaded.value.entriesIn('148')!.first.title, 'Libre (2024)');
+    expect(loaded.value.entriesIn('148')!.first.title, 'Horizon (2024)');
     final again = await repository.all(ContentKind.movies, parse);
     expect(again.savedAt, isNotNull, reason: 'relu depuis le cache');
   });

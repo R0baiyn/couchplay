@@ -182,21 +182,21 @@ void main() {
     expect(find.text('AR · ARABE أفلام عربية'), findsNothing);
     expect(find.text('VOST · Films'), findsNothing);
     // Grille de la première catégorie (le faux serveur renvoie la fixture),
-    // les trois versions de « Libre » en une seule affiche.
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    // les trois versions de « Horizon » en une seule affiche.
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
 
     expect(find.byType(MovieScreen), findsOneWidget);
-    expect(find.textContaining('Mélanie Laurent'), findsOneWidget);
+    expect(find.textContaining('Réalisateur Fictif'), findsOneWidget);
     expect(find.text('2024  ·  1 h 50  ·  ★ 6.6'), findsOneWidget);
 
     // Échap ramène à la grille.
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
     expect(find.byType(MovieScreen), findsNothing);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
   });
 
   testWidgets("la mise à jour attend que l'accueil soit devant", (
@@ -218,7 +218,7 @@ void main() {
       ],
     );
     final offer = find.text('Version 0.1.1 disponible');
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
 
     // Trouvée pendant qu'une fiche est ouverte : rien par-dessus.
@@ -248,7 +248,7 @@ void main() {
 
     await tester.tap(find.text('Films'));
     await settle(tester);
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     await tester.tap(find.byTooltip('Ajouter à ma liste'));
     await settle(tester);
@@ -259,26 +259,26 @@ void main() {
     await tester.tap(find.text('Accueil'));
     await settle(tester);
     expect(find.textContaining('Ma liste est vide'), findsNothing);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
     // « Tout voir » : grille filtrable.
     await tester.tap(find.text('Tout voir'));
     await settle(tester);
     expect(find.byType(FavoritesScreen), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
     // Le favori est la version proposée sur la fiche : la meilleure.
     expect(find.byIcon(Icons.favorite), findsOneWidget);
     await tester.tap(find.text('Séries'));
     await settle(tester);
-    expect(find.text('Libre (2024)'), findsNothing);
+    expect(find.text('Horizon (2024)'), findsNothing);
     expect(find.text('Rien dans ma liste ici.'), findsOneWidget);
     await tester.tap(find.text('Films'));
     await settle(tester);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
     // La fiche s'ouvre depuis la grille ; retirer le favori le fait
     // disparaître au retour.
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     expect(find.byType(MovieScreen), findsOneWidget);
     expect(
@@ -292,7 +292,7 @@ void main() {
     await settle(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
-    expect(find.text('Libre (2024)'), findsNothing);
+    expect(find.text('Horizon (2024)'), findsNothing);
   });
 
   testWidgets('Séries : catégories, fiche, saisons et épisodes', (
@@ -302,16 +302,16 @@ void main() {
     await tester.tap(find.text('Séries'));
     await settle(tester);
 
-    expect(find.text('Séries NETFLIX'), findsOneWidget);
+    expect(find.text('Séries PLATEFORME A'), findsOneWidget);
     expect(find.text('Séries SUB-AR'), findsNothing);
 
-    await tester.tap(find.text('Vikings'));
+    await tester.tap(find.text('Les Veilleurs'));
     await settle(tester);
 
     expect(find.byType(SeriesScreen), findsOneWidget);
     expect(find.text('Saison 1'), findsOneWidget);
     expect(find.text('Saison 2'), findsOneWidget);
-    final firstEpisode = find.textContaining('1. Vikings - S01E01');
+    final firstEpisode = find.textContaining('1. Les Veilleurs - S01E01');
     await tester.scrollUntilVisible(firstEpisode, 300);
     expect(firstEpisode, findsOneWidget);
 
@@ -334,7 +334,7 @@ void main() {
           'version': 1,
           'progress': {
             'movie:144014': {
-              'name': 'Libre (2024) HD VF',
+              'name': 'Horizon (2024) HD VF',
               'extension': 'mp4',
               'position': 754,
               'duration': 6600,
@@ -345,7 +345,7 @@ void main() {
       );
     await pumpApp(tester);
     // La fiche propose la version déjà commencée, pas la meilleure.
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     await tester.tap(find.text('Lecture'));
     await settle(tester);
@@ -363,9 +363,9 @@ void main() {
     await pumpApp(tester);
     await tester.tap(find.text('Séries'));
     await settle(tester);
-    await tester.tap(find.text('Vikings'));
+    await tester.tap(find.text('Les Veilleurs'));
     await settle(tester);
-    final firstEpisode = find.textContaining('1. Vikings - S01E01');
+    final firstEpisode = find.textContaining('1. Les Veilleurs - S01E01');
     await tester.scrollUntilVisible(firstEpisode, 300);
 
     Focus.of(tester.element(firstEpisode)).requestFocus();
@@ -381,19 +381,19 @@ void main() {
   });
 
   testWidgets('un épisode se marque vu ou non vu, et le reste', (tester) async {
-    Future<void> openVikings() async {
+    Future<void> openVeilleurs() async {
       await tester.tap(find.text('Séries'));
       await settle(tester);
-      await tester.tap(find.text('Vikings'));
+      await tester.tap(find.text('Les Veilleurs'));
       await settle(tester);
     }
 
-    final firstEpisode = find.textContaining('1. Vikings - S01E01');
+    final firstEpisode = find.textContaining('1. Les Veilleurs - S01E01');
     final menu = find.byTooltip("Plus d'options");
     final seen = find.byIcon(Icons.check_circle);
 
     await pumpApp(tester);
-    await openVikings();
+    await openVeilleurs();
     await tester.scrollUntilVisible(firstEpisode, 300);
     expect(seen, findsNothing);
     await tester.tap(menu.first);
@@ -409,7 +409,7 @@ void main() {
     expect(watched(await savedProgress(tester, watched)), isTrue);
     await tester.pumpWidget(const SizedBox());
     await pumpApp(tester);
-    await openVikings();
+    await openVeilleurs();
     await tester.scrollUntilVisible(firstEpisode, 300);
     expect(seen, findsOneWidget);
     await tester.tap(menu.first);
@@ -426,7 +426,7 @@ void main() {
       'seriesId': '1',
       'season': 1,
       'episode': number,
-      'name': 'Vikings',
+      'name': 'Les Veilleurs',
       'extension': 'mkv',
       'position': position,
       'duration': 2700,
@@ -439,14 +439,14 @@ void main() {
           'version': 1,
           'progress': {
             'movie:144014': {
-              'name': 'Libre (2024) HD VF',
+              'name': 'Horizon (2024) HD VF',
               'extension': 'mp4',
               'position': 754,
               'duration': 6600,
               'updatedAt': '2026-01-01T00:00:00Z',
             },
             'movie:144015': {
-              'name': 'Libre (2024) FHD VF',
+              'name': 'Horizon (2024) FHD VF',
               'extension': 'mkv',
               'position': 6600,
               'duration': 6600,
@@ -462,22 +462,22 @@ void main() {
 
     expect(find.text('Continuer à regarder'), findsOneWidget);
     // L'épisode le plus récent de la série, puis le film ; rien de vu.
-    expect(find.text('Vikings · S1E2'), findsOneWidget);
-    expect(find.text('Vikings · S1E1'), findsNothing);
-    expect(find.text('Libre (2024) HD VF'), findsOneWidget);
-    expect(find.text('Libre (2024) FHD VF'), findsNothing);
+    expect(find.text('Les Veilleurs · S1E2'), findsOneWidget);
+    expect(find.text('Les Veilleurs · S1E1'), findsNothing);
+    expect(find.text('Horizon (2024) HD VF'), findsOneWidget);
+    expect(find.text('Horizon (2024) FHD VF'), findsNothing);
     expect(
-      tester.getTopLeft(find.text('Vikings · S1E2')).dx,
-      lessThan(tester.getTopLeft(find.text('Libre (2024) HD VF')).dx),
+      tester.getTopLeft(find.text('Les Veilleurs · S1E2')).dx,
+      lessThan(tester.getTopLeft(find.text('Horizon (2024) HD VF')).dx),
     );
 
     // Appui long, « Retirer » : l'entrée part, la progression reste.
-    await tester.longPress(find.text('Libre (2024) HD VF'));
+    await tester.longPress(find.text('Horizon (2024) HD VF'));
     await settle(tester);
     await tester.tap(find.text('Retirer'));
     await settle(tester);
-    expect(find.text('Libre (2024) HD VF'), findsNothing);
-    expect(find.text('Vikings · S1E2'), findsOneWidget);
+    expect(find.text('Horizon (2024) HD VF'), findsNothing);
+    expect(find.text('Les Veilleurs · S1E2'), findsOneWidget);
     final progress = await savedProgress(
       tester,
       (progress) => (progress['movie:144014'] as Map?)?['hidden'] == true,
@@ -500,7 +500,7 @@ void main() {
               'seriesId': '1',
               'season': 1,
               'episode': 2,
-              'name': 'Vikings',
+              'name': 'Les Veilleurs',
               'extension': 'mkv',
               'position': 2700,
               'duration': 2700,
@@ -512,14 +512,14 @@ void main() {
       );
     await pumpApp(tester, openMovies: false);
     // La tuile arrive avec la fiche de la série, sans roue de chargement.
-    final next = find.text('Vikings · S1E3');
+    final next = find.text('Les Veilleurs · S1E3');
     for (var i = 0; i < 20 && next.evaluate().isEmpty; i++) {
       await settle(tester);
     }
 
     expect(find.text('Continuer à regarder'), findsOneWidget);
     expect(next, findsOneWidget);
-    expect(find.text('Vikings · S1E2'), findsNothing);
+    expect(find.text('Les Veilleurs · S1E2'), findsNothing);
   });
 
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (
@@ -548,7 +548,7 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
     // Le bouton montre la catégorie choisie et ouvre le panneau ; toucher à
     // côté le ferme sans rien changer.
@@ -604,7 +604,7 @@ void main() {
     await pumpApp(tester);
 
     expect(find.textContaining('Hors ligne'), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
     // Plus de cache du tout : message et bouton.
     await tester.runAsync(() => root.delete(recursive: true));
@@ -619,7 +619,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    // Une catégorie de deux films : Libre, puis The King Tide.
+    // Une catégorie de deux films : Horizon, puis Marée Haute.
     await openCategory(tester, 'FR · FILMS HD');
 
     // Tab jusqu'à la première affiche (après les onglets et les catégories),
@@ -641,7 +641,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(AppBar),
-        matching: find.text('The King Tide (2024)'),
+        matching: find.text('Marée Haute (2024)'),
       ),
       findsOneWidget,
     );
@@ -684,7 +684,7 @@ void main() {
     await tester.pump();
     // Pendant le rechargement, la grille reste là.
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
     await settle(tester);
     expect(
@@ -693,7 +693,7 @@ void main() {
       reason: 'catégories et liste complète, une fois chacune',
     );
     expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
   });
 
   testWidgets('tirer la grille vers le bas l\'actualise (toucher)', (
@@ -703,7 +703,7 @@ void main() {
     final fake = server as FakeAdapter;
     final before = fake.calls;
 
-    await tester.fling(find.text('Libre (2024)'), const Offset(0, 400), 1000);
+    await tester.fling(find.text('Horizon (2024)'), const Offset(0, 400), 1000);
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await settle(tester);
@@ -712,7 +712,7 @@ void main() {
       before + 2,
       reason: 'catégories et liste complète, une fois chacune',
     );
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
   });
 
   testWidgets('télécommande : au lancement, une flèche donne le focus', (
@@ -745,10 +745,10 @@ void main() {
       // La case de recherche a le focus ; OK ouvre la saisie.
       await tester.sendKeyEvent(LogicalKeyboardKey.select);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(EditableText), 'libre');
+      await tester.enterText(find.byType(EditableText), 'horizon');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await settle(tester);
-      expect(find.text('Libre (2024)'), findsOneWidget);
+      expect(find.text('Horizon (2024)'), findsOneWidget);
     },
   );
 
@@ -899,7 +899,7 @@ void main() {
     expect(rail().selectedIndex, 1);
 
     // Une fiche se ferme d'abord.
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     expect(find.byType(MovieScreen), findsOneWidget);
     expect(await back(), isTrue);
@@ -940,17 +940,17 @@ void main() {
 
     await type('EGYPTE');
     expect(find.text('Films (1)'), findsOneWidget);
-    expect(find.text('Le Prince d\'Égypte (1998)'), findsOneWidget);
+    expect(find.text('Le Secret d\'Égypte (1998)'), findsOneWidget);
     expect(find.textContaining('Séries ('), findsNothing);
 
-    await type('vik');
+    await type('veil');
     expect(find.text('Séries (1)'), findsOneWidget);
-    expect(find.text('Vikings'), findsOneWidget);
+    expect(find.text('Les Veilleurs'), findsOneWidget);
 
     // Une seule affiche pour les trois versions.
-    await type('libre');
+    await type('horizon');
     expect(find.text('Films (1)'), findsOneWidget);
-    expect(find.text('Libre (2024)'), findsOneWidget);
+    expect(find.text('Horizon (2024)'), findsOneWidget);
 
     await type('zzz');
     expect(find.text('Aucun résultat pour « zzz ».'), findsOneWidget);
@@ -960,7 +960,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
 
     ChoiceChip chip(String label) =>
@@ -990,7 +990,7 @@ void main() {
     expect(find.byType(EditableText), findsNothing);
 
     // Sur une fiche, Ctrl+F et « / » ne font rien.
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
@@ -1026,7 +1026,7 @@ void main() {
           'version': 1,
           'progress': {
             'movie:144014': {
-              'name': 'Libre (2024) HD VF',
+              'name': 'Horizon (2024) HD VF',
               'extension': 'mp4',
               'position': 5000,
               'duration': 5000,
@@ -1041,7 +1041,7 @@ void main() {
     expect(find.byIcon(Icons.favorite), findsNothing);
 
     // La fiche propose la HD VF, déjà vue : c'est elle qui va dans la liste.
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     expect(
       tester
@@ -1069,7 +1069,7 @@ void main() {
       return routes.fetch(options, null, null);
     });
     await pumpApp(tester);
-    await tester.tap(find.text('Libre (2024)'));
+    await tester.tap(find.text('Horizon (2024)'));
     await settle(tester);
     expect(find.text('Réessayer'), findsOneWidget);
     expect(find.text('Lecture'), findsNothing);

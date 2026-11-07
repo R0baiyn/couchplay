@@ -34,14 +34,14 @@ void main() {
         );
         // 9 entrées, dont une au nom vide (vraie donnée du serveur) : ignorée.
         expect(movies, hasLength(8));
-        final libre = movies.first;
-        expect(libre.id, '144014');
-        expect(libre.name, 'Libre (2024) HD VF');
-        expect(libre.tmdbId, '1142518');
-        expect(libre.extension, 'mp4');
-        expect(libre.poster, startsWith('https://image.tmdb.org/'));
+        final horizon = movies.first;
+        expect(horizon.id, '144014');
+        expect(horizon.name, 'Horizon (2024) HD VF');
+        expect(horizon.tmdbId, '7000012');
+        expect(horizon.extension, 'mp4');
+        expect(horizon.poster, startsWith('https://example.com/img/'));
         // tmdb_id en entier dans la réponse : lu en texte comme les autres.
-        expect(movies.firstWhere((m) => m.id == '122716').tmdbId, '9837');
+        expect(movies.firstWhere((m) => m.id == '122716').tmdbId, '7000013');
       },
     );
 
@@ -49,7 +49,7 @@ void main() {
       final series = parseCatalogItems(_fixture('series'), ContentKind.series);
       expect(series, hasLength(5));
       expect(series.first.id, '17');
-      expect(series.first.name, 'Vikings');
+      expect(series.first.name, 'Les Veilleurs');
       expect(series.first.extension, isNull);
     });
 
@@ -69,15 +69,15 @@ void main() {
     test('version complète', () {
       final movie = parseMovieDetails(_fixture('vod_info'));
       final d = movie.details;
-      expect(d.name, 'Libre (2024) FHD VF');
+      expect(d.name, 'Horizon (2024) FHD VF');
       expect(d.year, 2024);
       expect(d.duration, const Duration(hours: 1, minutes: 50, seconds: 30));
       expect(d.genre, 'Action, Romance, Drame');
       expect(d.rating, closeTo(6.586, 0.001));
-      expect(d.director, 'Mélanie Laurent');
-      expect(d.cast, startsWith('Lucas Bravo'));
-      expect(d.plot, startsWith('Inspiré de faits réels'));
-      expect(d.backdrop, startsWith('https://image.tmdb.org/t/p/w1280/'));
+      expect(d.director, 'Réalisateur Fictif');
+      expect(d.cast, startsWith('Acteur Un'));
+      expect(d.plot, startsWith('Résumé fictif'));
+      expect(d.backdrop, startsWith('https://example.com/img/'));
       expect(movie.extension, 'mkv');
     });
 
@@ -106,7 +106,7 @@ void main() {
   group('fiche série', () {
     test('saisons depuis les épisodes, pas depuis la liste TMDB', () {
       final series = parseSeriesDetails(_fixture('series_info'));
-      expect(series.details.name, 'Vikings');
+      expect(series.details.name, 'Les Veilleurs');
       // La fixture garde 2 saisons de 3 épisodes ; la saison 0 de `seasons`
       // n'a aucun épisode et n'apparaît pas.
       expect(series.seasons.map((s) => s.number), [1, 2]);

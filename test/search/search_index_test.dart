@@ -29,34 +29,34 @@ List<String> titles(List<CatalogEntry> entries) => [
 void main() {
   group('search', () {
     final entries = [
-      entry('Le Fabuleux Destin d\'Amélie Poulain (2001)'),
-      entry('FR - Inception 4K'),
-      entry('Breaking Bad'),
+      entry('Le Fabuleux Destin d\'Éloïse Marchand (2001)'),
+      entry('FR - Mirage 4K'),
+      entry('Going Bad'),
       entry('Bad Boys (1995)'),
-      entry('Le Prince d\'Égypte (1998)'),
+      entry('Le Secret d\'Égypte (1998)'),
     ];
 
     test('sans accents ni majuscules', () {
-      expect(titles(search(entries, 'amelie')), [
-        'Le Fabuleux Destin d\'Amélie Poulain (2001)',
+      expect(titles(search(entries, 'eloise')), [
+        'Le Fabuleux Destin d\'Éloïse Marchand (2001)',
       ]);
-      expect(titles(search(entries, 'ÉGYPTE')), ['Le Prince d\'Égypte (1998)']);
+      expect(titles(search(entries, 'ÉGYPTE')), ['Le Secret d\'Égypte (1998)']);
     });
 
     test('préfixe pays et étiquettes ignorés', () {
-      expect(titles(search(entries, 'inception')), ['FR - Inception 4K']);
+      expect(titles(search(entries, 'mirage')), ['FR - Mirage 4K']);
       expect(search(entries, '4k'), isEmpty);
     });
 
     test('chaque mot doit apparaître, dans n\'importe quel ordre', () {
-      expect(titles(search(entries, 'poulain destin')), hasLength(1));
-      expect(search(entries, 'poulain egypte'), isEmpty);
+      expect(titles(search(entries, 'marchand destin')), hasLength(1));
+      expect(search(entries, 'marchand egypte'), isEmpty);
     });
 
     test('début de titre d\'abord, puis l\'ordre de la liste', () {
       expect(titles(search(entries, 'bad')), [
         'Bad Boys (1995)',
-        'Breaking Bad',
+        'Going Bad',
       ]);
     });
 
@@ -65,12 +65,12 @@ void main() {
         const CatalogItem(
           kind: ContentKind.movies,
           id: '1',
-          name: 'Acts of Vengeance SD',
+          name: 'Acts of Clarity SD',
         ),
         const CatalogItem(
           kind: ContentKind.movies,
           id: '2',
-          name: 'Actes de Vengeance (2017) MULTI',
+          name: 'Actes de Clarté (2017) MULTI',
         ),
       ]);
       expect(search([grouped], 'actes'), hasLength(1));
@@ -134,9 +134,9 @@ void main() {
           isNot(contains('category_id')),
         );
         final index = loaded.value;
-        final libre = index.entryOf('144014')!;
-        expect(libre.versions.map((v) => v.id), ['144016', '144015', '144014']);
-        expect(index.entryOf('144016'), same(libre));
+        final horizon = index.entryOf('144014')!;
+        expect(horizon.versions.map((v) => v.id), ['144016', '144015', '144014']);
+        expect(index.entryOf('144016'), same(horizon));
         // Film d'une catégorie arabe : masqué par défaut.
         expect(index.entryOf('19181'), isNull);
 
@@ -146,10 +146,10 @@ void main() {
             for (final version in entry.versions) version.name,
         ];
         expect(names('148'), [
-          'Libre (2024) HD VF',
-          'The King Tide (2024) HD VF',
+          'Horizon (2024) HD VF',
+          'Marée Haute (2024) HD VF',
         ]);
-        expect(names('619'), ['Libre (2024) 4K']);
+        expect(names('619'), ['Horizon (2024) 4K']);
         // Visible mais vide ; masquée : inconnue de l'index.
         expect(index.entriesIn('118'), isEmpty);
         expect(index.entriesIn('614'), isNull);

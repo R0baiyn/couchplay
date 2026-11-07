@@ -1,26 +1,26 @@
 {
  "info": {
-  "kinopoisk_url": "https://www.themoviedb.org/movie/1142518",
-  "tmdb_id": "1142518",
-  "name": "Libre (2024) FHD VF",
-  "o_name": "Libre (2024) FHD VF",
-  "cover_big": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/1cyo2yraWSOai6rokzK3dfz5xpD.jpg",
-  "movie_image": "https://image.tmdb.org/t/p/w600_and_h900_bestv2/1cyo2yraWSOai6rokzK3dfz5xpD.jpg",
+  "kinopoisk_url": "https://example.com/film/0",
+  "tmdb_id": "7000012",
+  "name": "Horizon (2024) FHD VF",
+  "o_name": "Horizon (2024) FHD VF",
+  "cover_big": "https://example.com/img/23.jpg",
+  "movie_image": "https://example.com/img/23.jpg",
   "releasedate": "2024-11-01",
   "episode_run_time": "110",
-  "youtube_trailer": "sGATc_TPGaM",
-  "director": "Mélanie Laurent",
-  "actors": "Lucas Bravo, Yvan Attal, Léa Luce Busato, Steve Tientcheu, David Ayala",
-  "cast": "Lucas Bravo, Yvan Attal, Léa Luce Busato, Steve Tientcheu, David Ayala",
-  "description": "Inspiré de faits réels, le film explore la vie tumultueuse de Bruno Sulak, un célèbre braqueur du XXe siècle. Connu pour ses vols de bijouteries sans violence, il devient une icône du banditisme et s'échappe plusieurs fois de prison pour retrouver Annie, sa complice et amante : traqué par la police, il devient l'ennemi public numéro un des années 1980.",
-  "plot": "Inspiré de faits réels, le film explore la vie tumultueuse de Bruno Sulak, un célèbre braqueur du XXe siècle. Connu pour ses vols de bijouteries sans violence, il devient une icône du banditisme et s'échappe plusieurs fois de prison pour retrouver Annie, sa complice et amante : traqué par la police, il devient l'ennemi public numéro un des années 1980.",
+  "youtube_trailer": "AAAAAAAAAAA",
+  "director": "Réalisateur Fictif",
+  "actors": "Acteur Un, Actrice Deux, Acteur Trois",
+  "cast": "Acteur Un, Actrice Deux, Acteur Trois",
+  "description": "Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile.",
+  "plot": "Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile. Résumé fictif écrit pour les tests, assez long pour que la fiche déborde et défile.",
   "age": "",
   "mpaa_rating": "",
   "rating_count_kinopoisk": 0,
   "country": "France",
   "genre": "Action, Romance, Drame",
   "backdrop_path": [
-   "https://image.tmdb.org/t/p/w1280/n9Do4rv1Hl3QvQLMmT5w6pBadqq.jpg"
+   "https://example.com/img/24.jpg"
   ],
   "duration_secs": 6630,
   "duration": "01:50:30",
@@ -72,7 +72,7 @@
     "timed_thumbnails": 0
    },
    "tags": {
-    "title": "Libre (2024)",
+    "title": "Horizon (2024)",
     "BPS": "9195654",
     "NUMBER_OF_FRAMES": "159129",
     "NUMBER_OF_BYTES": "7621329979",
@@ -122,7 +122,7 @@
    },
    "tags": {
     "language": "fre",
-    "title": "Libre (2024)",
+    "title": "Horizon (2024)",
     "BPS": "640000",
     "NUMBER_OF_FRAMES": "207200",
     "NUMBER_OF_BYTES": "530432000",
@@ -137,7 +137,7 @@
  },
  "movie_data": {
   "stream_id": 144015,
-  "name": "Libre (2024) FHD VF",
+  "name": "Horizon (2024) FHD VF",
   "added": "1734875995",
   "category_id": "30",
   "container_extension": "mkv",

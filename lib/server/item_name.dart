@@ -1,5 +1,5 @@
 /// Nom d'un film ou d'une série tel que le serveur l'écrit, décomposé :
-/// « FR · Libre (2024) HD VF » donne le titre « Libre (2024) », l'année 2024,
+/// « FR · Horizon (2024) HD VF » donne le titre « Horizon (2024) », l'année 2024,
 /// la qualité « HD » et la langue « VF ».
 ///
 /// Calculé une fois, au décodage des listes (dans l'isolate) : la recherche
@@ -51,7 +51,7 @@ final class ItemName {
   /// Titre pour la recherche ([normalize]), sans l'année.
   final String text;
 
-  /// Année entre parenthèses dans le nom, seulement : « Blade Runner 2049 »
+  /// Année entre parenthèses dans le nom, seulement : « Orbite 2049 »
   /// n'a pas d'année.
   final int? year;
 
@@ -79,7 +79,7 @@ final class ItemName {
 
 /// Texte ramené à l'essentiel pour comparer : minuscules, sans accents,
 /// ponctuation remplacée par des espaces, espaces simples.
-/// « L'Été  d'Amélie ! » donne « l ete d amelie ».
+/// « L'Été  d'Éloïse ! » donne « l ete d eloise ».
 String normalize(String text) {
   final out = StringBuffer();
   var space = true;
@@ -107,7 +107,7 @@ String normalize(String text) {
 }
 
 // Préfixe pays, seulement parmi des codes connus, et suivi d'un séparateur :
-// « FR · Drame », « FR - Inception », « |FR| Titre ». « ABBA - Gold »,
+// « FR · Drame », « FR - Mirage », « |FR| Titre ». « ZORA - Or »,
 // « DBZ : … » ou « IT (2017) » gardent leur nom.
 final _country = RegExp(
   r'^\s*(?:\|\s*(?:' +

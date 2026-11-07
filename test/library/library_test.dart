@@ -20,7 +20,7 @@ void _holdLock((String, SendPort) args) {
     ..closeSync();
 }
 
-const _movie = PlayItem.movie(id: '1', extension: 'mkv', name: 'Inception');
+const _movie = PlayItem.movie(id: '1', extension: 'mkv', name: 'Mirage');
 
 PlayItem _episode(String id, int season, int episode, {String series = '45'}) =>
     PlayItem.episode(
@@ -184,7 +184,7 @@ void main() {
           .withFavorite(
             Favorite(
               key: 'series:45',
-              name: 'Vikings',
+              name: 'Les Veilleurs',
               poster: 'https://x/p.jpg',
               addedAt: _t0,
             ),

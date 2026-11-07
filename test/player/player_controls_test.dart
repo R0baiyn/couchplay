@@ -45,7 +45,7 @@ void main() {
           home: Scaffold(
             body: PlayerControls(
               player: player,
-              title: 'Libre',
+              title: 'Horizon',
               fill: false,
               onToggleFill: () {},
               fullscreen: null,
