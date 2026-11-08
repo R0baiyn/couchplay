@@ -33,10 +33,6 @@ final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
   );
 });
 
-// Pas de nouvelle tentative automatique (Riverpod 3 en fait par défaut) :
-// l'écran propose « Réessayer », et le mode hors ligne prend le relais.
-Duration? noRetry(int _, Object _) => null;
-
 final categoriesProvider = AsyncNotifierProvider.autoDispose
     .family<CategoriesNotifier, Loaded<List<Category>>, ContentKind>(
       CategoriesNotifier.new,

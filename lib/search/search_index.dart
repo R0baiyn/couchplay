@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../accounts/server_session.dart';
 import '../catalog/catalog_providers.dart';
 import '../catalog/catalog_repository.dart';
 import '../catalog/catalog_settings.dart';

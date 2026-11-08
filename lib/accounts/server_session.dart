@@ -34,14 +34,15 @@ final serverClientProvider = Provider.autoDispose<ServerClient?>((ref) {
   return client;
 });
 
+/// Pour les providers qui interrogent le serveur : pas de nouvelle tentative
+/// automatique (Riverpod 3 en fait par défaut). Des identifiants refusés le
+/// resteraient, les écrans proposent « Réessayer », et le mode hors ligne du
+/// catalogue prend le relais.
+Duration? noRetry(int _, Object _) => null;
+
 /// État de l'abonnement du compte actif, rechargé quand ses accès changent.
-final accountInfoProvider = FutureProvider.autoDispose<AccountInfo>(
-  (ref) {
-    final client = ref.watch(serverClientProvider);
-    if (client == null) throw StateError('Aucun compte actif');
-    return client.accountInfo();
-  },
-  // Pas de nouvelle tentative automatique : des identifiants refusés le
-  // resteraient, et l'écran propose « Réessayer ».
-  retry: (_, _) => null,
-);
+final accountInfoProvider = FutureProvider.autoDispose<AccountInfo>((ref) {
+  final client = ref.watch(serverClientProvider);
+  if (client == null) throw StateError('Aucun compte actif');
+  return client.accountInfo();
+}, retry: noRetry);
