@@ -44,20 +44,13 @@ final class CatalogFilterNotifier extends Notifier<CatalogFilter> {
   }
 
   Future<void> setTag(String tag, {required bool shown}) => _update(
-    CatalogFilter(
+    state.copyWith(
       tags: shown ? {...state.tags, tag} : ({...state.tags}..remove(tag)),
-      showAdult: state.showAdult,
-      overrides: state.overrides,
     ),
   );
 
-  Future<void> setShowAdult(bool shown) => _update(
-    CatalogFilter(
-      tags: state.tags,
-      showAdult: shown,
-      overrides: state.overrides,
-    ),
-  );
+  Future<void> setShowAdult(bool shown) =>
+      _update(state.copyWith(showAdult: shown));
 
   /// Affiche ou masque une catégorie. Un choix égal à ce que donneraient les
   /// pays et l'adulte est retiré : la catégorie suit de nouveau la règle.
@@ -68,22 +61,15 @@ final class CatalogFilterNotifier extends Notifier<CatalogFilter> {
   }) {
     final key = CatalogFilter.overrideKey(kind, category.id);
     final overrides = {...state.overrides}..remove(key);
-    final byRule = CatalogFilter(
-      tags: state.tags,
-      showAdult: state.showAdult,
-    ).isVisible(kind, category);
+    final byRule = state
+        .copyWith(overrides: const {})
+        .isVisible(kind, category);
     if (shown != byRule) overrides[key] = shown;
-    return _update(
-      CatalogFilter(
-        tags: state.tags,
-        showAdult: state.showAdult,
-        overrides: overrides,
-      ),
-    );
+    return _update(state.copyWith(overrides: overrides));
   }
 
   Future<void> resetCategories() =>
-      _update(CatalogFilter(tags: state.tags, showAdult: state.showAdult));
+      _update(state.copyWith(overrides: const {}));
 
   Future<void> _pending = Future.value();
 

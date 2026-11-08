@@ -19,6 +19,16 @@ final class CatalogFilter {
   static String overrideKey(ContentKind kind, String categoryId) =>
       '${kind.name}:$categoryId';
 
+  CatalogFilter copyWith({
+    Set<String>? tags,
+    bool? showAdult,
+    Map<String, bool>? overrides,
+  }) => CatalogFilter(
+    tags: tags ?? this.tags,
+    showAdult: showAdult ?? this.showAdult,
+    overrides: overrides ?? this.overrides,
+  );
+
   bool isVisible(ContentKind kind, Category category) {
     final forced = overrides[overrideKey(kind, category.id)];
     if (forced != null) return forced;
