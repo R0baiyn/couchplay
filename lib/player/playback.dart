@@ -97,6 +97,8 @@ final class Playback {
     : player = Player(
         configuration: const PlayerConfiguration(
           title: 'CouchPlay',
+          // Explicite : `_start` lit les erreurs du journal de mpv (refus
+          // http qui n'arrivent que là).
           logLevel: MPVLogLevel.error,
         ),
       ) {
