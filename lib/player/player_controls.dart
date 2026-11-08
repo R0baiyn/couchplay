@@ -222,16 +222,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             AnimatedOpacity(
               opacity: _visible ? 1 : 0,
               duration: const Duration(milliseconds: 200),
-              child: IgnorePointer(
-                ignoring: !_visible,
-                child: Theme(
-                  data: ThemeData(
-                    brightness: Brightness.dark,
-                    colorSchemeSeed: Colors.deepPurple,
-                  ),
-                  child: _bars(context),
-                ),
-              ),
+              child: IgnorePointer(ignoring: !_visible, child: _bars(context)),
             ),
           ],
         ),
