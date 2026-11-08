@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../catalog/status_views.dart';
+import '../format.dart';
 import '../server/models.dart';
 import 'account_store.dart';
 import 'server_session.dart';
@@ -55,12 +56,6 @@ class _Details extends StatelessWidget {
     'disabled': 'Désactivé',
   };
 
-  static String _date(DateTime date) {
-    final local = date.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)}/${local.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final status = _statuses[info.status.toLowerCase()] ?? info.status;
@@ -68,7 +63,7 @@ class _Details extends StatelessWidget {
       ('Abonnement', info.isTrial ? '$status (essai)' : status),
       (
         'Expiration',
-        info.expiresAt == null ? 'Aucune' : _date(info.expiresAt!),
+        info.expiresAt == null ? 'Aucune' : formatDate(info.expiresAt!),
       ),
       (
         'Connexions',

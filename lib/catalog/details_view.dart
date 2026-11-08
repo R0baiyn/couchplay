@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../format.dart';
 import '../server/models.dart';
 import 'poster_grid.dart';
 
@@ -14,19 +15,13 @@ class DetailsHeader extends StatelessWidget {
   /// Bouton principal (« Lecture »), sous le titre : visible sans défiler.
   final Widget? action;
 
-  static String _duration(Duration d) {
-    final minutes = d.inMinutes;
-    if (minutes < 60) return '$minutes min';
-    return '${minutes ~/ 60} h ${(minutes % 60).toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final d = details;
     final facts = [
       if (d.year case final year?) '$year',
-      if (d.duration case final duration?) _duration(duration),
+      if (d.duration case final duration?) formatRuntime(duration),
       if (d.rating case final rating?) '★ ${rating.toStringAsFixed(1)}',
     ].join('  ·  ');
 

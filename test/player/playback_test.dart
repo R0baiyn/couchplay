@@ -93,13 +93,4 @@ void main() {
       expect(trackLabel(index: 0, codec: 'subrip'), 'Piste 1 (subrip)');
     });
   });
-
-  test('formatTime', () {
-    expect(formatTime(const Duration(seconds: 9)), '0:09');
-    expect(formatTime(const Duration(minutes: 5, seconds: 9)), '5:09');
-    expect(
-      formatTime(const Duration(hours: 1, minutes: 50, seconds: 30)),
-      '1:50:30',
-    );
-  });
 }

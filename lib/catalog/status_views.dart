@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../format.dart';
 import '../server/server_client.dart';
 
 /// Message d'erreur et bouton « Réessayer ».
@@ -48,11 +49,10 @@ class OfflineBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final date = savedAt?.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
     final when = date == null
         ? ''
-        : ' du ${two(date.day)}/${two(date.month)} à '
-              '${two(date.hour)}h${two(date.minute)}';
+        : ' du ${twoDigits(date.day)}/${twoDigits(date.month)} à '
+              '${twoDigits(date.hour)}h${twoDigits(date.minute)}';
     return Material(
       color: colors.tertiaryContainer,
       child: Padding(

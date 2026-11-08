@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../format.dart';
+
 /// Contrôles du lecteur, par-dessus la vidéo.
 ///
 /// - Souris : clic = pause, double-clic = plein écran (sur l'image, pas sur
@@ -674,15 +676,4 @@ String trackLabel({
   ];
   final label = parts.isEmpty ? 'Piste ${index + 1}' : parts.join(' · ');
   return codec == null || codec.isEmpty ? label : '$label ($codec)';
-}
-
-/// `1:05:09`, ou `5:09` sous une heure.
-String formatTime(Duration d) {
-  String two(int n) => n.toString().padLeft(2, '0');
-  final hours = d.inHours;
-  final minutes = d.inMinutes % 60;
-  final seconds = d.inSeconds % 60;
-  return hours > 0
-      ? '$hours:${two(minutes)}:${two(seconds)}'
-      : '$minutes:${two(seconds)}';
 }
