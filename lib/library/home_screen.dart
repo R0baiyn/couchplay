@@ -54,7 +54,7 @@ class HomeScreen extends ConsumerWidget {
                         )
                       : _tile(
                           key: ValueKey(entry.item.key),
-                          title: _shortTitle(entry.item),
+                          title: entry.item.shortTitle,
                           imageUrl: entry.item.poster,
                           progress: entry.fraction,
                           // Reprend directement, sans passer par la fiche.
@@ -140,10 +140,6 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-String _shortTitle(PlayItem item) => item.isEpisode
-    ? '${item.name} · S${item.season}E${item.episode}'
-    : item.name;
-
 const _tileWidth = 130.0;
 
 Widget _tile({
@@ -186,7 +182,7 @@ class _UpNext extends ConsumerWidget {
     if (next == null) return const SizedBox.shrink();
     return _tile(
       key: ValueKey(next.item.key),
-      title: _shortTitle(next.item),
+      title: next.item.shortTitle,
       imageUrl: next.item.poster,
       onTap: () => openPlayer(context, ref, next.item),
       onMenu: onMenu,

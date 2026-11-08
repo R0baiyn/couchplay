@@ -49,6 +49,24 @@ Progress _progress(
 );
 
 void main() {
+  test('titres : court pour les affiches, complet pour le lecteur', () {
+    expect(_movie.shortTitle, 'Mirage');
+    expect(_movie.title, 'Mirage');
+    expect(_episode('7', 1, 2).shortTitle, 'Série 45 · S1E2');
+    expect(_episode('7', 1, 2).title, 'Série 45 · S1E2');
+    const named = PlayItem.episode(
+      id: '8',
+      extension: 'mkv',
+      name: 'Série 45',
+      seriesId: '45',
+      season: 2,
+      episode: 3,
+      episodeTitle: 'Le retour',
+    );
+    expect(named.shortTitle, 'Série 45 · S2E3');
+    expect(named.title, 'Série 45 · S2E3 · Le retour');
+  });
+
   group('seuils', () {
     test('reprise proposée après 30 s, pas sur un contenu vu ou fini', () {
       expect(_progress(_movie, position: 29).resumeAt, isNull);

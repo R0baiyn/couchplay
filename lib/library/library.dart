@@ -43,10 +43,12 @@ final class PlayItem {
   /// Clé dans `library.json` : `movie:<id>` ou `episode:<id>`.
   String get key => isEpisode ? 'episode:$id' : 'movie:$id';
 
-  /// Titre affiché dans le lecteur.
-  String get title => isEpisode
-      ? '$name · S${season}E$episode${episodeTitle == null ? '' : ' · $episodeTitle'}'
-      : name;
+  /// Titre des affiches : le film, ou la série et `S1E2`.
+  String get shortTitle => isEpisode ? '$name · S${season}E$episode' : name;
+
+  /// Titre affiché dans le lecteur : avec celui de l'épisode, s'il en a un.
+  String get title =>
+      episodeTitle == null ? shortTitle : '$shortTitle · $episodeTitle';
 }
 
 /// Un favori : de quoi l'afficher sur l'accueil sans recharger le catalogue.
