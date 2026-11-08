@@ -35,10 +35,10 @@ final class ItemName {
         .replaceAll(_spaces, ' ')
         .trim()
         .replaceAll(_edgeSeparators, '');
-    final year = int.tryParse(_year.firstMatch(title)?[1] ?? '');
+    final year = int.tryParse(yearInParentheses.firstMatch(title)?[1] ?? '');
     return ItemName(
       display: title.isEmpty ? name.trim() : title,
-      text: normalize(title.replaceAll(_year, ' ')),
+      text: normalize(title.replaceAll(yearInParentheses, ' ')),
       year: year != null && year >= 1900 && year <= 2100 ? year : null,
       quality: quality,
       language: language,
@@ -147,7 +147,8 @@ const _qualityRanks = {
 /// Langue d'origine, sous-titrée ou non (`SUBT` : sous-titres arabes).
 const _originalLanguages = {'VO', 'VOST', 'VOSTFR', 'SUBT'};
 
-final _year = RegExp(r'\((\d{4})\)');
+/// Année entre parenthèses dans un nom : « Horizon (2024) ».
+final yearInParentheses = RegExp(r'\((\d{4})\)');
 final _emptyBrackets = RegExp(r'\(\s*\)|\[\s*\]');
 final _spaces = RegExp(r'\s+');
 // Séparateurs laissés en tête ou en fin par les étiquettes retirées :

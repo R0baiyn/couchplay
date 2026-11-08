@@ -272,7 +272,7 @@ Details _details(Map<String, Object?> info, {String? fallbackName}) {
     backdrop:
         _url(asList(info['backdrop_path']).firstOrNull) ??
         _url(info['backdrop_path']),
-    year: _year(release) ?? _year(_yearInName.firstMatch(name)?[1]),
+    year: _year(release) ?? _year(yearInParentheses.firstMatch(name)?[1]),
     duration: _duration(info),
     genre: asString(info['genre'])?.trim(),
     rating: rating != null && rating > 0 ? rating : null,
@@ -281,8 +281,6 @@ Details _details(Map<String, Object?> info, {String? fallbackName}) {
     cast: (asString(info['cast']) ?? asString(info['actors']))?.trim(),
   );
 }
-
-final _yearInName = RegExp(r'\((\d{4})\)');
 
 /// URL http(s) seulement : les serveurs renvoient parfois un texte vide ou un
 /// chemin relatif inutilisable.
