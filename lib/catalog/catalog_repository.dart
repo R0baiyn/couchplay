@@ -47,6 +47,10 @@ final class CatalogRepository {
     refresh: refresh,
   );
 
+  /// Fiches gardées une heure : repasser sur une fiche ne rappelle pas le
+  /// serveur, et un nouvel épisode apparaît dans l'heure.
+  static const detailsMaxAge = Duration(hours: 1);
+
   /// Tous les films ou toutes les séries en une requête, gardés aussi
   /// longtemps que les catégories : les grilles de chaque catégorie et la
   /// recherche en sont tirées, sans requête par catégorie. [parse] en fait
@@ -62,35 +66,27 @@ final class CatalogRepository {
     refresh: refresh,
   );
 
-  /// Fiches gardées une heure : repasser sur une fiche ne rappelle pas le
-  /// serveur, et un nouvel épisode apparaît dans l'heure.
-  static const detailsMaxAge = Duration(hours: 1);
-
   Future<MovieDetails> movie(String id) async => (await _load(
     'vod_info_$id',
     () => _client.fetch('get_vod_info', {'vod_id': id}),
     parseMovieDetails,
-    refresh: false,
     maxAge: detailsMaxAge,
   )).value;
 
-  Future<SeriesDetails> series(String id) async => (await _load(
-    'series_info_$id',
-    () => _client.fetch('get_series_info', {'series_id': id}),
-    parseSeriesDetails,
-    refresh: false,
-    maxAge: detailsMaxAge,
-  )).value;
+  Future<SeriesDetails> series(String id) => _series(id, detailsMaxAge);
 
   /// Même fiche que [series], mais acceptée jusqu'à [maxAge] : pour
   /// l'accueil, qui ne doit pas interroger le serveur pour chaque série
   /// suivie à chaque lancement.
-  Future<SeriesDetails> cachedSeries(String id) async => (await _load(
-    'series_info_$id',
-    () => _client.fetch('get_series_info', {'series_id': id}),
-    parseSeriesDetails,
-    refresh: false,
-  )).value;
+  Future<SeriesDetails> cachedSeries(String id) => _series(id, maxAge);
+
+  Future<SeriesDetails> _series(String id, Duration maxAge) async =>
+      (await _load(
+        'series_info_$id',
+        () => _client.fetch('get_series_info', {'series_id': id}),
+        parseSeriesDetails,
+        maxAge: maxAge,
+      )).value;
 
   /// [parse] doit être une fonction de premier niveau, ou une fermeture
   /// créée par l'une d'elles : elle part dans un isolate, et une fermeture
@@ -100,7 +96,7 @@ final class CatalogRepository {
     String name,
     Future<String> Function() fetch,
     T Function(String) parse, {
-    required bool refresh,
+    bool refresh = false,
     Duration? maxAge,
   }) async {
     final path = _cache.path(name);
