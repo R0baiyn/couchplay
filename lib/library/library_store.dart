@@ -68,23 +68,16 @@ final class LibraryStore {
     return const Library();
   }
 
-  Future<void>? _pending;
+  final _writer = SerialFileWriter(failure: 'Bibliothèque non écrite');
   var _readOnly = false;
 
-  /// Écrit [library] de façon atomique (fichier temporaire renommé), une
-  /// écriture après l'autre. Un échec est loggé : l'état reste en mémoire.
+  /// Écrit [library] (voir [SerialFileWriter]).
   Future<void> save(Library library) {
     if (_readOnly) return Future.value();
-    final text = const JsonEncoder.withIndent(' ').convert(library.toJson());
-    return _pending = (_pending ?? Future.value()).then((_) async {
-      final temp = File('${file.path}.tmp');
-      try {
-        await temp.writeAsString(text, flush: true);
-        await temp.rename(file.path);
-      } on FileSystemException catch (e) {
-        log('Bibliothèque non écrite', error: e.osError?.errorCode);
-      }
-    });
+    return _writer.write(
+      file,
+      const JsonEncoder.withIndent(' ').convert(library.toJson()),
+    );
   }
 }
 
