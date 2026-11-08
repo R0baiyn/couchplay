@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -63,13 +64,35 @@ final class AccountFiles {
   }
 }
 
-/// Écritures de fichiers de données d'un compte, l'une après l'autre :
-/// deux changements rapides n'écrivent pas le même fichier temporaire en
-/// même temps. Chacune est atomique (fichier temporaire renommé).
+/// Écrit [text] dans [path] de façon atomique : fichier temporaire au nom
+/// unique, puis renommage. Seule écriture des fichiers de données d'un
+/// compte (cache du catalogue, bibliothèque, réglages). Synchrone : appelée
+/// dans un isolate.
 ///
-/// Le dossier n'est jamais créé ici ([AccountFiles.create]) : une écriture
-/// en retard ne fait pas revenir le dossier d'un compte supprimé. Un échec
-/// est loggé sans lever : l'état reste en mémoire pour la session.
+/// Le dossier n'est jamais créé ici ([AccountFiles.create]) : s'il a
+/// disparu, le compte vient d'être supprimé, et une écriture en retard ne
+/// doit pas le faire revenir. Rend l'erreur (disque plein, fichier
+/// verrouillé) au lieu de la lever, `null` si tout est écrit.
+FileSystemException? writeAtomically(String path, String text) {
+  final temp = File('$path.${DateTime.now().microsecondsSinceEpoch}.tmp');
+  try {
+    temp.writeAsStringSync(text, flush: true);
+    temp.renameSync(path);
+    return null;
+  } on FileSystemException catch (e) {
+    try {
+      if (temp.existsSync()) temp.deleteSync();
+    } on FileSystemException {
+      // Rien de plus à faire : un fichier temporaire oublié ne gêne pas.
+    }
+    return e;
+  }
+}
+
+/// Écritures d'un fichier de données d'un compte, l'une après l'autre (la
+/// dernière demandée reste), chacune atomique ([writeAtomically]) et hors du
+/// thread de l'interface. Un échec est loggé sans lever : l'état reste en
+/// mémoire pour la session.
 final class SerialFileWriter {
   SerialFileWriter({required this.failure});
 
@@ -80,15 +103,14 @@ final class SerialFileWriter {
 
   Future<void> write(File file, String text) =>
       _pending = _pending.then((_) async {
-        final temp = File('${file.path}.tmp');
-        try {
-          await temp.writeAsString(text, flush: true);
-          await temp.rename(file.path);
-        } on FileSystemException catch (e) {
-          log(failure, error: e.osError?.errorCode);
-        }
+        final error = await _writeInIsolate(file.path, text);
+        if (error != null) log(failure, error: error.osError?.errorCode);
       });
 }
+
+// Fonction de premier niveau : l'isolate ne reçoit que ses paramètres.
+Future<FileSystemException?> _writeInIsolate(String path, String text) =>
+    Isolate.run(() => writeAtomically(path, text));
 
 /// Créé dans `main()` à partir du dossier de support, puis injecté.
 final accountFilesProvider = Provider<AccountFiles>(

@@ -6,8 +6,8 @@ import '../logging.dart';
 ///
 /// Le texte est gardé tel que le serveur l'a envoyé, sans réencodage ; sa
 /// date est celle du fichier. La lecture et l'écriture des gros fichiers se
-/// font dans l'isolate de décodage ([readText], [writeText]) : ici, seuls les
-/// chemins et les dates.
+/// font dans l'isolate de décodage ([readText], `writeAtomically`) : ici,
+/// seuls les chemins et les dates.
 ///
 /// Le cache est lié au serveur : si l'adresse ou l'utilisateur du compte
 /// change, l'ancien catalogue est effacé au premier accès.
@@ -73,27 +73,5 @@ String? readText(String path) {
     return File(path).readAsStringSync();
   } on FileSystemException {
     return null;
-  }
-}
-
-/// Écrit un fichier du cache, de façon atomique : fichier temporaire au nom
-/// unique, puis renommage. Renvoie `false` en cas d'échec (disque plein,
-/// fichier verrouillé), sans lever : le cache n'est qu'une économie.
-/// Appelé dans un isolate.
-bool writeText(String path, String text) {
-  final temp = File('$path.${DateTime.now().microsecondsSinceEpoch}.tmp');
-  try {
-    // Le dossier n'est pas recréé : s'il a disparu, le compte vient d'être
-    // supprimé, et une écriture en retard ne doit pas le faire revenir.
-    temp.writeAsStringSync(text, flush: true);
-    temp.renameSync(path);
-    return true;
-  } on FileSystemException {
-    try {
-      if (temp.existsSync()) temp.deleteSync();
-    } on FileSystemException {
-      // Rien de plus à faire : le fichier temporaire sera écrasé plus tard.
-    }
-    return false;
   }
 }

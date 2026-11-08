@@ -1,5 +1,6 @@
 import 'dart:isolate';
 
+import '../accounts/account_files.dart';
 import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
@@ -139,7 +140,7 @@ Future<T> _decodeAndStore<T>(
   try {
     result = await Isolate.run(() {
       final value = parse(text);
-      return (value, path == null || writeText(path, text));
+      return (value, path == null || writeAtomically(path, text) == null);
     });
   } on FormatException {
     log('Catalogue', error: 'JSON invalide : ${_preview(text)}');
