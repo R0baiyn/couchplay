@@ -367,6 +367,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _exit() => Navigator.maybePop(context);
 
+  /// Échap hors des contrôles : quitte d'abord le plein écran sur
+  /// ordinateur, comme dans les contrôles, puis le lecteur.
+  void _back() => _fullscreen && !_mobile ? _setFullscreen(false) : _exit();
+
+  late final _escape = <ShortcutActivator, VoidCallback>{
+    const SingleActivator(LogicalKeyboardKey.escape): _back,
+  };
+
   @override
   void dispose() {
     _lifecycle.dispose();
@@ -404,12 +412,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             pauseUponEnteringBackgroundMode: false,
           ),
           if (error != null)
-            // Échap : quitte d'abord le plein écran, comme dans les contrôles.
             CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.escape): () =>
-                    _fullscreen && !_mobile ? _setFullscreen(false) : _exit(),
-              },
+              bindings: _escape,
               child: _ErrorPanel(message: error, onRetry: _open, onExit: _exit),
             )
           else ...[
@@ -434,14 +438,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               Align(
                 alignment: Alignment.bottomRight,
                 // Le focus est sur l'encart, hors des contrôles : Échap doit
-                // quand même quitter (plein écran d'abord sur ordinateur).
+                // quand même quitter.
                 child: CallbackShortcuts(
-                  bindings: {
-                    const SingleActivator(LogicalKeyboardKey.escape): () =>
-                        _fullscreen && !_mobile
-                        ? _setFullscreen(false)
-                        : _exit(),
-                  },
+                  bindings: _escape,
                   child: _NextEpisodePanel(
                     title: next.item.title,
                     image: next.image ?? next.item.poster,
