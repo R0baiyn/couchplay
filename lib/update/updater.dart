@@ -52,14 +52,14 @@ bool isNewer(String candidate, String current) {
 
 /// Hôtes d'où les fichiers d'une release sont téléchargés : la page GitHub,
 /// puis le stockage vers lequel elle redirige.
-const downloadHosts = {
+const _downloadHosts = {
   'github.com',
   'objects.githubusercontent.com',
   'release-assets.githubusercontent.com',
 };
 
 bool isAllowedDownload(Uri url) =>
-    url.scheme == 'https' && downloadHosts.contains(url.host);
+    url.scheme == 'https' && _downloadHosts.contains(url.host);
 
 /// La mise à jour proposée par une réponse de `releases/latest`, si elle est
 /// plus récente que [current] et contient le fichier de cette variante, dont

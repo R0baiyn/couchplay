@@ -12,7 +12,7 @@ final class CloudflareDns {
   CloudflareDns({Future<String> Function(String server, String host)? query})
     : _query = query ?? _https;
 
-  static const servers = ['1.1.1.1', '1.0.0.1'];
+  static const _servers = ['1.1.1.1', '1.0.0.1'];
   static const _service = 'cloudflare-dns.com';
 
   final Future<String> Function(String server, String host) _query;
@@ -38,7 +38,7 @@ final class CloudflareDns {
   }
 
   Future<InternetAddress> _resolve(String host) async {
-    for (final server in servers) {
+    for (final server in _servers) {
       try {
         final (address, ttl) = parseAnswer(await _query(server, host));
         _cache[host] = (
