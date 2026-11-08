@@ -31,8 +31,6 @@ final class AccountInfo {
   final int? maxConnections;
   final int? activeConnections;
   final bool isTrial;
-
-  bool get isActive => status.toLowerCase() == 'active';
 }
 
 /// Films ou séries : les deux moitiés du catalogue, mêmes écrans.

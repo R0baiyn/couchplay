@@ -27,7 +27,6 @@ void main() {
     final info = await _client(FakeAdapter.replying(body)).accountInfo();
 
     expect(info.status, 'Active');
-    expect(info.isActive, isTrue);
     expect(info.isTrial, isFalse);
     expect(info.maxConnections, 1);
     expect(info.activeConnections, 0);
@@ -55,7 +54,7 @@ void main() {
     ).accountInfo();
 
     expect(info.expiresAt, isNull);
-    expect(info.isActive, isFalse);
+    expect(info.status, 'Expired');
   });
 
   group('erreurs typées', () {
