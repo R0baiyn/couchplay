@@ -33,11 +33,12 @@ final class Update {
 /// Numéros d'une version : `v0.1.10+3` donne `[0, 1, 10]`. `null` si le
 /// texte n'est pas une version.
 List<int>? parseVersion(String text) {
-  final match = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$')
-      .firstMatch(text.trim());
+  final match = _version.firstMatch(text.trim());
   if (match == null) return null;
   return [for (var i = 1; i <= 3; i++) int.parse(match[i]!)];
 }
+
+final _version = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$');
 
 /// [candidate] est strictement plus récente que [current].
 bool isNewer(String candidate, String current) {
@@ -263,7 +264,9 @@ final class Updater {
       }
       final location = response.headers.value(HttpHeaders.locationHeader);
       if (response.statusCode case final status? when status >= 300) {
-        if (location == null) throw HttpException('Redirection sans adresse');
+        if (location == null) {
+          throw const HttpException('Redirection sans adresse');
+        }
         url = url.resolve(location);
         continue;
       }
