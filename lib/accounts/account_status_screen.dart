@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../catalog/status_views.dart';
 import '../server/models.dart';
-import '../server/server_client.dart';
 import 'account_store.dart';
 import 'server_session.dart';
 
@@ -32,20 +32,9 @@ class AccountStatusScreen extends ConsumerWidget {
           // En premier : un rechargement garde l'ancienne valeur ou erreur.
           AsyncValue(isLoading: true) => const CircularProgressIndicator(),
           AsyncData(:final value) => _Details(value),
-          AsyncError(:final error) => Column(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 16,
-            children: [
-              Text(
-                error is ServerException ? error.message : 'Erreur inattendue',
-                textAlign: TextAlign.center,
-              ),
-              FilledButton(
-                autofocus: true,
-                onPressed: () => ref.invalidate(accountInfoProvider),
-                child: const Text('Réessayer'),
-              ),
-            ],
+          AsyncError(:final error) => ErrorView(
+            error: error,
+            onRetry: () => ref.invalidate(accountInfoProvider),
           ),
           _ => const CircularProgressIndicator(),
         },
