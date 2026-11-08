@@ -11,8 +11,8 @@ import 'search/search_index.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'settings/settings_screen.dart';
-import 'update/update_dialog.dart';
 import 'television.dart';
+import 'update/update_dialog.dart';
 import 'update/updater.dart';
 
 /// L'app, toujours en thème sombre : une salle de cinéma, pas un bureau.
@@ -282,7 +282,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     0 => const HomeScreen(),
     1 => const CatalogScreen(kind: ContentKind.movies),
     2 => const CatalogScreen(kind: ContentKind.series),
-
     _ => SearchScreen(focusNode: _searchField),
   };
 
@@ -349,7 +348,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                   padding: EdgeInsets.only(bottom: 16),
                   child: SettingsButton(inRail: true),
                 ),
-
                 destinations: [
                   for (final (icon, selected, label) in _tabs)
                     NavigationRailDestination(

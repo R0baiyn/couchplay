@@ -124,7 +124,6 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
             ),
           ],
         ),
-
         _ => const Center(child: CircularProgressIndicator()),
       },
     );

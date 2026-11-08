@@ -351,7 +351,6 @@ class _CategoryItems extends ConsumerWidget {
           sliver: SliverPosterGrid(entries: value.value, onOpen: onOpen),
         ),
       ],
-
       AsyncError(:final error) when !loaded.isLoading => [
         fill(ErrorView(error: error, onRetry: onRetry)),
       ],
