@@ -51,6 +51,16 @@ final class PlayItem {
       episodeTitle == null ? shortTitle : '$shortTitle · $episodeTitle';
 }
 
+/// Clé d'un film ou d'une série du catalogue dans `library.json` : celle de
+/// son favori et, pour un film, de sa progression ([PlayItem.key]).
+extension LibraryKey on CatalogItem {
+  /// `movie:<id>` ou `series:<id>`.
+  String get libraryKey => switch (kind) {
+    ContentKind.movies => 'movie:$id',
+    ContentKind.series => 'series:$id',
+  };
+}
+
 /// Un favori : de quoi l'afficher sur l'accueil sans recharger le catalogue.
 final class Favorite {
   const Favorite({

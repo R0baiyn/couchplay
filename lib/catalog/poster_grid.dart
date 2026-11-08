@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../library/library.dart';
 import '../library/library_store.dart';
 import '../search/search_index.dart';
-
 import '../server/models.dart';
 import 'versions.dart';
 
@@ -89,7 +89,6 @@ class _EntryTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final movie = entry.kind == ContentKind.movies;
-    final prefix = movie ? 'movie' : 'series';
     final versions =
         (movie
             ? ref.watch(
@@ -102,10 +101,10 @@ class _EntryTile extends ConsumerWidget {
     final (favorite, watched) = ref.watch(
       libraryProvider.select(
         (library) => (
-          versions.any((v) => library.favorites.containsKey('$prefix:${v.id}')),
+          versions.any((v) => library.favorites.containsKey(v.libraryKey)),
           movie &&
               versions.any(
-                (v) => library.progress['movie:${v.id}']?.watched ?? false,
+                (v) => library.progress[v.libraryKey]?.watched ?? false,
               ),
         ),
       ),

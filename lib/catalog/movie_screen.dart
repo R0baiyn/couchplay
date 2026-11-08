@@ -79,10 +79,10 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
           title: Text(selected.parsedName.display),
           actions: [
             FavoriteButton(
-              favoriteKey: 'movie:${selected.id}',
+              favoriteKey: selected.libraryKey,
               otherKeys: [
                 for (final v in versions)
-                  if (v != selected) 'movie:${v.id}',
+                  if (v != selected) v.libraryKey,
               ],
               name: selected.name,
               poster: poster,

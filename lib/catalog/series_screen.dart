@@ -41,7 +41,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           title: Text(widget.item.name),
           actions: [
             FavoriteButton(
-              favoriteKey: 'series:${widget.item.id}',
+              favoriteKey: widget.item.libraryKey,
               name: widget.item.name,
               poster: widget.item.poster,
             ),

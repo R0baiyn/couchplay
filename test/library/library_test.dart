@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
+import 'package:couchplay/server/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final _t0 = DateTime.utc(2026, 11, 2, 20);
@@ -65,6 +66,13 @@ void main() {
     );
     expect(named.shortTitle, 'Série 45 · S2E3');
     expect(named.title, 'Série 45 · S2E3 · Le retour');
+  });
+
+  test('clé d\'un film ou d\'une série du catalogue', () {
+    const movie = CatalogItem(kind: ContentKind.movies, id: '1', name: 'M');
+    const series = CatalogItem(kind: ContentKind.series, id: '1', name: 'S');
+    expect(movie.libraryKey, _movie.key);
+    expect(series.libraryKey, 'series:1');
   });
 
   group('seuils', () {

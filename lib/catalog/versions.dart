@@ -90,7 +90,7 @@ CatalogItem preferredVersion(List<CatalogItem> versions, Library library) {
   CatalogItem? watched;
   DateTime? watchedAt;
   for (final version in versions) {
-    final progress = library.progress['movie:${version.id}'];
+    final progress = library.progress[version.libraryKey];
     if (progress != null &&
         (watchedAt == null || progress.updatedAt.isAfter(watchedAt))) {
       watched = version;
@@ -99,7 +99,7 @@ CatalogItem preferredVersion(List<CatalogItem> versions, Library library) {
   }
   return watched ??
       versions
-          .where((v) => library.favorites.containsKey('movie:${v.id}'))
+          .where((v) => library.favorites.containsKey(v.libraryKey))
           .firstOrNull ??
       versions.first;
 }
