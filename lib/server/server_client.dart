@@ -176,22 +176,14 @@ final class ServerClient {
       // l'app mettrait en cache un catalogue vide. Les listes commencent par
       // `[` : seul un petit objet est décodé ici.
       if (text.length < 4096 && text.trimLeft().startsWith('{')) {
-        final body = _tryDecode(text);
-        final userInfo = body is Map ? body['user_info'] : null;
-        if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
-          throw const CredentialsRejected();
-        }
+        _checkAuth(_tryDecode(text));
       }
       return text;
     }
 
     // Corps d'erreur, petit : décodé ici. Mauvais identifiants : `auth: 0`
     // avec un code d'erreur chez certains serveurs (404). Le contenu prime.
-    final body = _tryDecode(text);
-    final userInfo = body is Map ? body['user_info'] : null;
-    if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
-      throw const CredentialsRejected();
-    }
+    _checkAuth(_tryDecode(text));
     switch (status) {
       case 401:
         throw const CredentialsRejected();
@@ -207,9 +199,18 @@ final class ServerClient {
     }
   }
 
-  static Object? _tryDecode(String? text) {
+  /// Lève [CredentialsRejected] si [body] porte un `user_info` sans
+  /// `auth: 1`.
+  static void _checkAuth(Object? body) {
+    final userInfo = body is Map ? body['user_info'] : null;
+    if (userInfo != null && asInt(asMap(userInfo)['auth']) != 1) {
+      throw const CredentialsRejected();
+    }
+  }
+
+  static Object? _tryDecode(String text) {
     try {
-      return jsonDecode(text ?? '');
+      return jsonDecode(text);
     } on FormatException {
       return null;
     }
