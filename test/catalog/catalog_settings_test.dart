@@ -28,6 +28,8 @@ void main() {
   });
   tearDown(() => root.deleteSync(recursive: true));
 
+  AccountFiles files() => AccountFiles(Directory('${root.path}/accounts'));
+
   Future<ProviderContainer> container() async {
     final store = await AccountStore.open();
     if (store.current.accounts.isEmpty) {
@@ -37,12 +39,12 @@ void main() {
             .withAccount(_account('b')),
       );
     }
+    // Comme au démarrage de l'app : chaque compte a son dossier.
+    await files().sync({'a', 'b'});
     final container = ProviderContainer.test(
       overrides: [
         accountStoreProvider.overrideWithValue(store),
-        accountFilesProvider.overrideWithValue(
-          AccountFiles(Directory('${root.path}/accounts')),
-        ),
+        accountFilesProvider.overrideWithValue(files()),
       ],
     );
     container.listen(catalogFilterProvider, (_, _) {});
@@ -67,6 +69,19 @@ void main() {
     expect(filter.tags, {'FR', 'AR'});
     expect(filter.showAdult, isTrue);
   });
+
+  test(
+    'une écriture en retard ne recrée pas le dossier d\'un compte supprimé',
+    () async {
+      final c = await container();
+      await files().delete('a');
+      await c.read(catalogFilterProvider.notifier).setShowAdult(true);
+
+      expect(files().of('a').existsSync(), isFalse);
+      // Le choix reste appliqué pour la session.
+      expect(c.read(catalogFilterProvider).showAdult, isTrue);
+    },
+  );
 
   test('deux comptes gardent des réglages indépendants', () async {
     final c = await container();

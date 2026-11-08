@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../accounts/account_files.dart';
 import '../accounts/account_store.dart';
-import '../logging.dart';
 import '../server/json_read.dart';
 import '../server/models.dart';
 import 'category_filter.dart';
@@ -71,25 +70,16 @@ final class CatalogFilterNotifier extends Notifier<CatalogFilter> {
   Future<void> resetCategories() =>
       _update(state.copyWith(overrides: const {}));
 
-  Future<void> _pending = Future.value();
+  // Un seul pour la vie du notifier : revenir à un compte pendant une
+  // écriture de ses réglages ne lance pas une seconde écriture en parallèle.
+  final _writer = SerialFileWriter(failure: 'Réglages du catalogue non écrits');
 
-  // Appliqué tout de suite ; l'écriture suit, atomique (fichier temporaire
-  // renommé) et en série : deux clics rapides n'écrivent pas le même fichier
-  // temporaire en même temps. Un échec garde le choix pour la session.
+  // Appliqué tout de suite ; l'écriture suit (voir [SerialFileWriter]).
   Future<void> _update(CatalogFilter next) {
     state = next;
     final file = _file;
     if (file == null) return Future.value();
-    return _pending = _pending.then((_) async {
-      final temp = File('${file.path}.tmp');
-      try {
-        await file.parent.create(recursive: true);
-        await temp.writeAsString(jsonEncode(_toJson(next)), flush: true);
-        await temp.rename(file.path);
-      } on FileSystemException catch (e) {
-        log('Réglages du catalogue non écrits', error: e.osError?.errorCode);
-      }
-    });
+    return _writer.write(file, jsonEncode(_toJson(next)));
   }
 
   static CatalogFilter _fromJson(Object? json) {
