@@ -37,11 +37,7 @@ class FavoriteButton extends ConsumerWidget {
       icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
       onPressed: () => favorite
           ? library.removeFavorites(keys)
-          : library.toggleFavorite(
-              key: favoriteKey,
-              name: name,
-              poster: poster,
-            ),
+          : library.addFavorite(key: favoriteKey, name: name, poster: poster),
     );
   }
 }

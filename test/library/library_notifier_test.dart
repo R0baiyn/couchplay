@@ -52,23 +52,25 @@ void main() {
     final first = await container();
     await first
         .read(libraryProvider.notifier)
-        .toggleFavorite(key: 'movie:1', name: 'Mirage');
+        .addFavorite(key: 'movie:1', name: 'Mirage');
     expect(first.read(libraryProvider).favorites.keys, ['movie:1']);
     first.dispose();
 
     final second = await container();
     expect(second.read(libraryProvider).favorites.keys, ['movie:1']);
-    await second
-        .read(libraryProvider.notifier)
-        .toggleFavorite(key: 'movie:1', name: 'Mirage');
+    await second.read(libraryProvider.notifier).removeFavorites(['movie:1']);
     expect(second.read(libraryProvider).favorites, isEmpty);
+    second.dispose();
+
+    final third = await container();
+    expect(third.read(libraryProvider).favorites, isEmpty);
   });
 
   test('deux comptes ont des favoris indépendants', () async {
     final c = await container();
     await c
         .read(libraryProvider.notifier)
-        .toggleFavorite(key: 'series:45', name: 'Les Veilleurs');
+        .addFavorite(key: 'series:45', name: 'Les Veilleurs');
 
     await c.read(accountsProvider.notifier).activate('b');
     expect(c.read(libraryProvider).favorites, isEmpty);

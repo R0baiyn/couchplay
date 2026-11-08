@@ -110,23 +110,19 @@ final class LibraryNotifier extends Notifier<Library> {
     return store.load();
   }
 
-  bool isFavorite(String key) => state.favorites.containsKey(key);
-
-  Future<void> toggleFavorite({
+  Future<void> addFavorite({
     required String key,
     required String name,
     String? poster,
   }) => _set(
-    isFavorite(key)
-        ? state.withoutFavorite(key)
-        : state.withFavorite(
-            Favorite(
-              key: key,
-              name: name,
-              poster: poster,
-              addedAt: DateTime.now().toUtc(),
-            ),
-          ),
+    state.withFavorite(
+      Favorite(
+        key: key,
+        name: name,
+        poster: poster,
+        addedAt: DateTime.now().toUtc(),
+      ),
+    ),
   );
 
   Future<void> removeFavorites(Iterable<String> keys) =>
