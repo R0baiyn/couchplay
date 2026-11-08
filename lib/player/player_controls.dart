@@ -163,9 +163,11 @@ class _PlayerControlsState extends State<PlayerControls> {
       if (!repeat) _player.playOrPause();
     } else if (key == LogicalKeyboardKey.keyF) {
       if (!repeat && widget.fullscreen != null) widget.onToggleFullscreen();
-    } else if (key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.goBack) {
-      // Maintenue, Échap ne quitte pas le lecteur dans la foulée.
+    } else if (key == LogicalKeyboardKey.escape) {
+      // Retour (Android, télécommande) n'est pas traité ici : Android ferme
+      // déjà le lecteur par son retour système, le traiter aussi fermait
+      // l'écran d'en dessous. Maintenue, Échap ne quitte pas le lecteur dans
+      // la foulée.
       if (!repeat) {
         widget.fullscreen ?? false
             ? widget.onToggleFullscreen()

@@ -125,6 +125,56 @@ void main() {
     },
   );
 
+  testWidgets('retour Android : ferme le lecteur seul, pas la fiche dessous', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: CouchPlayApp(home: Scaffold(body: Text('Accueil'))),
+      ),
+    );
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('Fiche')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          body: PlayerControls(
+            player: player,
+            title: 'Horizon',
+            fill: false,
+            onToggleFill: () {},
+            fullscreen: null,
+            onToggleFullscreen: () {},
+            onExit: () => Navigator.maybePop(context),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Android : la touche passe d'abord par l'app, puis par le retour système.
+    // Simulée en « web » : le simulateur n'a pas de code Android pour elle.
+    await tester.sendKeyEvent(
+      LogicalKeyboardKey.goBack,
+      platform: 'web',
+      physicalKey: PhysicalKeyboardKey.browserBack,
+    );
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      'flutter/navigation',
+      const JSONMethodCodec().encodeMethodCall(const MethodCall('popRoute')),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PlayerControls), findsNothing);
+    expect(find.text('Fiche'), findsOneWidget);
+  });
+
   testWidgets('TV : pas de volume, la télécommande règle celui de la TV', (
     tester,
   ) async {
