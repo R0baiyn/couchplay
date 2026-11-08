@@ -54,25 +54,18 @@ final class CategoriesNotifier extends AsyncNotifier<Loaded<List<Category>>> {
 
   /// « Actualiser » : ignore le cache, même récent. Les données affichées
   /// restent en place pendant le rechargement.
-  Future<void> refresh() => _refreshWith(
-    ref,
-    (repository) => repository.categories(kind, refresh: true),
-    (value) => state = value,
-  );
-}
-
-/// Recharge, puis publie le résultat seulement si le provider est toujours
-/// celui qui a lancé la requête. Changer de compte pendant le rechargement
-/// reconstruit le provider : le résultat de l'ancien compte est alors jeté,
-/// au lieu de s'afficher sous le nouveau.
-Future<void> _refreshWith<T>(
-  Ref ref,
-  Future<T> Function(CatalogRepository repository) load,
-  void Function(AsyncValue<T> value) publish,
-) async {
-  final repository = ref.read(catalogRepositoryProvider);
-  final result = await AsyncValue.guard(() => load(repository));
-  if (ref.mounted) publish(result);
+  ///
+  /// Le résultat n'est publié que si le provider est toujours celui qui a
+  /// lancé la requête. Changer de compte pendant le rechargement reconstruit
+  /// le provider : le résultat de l'ancien compte est alors jeté, au lieu de
+  /// s'afficher sous le nouveau.
+  Future<void> refresh() async {
+    final repository = ref.read(catalogRepositoryProvider);
+    final result = await AsyncValue.guard(
+      () => repository.categories(kind, refresh: true),
+    );
+    if (ref.mounted) state = result;
+  }
 }
 
 final movieDetailsProvider = FutureProvider.autoDispose
