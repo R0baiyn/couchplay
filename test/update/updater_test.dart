@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:couchplay/update/android_installer.dart';
+import 'package:couchplay/update/linux_installer.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
 import 'package:dio/dio.dart';
@@ -73,10 +74,19 @@ void main() {
   });
 
   group('updateFrom', () {
-    Map<String, Object?> release({String tag = 'v0.1.1'}) => {
+    Map<String, Object?> release({
+      String tag = 'v0.1.1',
+      String page = 'https://github.com/R0baiyn/couchplay/releases/tag/v0.1.1',
+    }) => {
       'tag_name': tag,
       'body': '- Nouvelle icône\n',
+      'html_url': page,
       'assets': [
+        {
+          'name': 'couchplay-0.1.1-linux-x64.tar.gz',
+          'browser_download_url': 'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/couchplay-0.1.1-linux-x64.tar.gz',
+          'size': 40,
+        },
         {
           'name': 'couchplay-0.1.1-windows-portable.zip',
           'browser_download_url': 'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/couchplay-0.1.1-windows-portable.zip',
@@ -131,6 +141,31 @@ void main() {
       expect(forAbi(Abi.androidArm)!.asset.path, endsWith('-armv7.apk'));
       // Pas d'APK publié pour un émulateur x86_64 : pas de mise à jour.
       expect(androidAssetSuffix(Abi.androidX64), isNull);
+    });
+
+    test("Linux : l'archive et la page de la release", () {
+      final update = updateFrom(
+        release(),
+        current: '0.1.0',
+        suffix: LinuxInstaller().assetSuffix,
+      )!;
+      expect(update.asset.path, endsWith('-linux-x64.tar.gz'));
+      expect(update.size, 40);
+      expect(
+        update.page,
+        Uri.parse('https://github.com/R0baiyn/couchplay/releases/tag/v0.1.1'),
+      );
+    });
+
+    test('page de release hors de GitHub en HTTPS : ignorée', () {
+      Uri? page(String url) => updateFrom(
+        release(page: url),
+        current: '0.1.0',
+        suffix: setup,
+      )!.page;
+      expect(page('https://example.com/releases/tag/v0.1.1'), isNull);
+      expect(page('http://github.com/R0baiyn/couchplay'), isNull);
+      expect(page('file:///etc/passwd'), isNull);
     });
 
     test('rien si la version n\'est pas plus récente', () {

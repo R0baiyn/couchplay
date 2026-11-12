@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:couchplay/update/linux_installer.dart';
 import 'package:couchplay/update/update_dialog.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:dio/dio.dart';
@@ -171,5 +172,78 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('Linux', () {
+    final page = Uri.parse(
+      'https://github.com/R0baiyn/couchplay/releases/tag/v0.1.1',
+    );
+
+    /// La fenêtre ouverte sous Linux : [opened] reçoit chaque page ouverte.
+    Future<void> openLinux(
+      WidgetTester tester,
+      List<Uri> opened, {
+      Uri? releasePage,
+    }) async {
+      final updater = Updater(
+        version: '0.1.0',
+        installer: LinuxInstaller(open: (url) async => opened.add(url)),
+        adapter: FakeAdapter((_) async => fail('aucun téléchargement')),
+      );
+      final linuxUpdate = Update(
+        version: '0.1.1',
+        notes: 'Nouveautés',
+        asset: Uri.parse('https://github.com/R0baiyn/couchplay/x.tar.gz'),
+        size: 3,
+        page: releasePage,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () =>
+                    showUpdateDialog(context, updater, linuxUpdate),
+                child: const Text('Ouvrir'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Ouvrir'));
+      await tester.pumpAndSettle();
+      expect(find.text('Version 0.1.1 disponible'), findsOneWidget);
+      expect(find.text('Nouveautés'), findsOneWidget);
+      expect(find.text('Mettre à jour'), findsNothing);
+    }
+
+    testWidgets('« Ouvrir la page » : la release, sans téléchargement', (
+      tester,
+    ) async {
+      final opened = <Uri>[];
+      await openLinux(tester, opened, releasePage: page);
+      await tester.tap(find.text('Ouvrir la page'));
+      await tester.pumpAndSettle();
+      expect(opened, [page]);
+      expect(find.text('Version 0.1.1 disponible'), findsNothing);
+      expect(find.textContaining('Téléchargement'), findsNothing);
+    });
+
+    testWidgets("« Plus tard » : rien d'ouvert ni de téléchargé", (
+      tester,
+    ) async {
+      final opened = <Uri>[];
+      await openLinux(tester, opened, releasePage: page);
+      await tester.tap(find.text('Plus tard'));
+      await tester.pumpAndSettle();
+      expect(opened, isEmpty);
+      expect(find.text('Version 0.1.1 disponible'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets("sans page sûre : pas de bouton pour l'ouvrir", (tester) async {
+      await openLinux(tester, []);
+      expect(find.text('Ouvrir la page'), findsNothing);
+    });
   });
 }

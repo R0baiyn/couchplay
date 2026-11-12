@@ -16,6 +16,7 @@ import 'server/cloudflare_dns.dart';
 import 'settings/app_settings.dart';
 import 'television.dart';
 import 'update/android_installer.dart';
+import 'update/linux_installer.dart';
 import 'update/updater.dart';
 import 'update/windows_installer.dart';
 
@@ -56,7 +57,7 @@ Future<void> main() async {
 
 /// L'installation des mises à jour, pour une version release qui a un
 /// fichier publié : installée ou portable sous Windows, APK de son
-/// architecture sous Android.
+/// architecture sous Android, simple avis sous Linux.
 Future<Installer?> _installer() async {
   if (!kReleaseMode) return null;
   if (Platform.isWindows) {
@@ -71,5 +72,6 @@ Future<Installer?> _installer() async {
       workDir: Directory('${cache.path}/update'),
     );
   }
+  if (Platform.isLinux) return LinuxInstaller();
   return null;
 }

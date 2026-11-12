@@ -4,17 +4,22 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../logging.dart';
+import 'linux_installer.dart';
 import 'updater.dart';
 
 /// « Version X disponible » et ses notes. « Mettre à jour » l'installe tout
 /// de suite (Windows relance l'app, Android ouvre son installateur) ;
 /// « Plus tard » la télécharge en fond, et elle s'installe à la fermeture
-/// (Windows) ou au prochain démarrage (Android).
+/// (Windows) ou au prochain démarrage (Android). Sous Linux, rien ne se
+/// télécharge : « Ouvrir la page » ouvre la release dans le navigateur.
 Future<void> showUpdateDialog(
   BuildContext context,
   Updater updater,
   Update update,
 ) async {
+  if (updater.installer case final LinuxInstaller linux) {
+    return _showLinuxDialog(context, linux, update);
+  }
   final now = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -116,5 +121,41 @@ Future<void> showUpdateDialog(
         ),
       ),
     );
+  }
+}
+
+Future<void> _showLinuxDialog(
+  BuildContext context,
+  LinuxInstaller installer,
+  Update update,
+) async {
+  final page = update.page;
+  final open = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Version ${update.version} disponible'),
+      content: update.notes.isEmpty
+          ? null
+          : SingleChildScrollView(child: Text(update.notes)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Plus tard'),
+        ),
+        if (page != null)
+          FilledButton(
+            autofocus: true,
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ouvrir la page'),
+          ),
+      ],
+    ),
+  );
+  if (open != true || page == null) return;
+  try {
+    await installer.open(page);
+  } on Exception catch (e) {
+    // Sans xdg-open, l'app continue : la release reste sur GitHub.
+    log('Ouverture de la page de mise à jour', error: e.runtimeType);
   }
 }

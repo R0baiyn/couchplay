@@ -16,6 +16,7 @@ final class Update {
     required this.notes,
     required this.asset,
     required this.size,
+    this.page,
   });
 
   /// Sans le `v` du tag : `0.1.1`.
@@ -28,6 +29,10 @@ final class Update {
   /// Taille annoncée par GitHub, en octets : un téléchargement d'une autre
   /// taille est refusé.
   final int size;
+
+  /// Page de la release sur GitHub, `null` si elle n'y est pas en HTTPS :
+  /// Linux l'ouvre dans le navigateur.
+  final Uri? page;
 }
 
 /// Numéros d'une version : `v0.1.10+3` donne `[0, 1, 10]`. `null` si le
@@ -85,11 +90,18 @@ Update? updateFrom(
     final url = link is String ? Uri.tryParse(link) : null;
     if (url == null || !isAllowedDownload(url) || size is! int) continue;
     final notes = json['body'];
+    final page = switch (json['html_url']) {
+      final String link => Uri.tryParse(link),
+      _ => null,
+    };
     return Update(
       version: tag.replaceFirst(RegExp('^v'), ''),
       notes: notes is String ? notes.trim() : '',
       asset: url,
       size: size,
+      page: page != null && page.scheme == 'https' && page.host == 'github.com'
+          ? page
+          : null,
     );
   }
   return null;
