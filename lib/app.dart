@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'accounts/account_store.dart';
 import 'accounts/login_screen.dart';
 import 'catalog/catalog_screen.dart';
+import 'focus_ring.dart';
 import 'library/home_screen.dart';
 import 'search/search_index.dart';
 import 'search/search_screen.dart';
@@ -16,15 +17,25 @@ import 'update/update_dialog.dart';
 import 'update/updater.dart';
 
 /// L'app, toujours en thème sombre : une salle de cinéma, pas un bureau.
-class CouchPlayApp extends StatelessWidget {
+class CouchPlayApp extends StatefulWidget {
   const CouchPlayApp({super.key, required this.home});
 
   final Widget home;
 
+  @override
+  State<CouchPlayApp> createState() => _CouchPlayAppState();
+}
+
+class _CouchPlayAppState extends State<CouchPlayApp> {
   static final _dark = ThemeData(
     colorSchemeSeed: Colors.deepPurple,
     brightness: Brightness.dark,
   );
+
+  /// Au clavier et à la télécommande : l'anneau sur l'élément qui a le
+  /// focus. Changer de thème avec le mode reconstruit tous les boutons,
+  /// même celui qui garde le focus après un toucher.
+  static final _keyboard = withFocusRing(_dark);
 
   static final _navigator = GlobalKey<NavigatorState>();
 
@@ -43,12 +54,28 @@ class CouchPlayApp extends StatelessWidget {
     ),
   };
 
+  var _mode = FocusManager.instance.highlightMode;
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addHighlightModeListener(_onModeChange);
+  }
+
+  void _onModeChange(FocusHighlightMode mode) => setState(() => _mode = mode);
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeHighlightModeListener(_onModeChange);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CouchPlay',
       debugShowCheckedModeBanner: false,
-      theme: _dark,
+      theme: _mode == FocusHighlightMode.traditional ? _keyboard : _dark,
       navigatorKey: _navigator,
       // Échap revient en arrière partout, comme le bouton retour (clavier,
       // télécommande). Placé au-dessus du Navigator, ce raccourci reçoit la
@@ -75,7 +102,7 @@ class CouchPlayApp extends StatelessWidget {
           child: Shortcuts(shortcuts: _remoteKeys, child: app),
         );
       },
-      home: home,
+      home: widget.home,
     );
   }
 }
@@ -351,8 +378,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 destinations: [
                   for (final (icon, selected, label) in _tabs)
                     NavigationRailDestination(
-                      icon: Icon(icon),
-                      selectedIcon: Icon(selected),
+                      icon: FocusRing(child: Icon(icon)),
+                      selectedIcon: FocusRing(child: Icon(selected)),
                       label: Text(label),
                     ),
                 ],
@@ -372,8 +399,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         destinations: [
           for (final (icon, selected, label) in _tabs)
             NavigationDestination(
-              icon: Icon(icon),
-              selectedIcon: Icon(selected),
+              icon: FocusRing(child: Icon(icon)),
+              selectedIcon: FocusRing(child: Icon(selected)),
               label: label,
             ),
         ],
