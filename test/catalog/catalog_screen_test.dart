@@ -543,23 +543,27 @@ void main() {
       );
     await pumpApp(tester, size: const Size(1280, 1500), openMovies: false);
 
-    // Deux rangées sur l'accueil : tout l'historique, puis les seuls vus.
-    expect(find.text('Historique'), findsOneWidget);
+    // L'accueil : la rangée « Vus » (seulement les vus), pas de rangée
+    // « Historique », et le bouton « Historique » tout en bas.
     expect(find.text('Vus'), findsOneWidget);
-    expect(
-      tester.getTopLeft(find.text('Historique')).dy,
-      lessThan(tester.getTopLeft(find.text('Vus')).dy),
-    );
     for (final key in [
       'history:movie:144014',
       'history:movie:144015',
       'history:episode:6912',
-      'seen:movie:144015',
     ]) {
-      expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      expect(find.byKey(ValueKey(key)), findsNothing, reason: key);
     }
+    expect(find.byKey(const ValueKey('seen:movie:144015')), findsOneWidget);
     expect(find.byKey(const ValueKey('seen:movie:144014')), findsNothing);
     expect(find.byKey(const ValueKey('seen:episode:6912')), findsNothing);
+    final button = find.widgetWithText(OutlinedButton, 'Historique');
+    expect(button, findsOneWidget);
+    for (final above in [find.text('Vus'), find.text('Ma liste')]) {
+      expect(
+        tester.getTopLeft(button).dy,
+        greaterThan(tester.getTopLeft(above).dy),
+      );
+    }
 
     // Une affiche de « Vus » ouvre la fiche du film.
     await tester.tap(find.byKey(const ValueKey('seen:movie:144015')));
@@ -567,19 +571,8 @@ void main() {
     expect(find.byType(MovieScreen), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
-    // Une affiche de l'historique : la série, pour un épisode.
-    await tester.tap(find.byKey(const ValueKey('history:episode:6912')));
-    await settle(tester);
-    expect(find.byType(SeriesScreen), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await settle(tester);
 
-    await tester.scrollUntilVisible(
-      find.text('Gérer'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Gérer'));
+    await tester.tap(button);
     await settle(tester);
     expect(find.byType(HistoryScreen), findsOneWidget);
     // Tout y est, retiré de « Continuer » et vu compris, le plus récent
@@ -1074,17 +1067,13 @@ void main() {
             }),
           );
         await pumpTv(tester);
-        // Jusqu'à « Gérer » (rangée Historique), puis l'écran, puis effacer.
+        // Jusqu'au bouton « Historique », tout en bas, puis l'écran, puis
+        // effacer.
         await press(tester, LogicalKeyboardKey.arrowRight);
-        for (final key in [
-          LogicalKeyboardKey.arrowDown,
-          LogicalKeyboardKey.arrowDown,
-          LogicalKeyboardKey.arrowUp,
-          LogicalKeyboardKey.arrowRight,
-        ]) {
-          await press(tester, key);
+        for (var i = 0; i < 6 && focused() != 'Historique'; i++) {
+          await press(tester, LogicalKeyboardKey.arrowDown);
         }
-        expect(focused(), 'Gérer');
+        expect(focused(), 'Historique');
         await press(tester, LogicalKeyboardKey.select);
         expect(find.byType(HistoryScreen), findsOneWidget);
         await tester.tap(find.text("Effacer l'historique"));

@@ -22,7 +22,7 @@ class HomeScreen extends ConsumerWidget {
     final library = ref.watch(libraryProvider);
     final started = library.continueWatching;
     final favorites = library.favoritesByDate;
-    final history = library.history;
+    final hasHistory = library.progress.isNotEmpty;
     final seen = library.seen;
     final theme = Theme.of(context);
 
@@ -108,25 +108,28 @@ class HomeScreen extends ConsumerWidget {
                   ),
               ],
             ),
-          if (history.isNotEmpty) ...[
-            header(
-              'Historique',
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => const HistoryScreen(),
-                  ),
-                ),
-                child: const Text('Gérer'),
-              ),
-            ),
-            _entryRow(context, 'history', history),
-          ],
           if (seen.isNotEmpty) ...[
             header('Vus'),
             _entryRow(context, 'seen', seen),
           ],
+          // Tout en bas, sous toutes les rangées : la liste complète.
+          if (hasHistory)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const HistoryScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.history),
+                  label: const Text('Historique'),
+                ),
+              ),
+            ),
         ],
       ),
     );
