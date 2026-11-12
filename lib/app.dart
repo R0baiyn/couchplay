@@ -139,6 +139,14 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
+  /// L'icône d'un onglet, à la taille de sa pastille ([width] × 32) : comme
+  /// le bouton Réglages du rail, l'anneau entoure la pastille, pas le libellé.
+  static Widget _tabIcon(IconData icon, double width) => FocusRing(
+    hug: true,
+    radius: 16,
+    child: SizedBox(width: width, height: 32, child: Icon(icon)),
+  );
+
   static const _tabs = [
     (Icons.home_outlined, Icons.home, 'Accueil'),
     (Icons.movie_outlined, Icons.movie, 'Films'),
@@ -409,8 +417,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 destinations: [
                   for (final (icon, selected, label) in _tabs)
                     NavigationRailDestination(
-                      icon: FocusRing(child: Icon(icon)),
-                      selectedIcon: FocusRing(child: Icon(selected)),
+                      icon: _tabIcon(icon, 56),
+                      selectedIcon: _tabIcon(selected, 56),
                       label: Text(label),
                     ),
                 ],
@@ -430,8 +438,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         destinations: [
           for (final (icon, selected, label) in _tabs)
             NavigationDestination(
-              icon: FocusRing(child: Icon(icon)),
-              selectedIcon: FocusRing(child: Icon(selected)),
+              icon: _tabIcon(icon, 64),
+              selectedIcon: _tabIcon(selected, 64),
               label: label,
             ),
         ],

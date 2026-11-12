@@ -10,6 +10,7 @@ import 'package:couchplay/app.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
+import 'package:couchplay/focus_ring.dart';
 import 'package:couchplay/library/favorites_screen.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/search/search_index.dart';
@@ -1192,4 +1193,37 @@ void main() {
     );
     expect(tester.getBottomLeft(settings).dy, greaterThan(800 - 100));
   });
+
+  for (final (name, size, bar, width) in [
+    ('rail', const Size(1280, 800), NavigationRail, 56.0),
+    ('barre', const Size(400, 800), NavigationBar, 64.0),
+  ]) {
+    testWidgets('$name : l’anneau entoure l’icône de l’onglet, pas le libellé', (
+      tester,
+    ) async {
+      await pumpApp(tester, size: size, openMovies: false);
+      final ring = find
+          .descendant(of: find.byType(bar), matching: find.byType(FocusRing))
+          .first;
+      // Un appui de touche passe en mode clavier, puis l'onglet prend le focus.
+      await tester.sendKeyEvent(LogicalKeyboardKey.shiftLeft);
+      Focus.of(tester.element(ring)).requestFocus();
+      await tester.pumpAndSettle();
+
+      // La pastille de l'icône, comme le bouton Réglages du rail.
+      expect(tester.getSize(ring), Size(width, 32));
+      expect(
+        tester.renderObject(ring),
+        paints..rrect(
+          rrect: RRect.fromRectAndRadius(
+            (Offset.zero & Size(width, 32)).deflate(focusRing.width / 2),
+            // Une pilule.
+            Radius.circular((32 - focusRing.width) / 2),
+          ),
+          color: Colors.white,
+          strokeWidth: 3,
+        ),
+      );
+    });
+  }
 }
