@@ -9,6 +9,7 @@ import '../catalog/versions.dart';
 import '../player/player_screen.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
+import 'history_screen.dart';
 import 'library.dart';
 import 'library_store.dart';
 
@@ -21,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
     final library = ref.watch(libraryProvider);
     final started = library.continueWatching;
     final favorites = library.favoritesByDate;
+    final hasHistory = library.progress.isNotEmpty;
     final theme = Theme.of(context);
 
     Widget header(String title, [Widget? action]) => Padding(
@@ -41,8 +43,20 @@ class HomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          if (hasHistory)
+            header(
+              'Continuer à regarder',
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const HistoryScreen(),
+                  ),
+                ),
+                child: const Text('Historique'),
+              ),
+            ),
           if (started.isNotEmpty) ...[
-            header('Continuer à regarder'),
             _PosterRow(
               children: [
                 for (final entry in started)

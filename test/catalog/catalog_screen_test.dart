@@ -12,6 +12,7 @@ import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
 import 'package:couchplay/focus_ring.dart';
 import 'package:couchplay/library/favorites_screen.dart';
+import 'package:couchplay/library/history_screen.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/search/search_screen.dart';
@@ -486,6 +487,106 @@ void main() {
     final movie = progress['movie:144014'] as Map?;
     expect(movie?['position'], 754);
     expect(movie?['hidden'], isTrue);
+  });
+
+  testWidgets('Historique : liste, fiche, retrait, effacement, état vide', (
+    tester,
+  ) async {
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'favorites': {
+            'movie:144014': {
+              'name': 'Horizon (2024) HD VF',
+              'addedAt': '2026-01-01T00:00:00Z',
+            },
+          },
+          'progress': {
+            'movie:144014': {
+              'name': 'Horizon (2024) HD VF',
+              'extension': 'mp4',
+              'position': 754,
+              'duration': 6600,
+              'hidden': true,
+              'updatedAt': '2026-01-01T00:00:00Z',
+            },
+            'movie:144015': {
+              'name': 'Horizon (2024) FHD VF',
+              'extension': 'mkv',
+              'position': 6600,
+              'duration': 6600,
+              'watched': true,
+              'updatedAt': '2026-01-04T00:00:00Z',
+            },
+            'episode:6912': {
+              'seriesId': '1',
+              'season': 1,
+              'episode': 1,
+              'name': 'Les Veilleurs',
+              'extension': 'mkv',
+              'position': 600,
+              'duration': 2700,
+              'updatedAt': '2026-01-02T00:00:00Z',
+            },
+          },
+        }),
+      );
+    await pumpApp(tester, openMovies: false);
+
+    await tester.tap(find.text('Historique'));
+    await settle(tester);
+    expect(find.byType(HistoryScreen), findsOneWidget);
+    // Tout y est, retiré de « Continuer » et vu compris, le plus récent
+    // d'abord.
+    final vu = tester.getTopLeft(find.text('Horizon (2024) FHD VF')).dy;
+    final episode = tester.getTopLeft(find.text('Les Veilleurs · S1E1')).dy;
+    final retire = tester.getTopLeft(find.text('Horizon (2024) HD VF')).dy;
+    expect(vu, lessThan(episode));
+    expect(episode, lessThan(retire));
+    expect(find.textContaining('04/01/2026 · Vu'), findsOneWidget);
+    expect(find.textContaining('02/01/2026 · 10:00 / 45:00'), findsOneWidget);
+
+    // Un épisode ouvre la fiche de sa série.
+    await tester.tap(find.text('Les Veilleurs · S1E1'));
+    await settle(tester);
+    expect(find.byType(SeriesScreen), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+
+    // Retirer une ligne : sa progression part, les autres restent.
+    await tester.tap(find.byTooltip("Retirer de l'historique").first);
+    await settle(tester);
+    expect(find.text('Horizon (2024) FHD VF'), findsNothing);
+    expect(find.text('Les Veilleurs · S1E1'), findsOneWidget);
+    final progress = await savedProgress(
+      tester,
+      (progress) =>
+          progress.isNotEmpty && !progress.containsKey('movie:144015'),
+    );
+    expect(progress.keys, unorderedEquals(['movie:144014', 'episode:6912']));
+
+    // Effacer : confirmation, état vide, favoris intacts.
+    await tester.tap(find.text("Effacer l'historique"));
+    await settle(tester);
+    await tester.tap(find.text('Annuler'));
+    await settle(tester);
+    expect(find.text('Les Veilleurs · S1E1'), findsOneWidget);
+    await tester.tap(find.text("Effacer l'historique"));
+    await settle(tester);
+    await tester.tap(find.text('Effacer'));
+    await settle(tester);
+    expect(find.text("Rien regardé pour l'instant"), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HistoryScreen)),
+    );
+    expect(container.read(libraryProvider).favorites.keys, ['movie:144014']);
+
+    // Sans historique, plus de bouton sur l'accueil.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.text('Historique'), findsNothing);
   });
 
   testWidgets('épisode fini : « Continuer » propose le suivant', (
