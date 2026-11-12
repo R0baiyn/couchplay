@@ -361,6 +361,14 @@ void main() {
       ]);
     });
 
+    test("« Vus » : seulement les marqués vus, le plus récent d'abord", () {
+      final more = base.withProgress(
+        _progress(_episode('9', 1, 4), watched: true, minutesLater: 5),
+      );
+      expect(more.seen.map((p) => p.item.key), ['episode:9', 'movie:2']);
+      expect(base.history, hasLength(4));
+    });
+
     test('retirer une ligne efface sa progression, pas les autres', () {
       final next = base.withoutProgress('movie:1');
       expect(next.progress.keys, isNot(contains('movie:1')));

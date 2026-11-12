@@ -22,7 +22,8 @@ class HomeScreen extends ConsumerWidget {
     final library = ref.watch(libraryProvider);
     final started = library.continueWatching;
     final favorites = library.favoritesByDate;
-    final hasHistory = library.progress.isNotEmpty;
+    final history = library.history;
+    final seen = library.seen;
     final theme = Theme.of(context);
 
     Widget header(String title, [Widget? action]) => Padding(
@@ -43,20 +44,8 @@ class HomeScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          if (hasHistory)
-            header(
-              'Continuer à regarder',
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => const HistoryScreen(),
-                  ),
-                ),
-                child: const Text('Historique'),
-              ),
-            ),
           if (started.isNotEmpty) ...[
+            header('Continuer à regarder'),
             _PosterRow(
               children: [
                 for (final entry in started)
@@ -119,10 +108,46 @@ class HomeScreen extends ConsumerWidget {
                   ),
               ],
             ),
+          if (history.isNotEmpty) ...[
+            header(
+              'Historique',
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const HistoryScreen(),
+                  ),
+                ),
+                child: const Text('Gérer'),
+              ),
+            ),
+            _entryRow(context, 'history', history),
+          ],
+          if (seen.isNotEmpty) ...[
+            header('Vus'),
+            _entryRow(context, 'seen', seen),
+          ],
         ],
       ),
     );
   }
+
+  /// Rangée d'une liste de progressions : les [_rowLength] plus récentes ;
+  /// l'écran Historique les a toutes. Une affiche ouvre la fiche du film, ou
+  /// celle de la série pour un épisode.
+  Widget _entryRow(BuildContext context, String row, List<Progress> entries) =>
+      _PosterRow(
+        children: [
+          for (final entry in entries.take(_rowLength))
+            _tile(
+              key: ValueKey('$row:${entry.item.key}'),
+              title: entry.item.shortTitle,
+              imageUrl: entry.item.poster,
+              progress: entry.finished ? null : entry.fraction,
+              onTap: () => openDetails(context, historyEntry(entry.item)),
+            ),
+        ],
+      );
 
   /// « Retirer » : l'entrée quitte la rangée, la progression reste.
   /// ponytail: appui long ou clic droit seulement ; une touche de menu de
@@ -155,6 +180,9 @@ class HomeScreen extends ConsumerWidget {
 }
 
 const _tileWidth = 130.0;
+
+/// Affiches par rangée « Historique » et « Vus » : elles restent courtes.
+const _rowLength = 20;
 
 Widget _tile({
   required Key key,

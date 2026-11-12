@@ -163,6 +163,13 @@ void main() {
     return progress;
   }
 
+  /// Un texte dans la rangée « Continuer à regarder » (la première rangée) :
+  /// l'historique et « Vus » répètent les mêmes titres plus bas.
+  Finder inContinue(String text) => find.descendant(
+    of: find.byType(SingleChildScrollView).first,
+    matching: find.text(text),
+  );
+
   /// Liste des catégories du grand écran : défile jusqu'à [name], l'ouvre.
   Future<void> openCategory(WidgetTester tester, String name) async {
     await tester.scrollUntilVisible(
@@ -464,22 +471,22 @@ void main() {
 
     expect(find.text('Continuer à regarder'), findsOneWidget);
     // L'épisode le plus récent de la série, puis le film ; rien de vu.
-    expect(find.text('Les Veilleurs · S1E2'), findsOneWidget);
-    expect(find.text('Les Veilleurs · S1E1'), findsNothing);
-    expect(find.text('Horizon (2024) HD VF'), findsOneWidget);
-    expect(find.text('Horizon (2024) FHD VF'), findsNothing);
+    expect(inContinue('Les Veilleurs · S1E2'), findsOneWidget);
+    expect(inContinue('Les Veilleurs · S1E1'), findsNothing);
+    expect(inContinue('Horizon (2024) HD VF'), findsOneWidget);
+    expect(inContinue('Horizon (2024) FHD VF'), findsNothing);
     expect(
-      tester.getTopLeft(find.text('Les Veilleurs · S1E2')).dx,
-      lessThan(tester.getTopLeft(find.text('Horizon (2024) HD VF')).dx),
+      tester.getTopLeft(inContinue('Les Veilleurs · S1E2')).dx,
+      lessThan(tester.getTopLeft(inContinue('Horizon (2024) HD VF')).dx),
     );
 
     // Appui long, « Retirer » : l'entrée part, la progression reste.
-    await tester.longPress(find.text('Horizon (2024) HD VF'));
+    await tester.longPress(inContinue('Horizon (2024) HD VF'));
     await settle(tester);
     await tester.tap(find.text('Retirer'));
     await settle(tester);
-    expect(find.text('Horizon (2024) HD VF'), findsNothing);
-    expect(find.text('Les Veilleurs · S1E2'), findsOneWidget);
+    expect(inContinue('Horizon (2024) HD VF'), findsNothing);
+    expect(inContinue('Les Veilleurs · S1E2'), findsOneWidget);
     final progress = await savedProgress(
       tester,
       (progress) => (progress['movie:144014'] as Map?)?['hidden'] == true,
@@ -533,9 +540,45 @@ void main() {
           },
         }),
       );
-    await pumpApp(tester, openMovies: false);
+    await pumpApp(tester, size: const Size(1280, 1500), openMovies: false);
 
-    await tester.tap(find.text('Historique'));
+    // Deux rangées sur l'accueil : tout l'historique, puis les seuls vus.
+    expect(find.text('Historique'), findsOneWidget);
+    expect(find.text('Vus'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Historique')).dy,
+      lessThan(tester.getTopLeft(find.text('Vus')).dy),
+    );
+    for (final key in [
+      'history:movie:144014',
+      'history:movie:144015',
+      'history:episode:6912',
+      'seen:movie:144015',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+    }
+    expect(find.byKey(const ValueKey('seen:movie:144014')), findsNothing);
+    expect(find.byKey(const ValueKey('seen:episode:6912')), findsNothing);
+
+    // Une affiche de « Vus » ouvre la fiche du film.
+    await tester.tap(find.byKey(const ValueKey('seen:movie:144015')));
+    await settle(tester);
+    expect(find.byType(MovieScreen), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    // Une affiche de l'historique : la série, pour un épisode.
+    await tester.tap(find.byKey(const ValueKey('history:episode:6912')));
+    await settle(tester);
+    expect(find.byType(SeriesScreen), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+
+    await tester.scrollUntilVisible(
+      find.text('Gérer'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Gérer'));
     await settle(tester);
     expect(find.byType(HistoryScreen), findsOneWidget);
     // Tout y est, retiré de « Continuer » et vu compris, le plus récent
@@ -587,6 +630,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
     expect(find.text('Historique'), findsNothing);
+    expect(find.text('Vus'), findsNothing);
   });
 
   testWidgets('épisode fini : « Continuer » propose le suivant', (
@@ -614,14 +658,14 @@ void main() {
       );
     await pumpApp(tester, openMovies: false);
     // La tuile arrive avec la fiche de la série, sans roue de chargement.
-    final next = find.text('Les Veilleurs · S1E3');
+    final next = inContinue('Les Veilleurs · S1E3');
     for (var i = 0; i < 20 && next.evaluate().isEmpty; i++) {
       await settle(tester);
     }
 
     expect(find.text('Continuer à regarder'), findsOneWidget);
     expect(next, findsOneWidget);
-    expect(find.text('Les Veilleurs · S1E2'), findsNothing);
+    expect(inContinue('Les Veilleurs · S1E2'), findsNothing);
   });
 
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (

@@ -292,6 +292,13 @@ final class Library {
       progress.values.toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
+  /// « Vus » : ce qui porte la marque « vu » (fini, ou coché à la main), un
+  /// film ou un épisode par entrée, du plus récent au plus ancien.
+  List<Progress> get seen => [
+    for (final entry in history)
+      if (entry.watched) entry,
+  ];
+
   /// « Continuer à regarder », du plus récent au plus ancien : les films
   /// commencés (30 s ou plus) et pas finis, et une entrée par série, son
   /// épisode regardé en dernier quel que soit son numéro, même à peine
