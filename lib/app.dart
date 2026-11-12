@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -205,6 +207,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
+    _exitArmed?.cancel();
     for (final index in _indexes) {
       index.close();
     }
@@ -264,6 +267,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (_index < tabs.length) tabs[_index].requestFocus();
   }
 
+  /// Sur TV, le lecteur se ferme parfois seul (fin du dernier épisode,
+  /// veille) ou au premier de deux appuis rapprochés : le retour suivant
+  /// tomberait sur l'Accueil et quitterait l'app. Il faut donc un 2e appui
+  /// dans les 2 s ; tant que ce minuteur court, le retour quitte.
+  Timer? _exitArmed;
+  static const _exitWindow = Duration(seconds: 2);
+
+  void _armExit() {
+    setState(
+      () => _exitArmed = Timer(_exitWindow, () {
+        if (mounted) setState(() => _exitArmed = null);
+      }),
+    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Appuie encore sur retour pour quitter'),
+          duration: _exitWindow,
+        ),
+      );
+  }
+
   void _select(int index) {
     setState(() {
       _index = index;
@@ -317,11 +343,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Dépendance à la route : reconstruit quand l'accueil revient devant.
     if (ModalRoute.of(context)?.isCurrent ?? false) _offerUpdate();
     // Retour (Android, télécommande, Échap) depuis un autre onglet : revient
-    // à l'Accueil. Seul l'Accueil quitte l'app.
+    // à l'Accueil. Seul l'Accueil quitte l'app ; sur TV, au 2e appui.
+    final tv = ref.watch(televisionProvider);
     return PopScope(
-      canPop: _index == 0,
+      canPop: _index == 0 && (!tv || _exitArmed != null),
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        if (_index == 0) {
+          _armExit();
+          return;
+        }
         _select(0);
         // Sur TV, le focus suit : l'onglet quitté est caché, il le perdrait.
         if (ref.read(televisionProvider)) {

@@ -862,6 +862,42 @@ void main() {
       expect(focused(), 'Accueil', reason: 'depuis le rail');
     });
 
+    testWidgets('Accueil : retour quitte seulement au 2e appui en 2 s', (
+      tester,
+    ) async {
+      await pumpTv(tester);
+      const message = 'Appuie encore sur retour pour quitter';
+      // Bouton retour d'Android, sans attendre : la fenêtre est de 2 s.
+      Future<bool> back() async {
+        final handled = await tester.binding.handlePopRoute();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        return handled;
+      }
+
+      // Le lecteur (ici un écran qui en tient lieu) ouvert depuis l'Accueil
+      // se ferme seul ; le retour suivant reste dans l'app.
+      unawaited(
+        Navigator.of(
+          tester.element(find.byType(HomeShell)),
+        ).push(MaterialPageRoute<void>(builder: (_) => const Text('lecteur'))),
+      );
+      await settle(tester);
+      expect(await back(), isTrue);
+      await settle(tester);
+      expect(find.text('lecteur'), findsNothing);
+      expect(find.byType(HomeShell), findsOneWidget);
+
+      expect(await back(), isTrue, reason: '1er appui : l\'app reste');
+      expect(find.text(message), findsOneWidget);
+      expect(await back(), isFalse, reason: '2e appui en 2 s : quitte');
+
+      // Passé 2 s, il faut de nouveau deux appuis.
+      await tester.pump(const Duration(seconds: 3));
+      expect(await back(), isTrue);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
     testWidgets('fiche : ↓ sans rien dessous fait défiler la page', (
       tester,
     ) async {
