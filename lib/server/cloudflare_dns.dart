@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../logging.dart';
+import 'doh_root.dart';
 
 /// Résout les noms d'hôte par Cloudflare (1.1.1.1, puis 1.0.0.1 en secours),
 /// en DNS sur HTTPS : jamais par le DNS du système ni du fournisseur
@@ -10,7 +11,7 @@ import '../logging.dart';
 /// DNS du système : si Cloudflare ne répond pas, la connexion échoue.
 final class CloudflareDns {
   CloudflareDns({Future<String> Function(String server, String host)? query})
-    : _query = query ?? _https;
+    : _query = query ?? https;
 
   static const _servers = ['1.1.1.1', '1.0.0.1'];
   static const _service = 'cloudflare-dns.com';
@@ -71,18 +72,37 @@ final class CloudflareDns {
     throw const FormatException('Aucune adresse IPv4 dans la réponse');
   }
 
-  static Future<String> _https(String server, String host) async {
+  /// Contexte TLS de la connexion DoH, et d'elle seule : racines du système
+  /// plus [sslComRootEcc] (voir `doh_root.dart`). Les autres connexions de
+  /// l'app gardent le contexte par défaut.
+  static SecurityContext dohContext({bool withTrustedRoots = true}) =>
+      SecurityContext(withTrustedRoots: withTrustedRoots)
+        ..setTrustedCertificatesBytes(utf8.encode(sslComRootEcc));
+
+  static final _context = dohContext();
+
+  /// Réponse JSON de [server] pour le nom [host].
+  static Future<String> https(
+    String server,
+    String host, [
+    SecurityContext? context,
+  ]) async {
     // Connexion directe à [server], certificat vérifié pour le nom du
     // service : Dart refuse les certificats présentés pour une adresse IP.
-    // ponytail: sous Windows, la racine SSL.com de ce certificat n'est dans
-    // le magasin système qu'après un premier téléchargement par Windows ;
-    // l'embarquer dans l'app si un PC neuf échoue ici.
+    // Racine embarquée (origine, empreinte, expiration, renouvellement) :
+    // `doh_root.dart`.
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 5)
       ..connectionFactory = (uri, _, _) async {
         final task = await Socket.startConnect(server, 443);
         return ConnectionTask.fromSocket(
-          task.socket.then((s) => SecureSocket.secure(s, host: _service)),
+          task.socket.then(
+            (s) => SecureSocket.secure(
+              s,
+              host: _service,
+              context: context ?? _context,
+            ),
+          ),
           task.cancel,
         );
       };

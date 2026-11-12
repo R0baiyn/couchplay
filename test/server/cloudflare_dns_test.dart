@@ -54,4 +54,47 @@ void main() {
     expect((await dns.lookup('192.168.1.42')).address, '192.168.1.42');
     expect((await dns.lookup('localhost')).isLoopback, isTrue);
   });
+
+  // Vraies requêtes à Cloudflare : lancées seulement avec RESEAU=1
+  // (`RESEAU=1 flutter test test/server/cloudflare_dns_test.dart`).
+  group('réseau', skip: Platform.environment['RESEAU'] != '1', () {
+    for (final server in ['1.1.1.1', '1.0.0.1']) {
+      test(
+        '$server : sans racines du système, la racine embarquée suffit',
+        () async {
+          final body = await CloudflareDns.https(
+            server,
+            'example.com',
+            CloudflareDns.dohContext(withTrustedRoots: false),
+          );
+          expect(
+            CloudflareDns.parseAnswer(body).$1.type,
+            InternetAddressType.IPv4,
+          );
+        },
+      );
+
+      test(
+        '$server : contexte de l\'app (système + racine embarquée)',
+        () async {
+          final body = await CloudflareDns.https(server, 'example.com');
+          expect(
+            CloudflareDns.parseAnswer(body).$1.type,
+            InternetAddressType.IPv4,
+          );
+        },
+      );
+
+      test('$server : sans aucune racine, le certificat est refusé', () async {
+        await expectLater(
+          CloudflareDns.https(
+            server,
+            'example.com',
+            SecurityContext(withTrustedRoots: false),
+          ),
+          throwsA(isA<HandshakeException>()),
+        );
+      });
+    }
+  });
 }
