@@ -262,11 +262,34 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return KeyEventResult.handled;
   }
 
+  static final _arrows = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+  };
+
   KeyEventResult _contentKey(FocusNode _, KeyEvent event) {
-    if (!_isDown(event, LogicalKeyboardKey.arrowLeft)) {
+    if (event is KeyUpEvent || !_arrows.contains(event.logicalKey)) {
       return KeyEventResult.ignored;
     }
     final focused = FocusManager.instance.primaryFocus;
+    // La zone elle-même a le focus : l'élément qui l'avait a disparu (liste
+    // vidée, tuile retirée). Une flèche le redonne au premier élément de
+    // l'onglet, ou au rail s'il n'y en a aucun : sinon la télécommande ne
+    // répondrait plus.
+    if (focused is FocusScopeNode) {
+      final first = _reachable(_content).firstOrNull;
+      if (first != null) {
+        first.requestFocus();
+      } else {
+        _focusTab();
+      }
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey != LogicalKeyboardKey.arrowLeft) {
+      return KeyEventResult.ignored;
+    }
     if (focused == null || !focused.focusInDirection(TraversalDirection.left)) {
       _focusTab();
     }

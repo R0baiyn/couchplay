@@ -901,7 +901,7 @@ void main() {
   group('TV, à la télécommande', () {
     /// Une grille de 40 films dans « Films 4K », et l'app à la taille d'une
     /// TV (960 × 540).
-    Future<void> pumpTv(WidgetTester tester) async {
+    Future<void> pumpTv(WidgetTester tester, {String? seriesInfo}) async {
       final film = (jsonDecode(_fixture('vod_streams')) as List).first as Map;
       server = FakeAdapter.routes({
         '': activeAccountJson,
@@ -919,7 +919,7 @@ void main() {
         'get_vod_info': _fixture('vod_info'),
         'get_series_categories': _fixture('series_categories'),
         'get_series': _fixture('series'),
-        'get_series_info': _fixture('series_info'),
+        'get_series_info': seriesInfo ?? _fixture('series_info'),
       });
       await pumpApp(
         tester,
@@ -985,6 +985,135 @@ void main() {
       await press(tester, LogicalKeyboardKey.arrowRight);
       expect(focused(), visited);
     });
+
+    /// Une série de 30 épisodes : la liste dépasse l'écran.
+    String longSeries() {
+      final info = jsonDecode(_fixture('series_info')) as Map<String, Object?>;
+      final first =
+          ((info['episodes']! as Map)['1']! as List).first
+              as Map<String, Object?>;
+      return jsonEncode({
+        ...info,
+        'episodes': {
+          '1': [
+            for (var i = 1; i <= 30; i++)
+              {
+                ...first,
+                'id': '${7000 + i}',
+                'episode_num': i,
+                'title': 'Épisode $i',
+              },
+          ],
+        },
+      });
+    }
+
+    testWidgets(
+      'fiche série : le focus descend dans les épisodes, la page suit',
+      (tester) async {
+        await pumpTv(tester, seriesInfo: longSeries());
+        await tester.tap(find.text('Séries'));
+        await settle(tester);
+        await tester.tap(find.byType(PosterTile).first);
+        await settle(tester);
+        expect(find.byType(SeriesScreen), findsOneWidget);
+
+        var guard = 0;
+        while (!(focused() ?? '').startsWith('1. ') && guard++ < 20) {
+          await press(tester, LogicalKeyboardKey.arrowDown);
+        }
+        for (var i = 0; i < 12; i++) {
+          await press(tester, LogicalKeyboardKey.arrowDown);
+        }
+        final focus = FocusManager.instance.primaryFocus!;
+        final box = focus.context!.findRenderObject()! as RenderBox;
+        final top = box.localToGlobal(Offset.zero).dy;
+        expect(focused(), startsWith('13. '));
+        expect(
+          top,
+          inInclusiveRange(0, 540),
+          reason: "l'épisode est à l'écran",
+        );
+
+        // Un écran par-dessus (le lecteur), puis retour : même place.
+        unawaited(
+          Navigator.of(tester.element(find.byType(SeriesScreen))).push(
+            MaterialPageRoute<void>(builder: (_) => const Text('lecteur')),
+          ),
+        );
+        await settle(tester);
+        await tester.binding.handlePopRoute();
+        await settle(tester);
+        expect(focused(), startsWith('13. '));
+        final back = FocusManager.instance.primaryFocus!.context!;
+        expect(
+          (back.findRenderObject()! as RenderBox).localToGlobal(Offset.zero).dy,
+          inInclusiveRange(0, 540),
+        );
+      },
+    );
+
+    testWidgets(
+      "retour sur l'Accueil après « Effacer » : les flèches répondent",
+      (tester) async {
+        File('${root.path}/accounts/compte/library.json')
+          ..createSync(recursive: true)
+          ..writeAsStringSync(
+            jsonEncode({
+              'version': 1,
+              'progress': {
+                'movie:144014': {
+                  'name': 'Horizon (2024) HD VF',
+                  'extension': 'mp4',
+                  'position': 754,
+                  'duration': 6600,
+                  'updatedAt': '2026-01-01T00:00:00Z',
+                },
+              },
+            }),
+          );
+        await pumpTv(tester);
+        // Jusqu'à « Gérer » (rangée Historique), puis l'écran, puis effacer.
+        await press(tester, LogicalKeyboardKey.arrowRight);
+        for (final key in [
+          LogicalKeyboardKey.arrowDown,
+          LogicalKeyboardKey.arrowDown,
+          LogicalKeyboardKey.arrowUp,
+          LogicalKeyboardKey.arrowRight,
+        ]) {
+          await press(tester, key);
+        }
+        expect(focused(), 'Gérer');
+        await press(tester, LogicalKeyboardKey.select);
+        expect(find.byType(HistoryScreen), findsOneWidget);
+        await tester.tap(find.text("Effacer l'historique"));
+        await settle(tester);
+        expect(focused(), 'Annuler');
+        await press(tester, LogicalKeyboardKey.arrowRight);
+        expect(focused(), 'Effacer');
+        await press(tester, LogicalKeyboardKey.select);
+        expect(find.text("Rien regardé pour l'instant"), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await settle(tester);
+        expect(find.byType(HistoryScreen), findsNothing);
+        expect(find.text('Historique'), findsNothing);
+
+        // Les flèches doivent encore mener quelque part : un élément de
+        // l'Accueil (pas la zone seule) a le focus, et ↓ le déplace.
+        final node = FocusManager.instance.primaryFocus;
+        expect(node, isNotNull);
+        expect(node!.context, isNotNull);
+        await press(tester, LogicalKeyboardKey.arrowDown);
+        final moved = FocusManager.instance.primaryFocus;
+        expect(
+          moved is FocusScopeNode,
+          isFalse,
+          reason: 'un élément a le focus',
+        );
+        // Rien à atteindre dans l'Accueil vidé : le rail reprend le focus.
+        expect(focused(), 'Accueil');
+      },
+    );
 
     testWidgets('retour depuis un onglet : le focus sur « Accueil »', (
       tester,
