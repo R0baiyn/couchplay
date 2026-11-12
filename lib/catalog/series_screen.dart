@@ -1,3 +1,5 @@
+import '../focus_scroll.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -82,7 +84,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: FocusTraversalGroup(
+              child: SmoothFocusGroup(
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,

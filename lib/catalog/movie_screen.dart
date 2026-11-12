@@ -1,3 +1,5 @@
+import '../focus_scroll.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -146,7 +148,7 @@ class _VersionPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = versionLabels(versions);
-    return FocusTraversalGroup(
+    return SmoothFocusGroup(
       child: Wrap(
         spacing: 8,
         runSpacing: 8,

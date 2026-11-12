@@ -1,3 +1,5 @@
+import '../focus_scroll.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -273,7 +275,7 @@ class _CategoryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FocusTraversalGroup(
+    return SmoothFocusGroup(
       child: ListView.builder(
         itemCount: categories.length,
         itemBuilder: (context, index) {
@@ -313,7 +315,7 @@ class _CategoryItems extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final loaded = ref.watch(itemsProvider((kind, categoryId)));
-    return FocusTraversalGroup(
+    return SmoothFocusGroup(
       child: RefreshIndicator(
         onRefresh: onRefresh,
         child: CustomScrollView(

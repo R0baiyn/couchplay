@@ -9,6 +9,7 @@ import 'accounts/account_store.dart';
 import 'accounts/login_screen.dart';
 import 'catalog/catalog_screen.dart';
 import 'focus_ring.dart';
+import 'focus_scroll.dart';
 import 'library/home_screen.dart';
 import 'search/search_index.dart';
 import 'search/search_screen.dart';
@@ -91,7 +92,11 @@ class _CouchPlayAppState extends State<CouchPlayApp> {
           // Encoche, caméra et boutons du téléphone : rien ne passe dessous,
           // surtout en paysage où ils sont sur les côtés. Le haut est géré
           // par les barres d'application.
-          child: SafeArea(top: false, child: TvArrowKeys(child: child!)),
+          child: SafeArea(
+            top: false,
+            // Accueil et écrans sans groupe propre : défilement doux aussi.
+            child: SmoothFocusGroup(child: TvArrowKeys(child: child!)),
+          ),
         );
         // Sur ordinateur, ↑ ↓ gardent leur rôle dans un champ (début, fin)
         // et sur un curseur (volume).

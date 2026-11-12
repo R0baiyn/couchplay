@@ -1,3 +1,5 @@
+import '../focus_scroll.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -191,7 +193,7 @@ class _Results extends StatelessWidget {
             ),
           ],
         );
-    return FocusTraversalGroup(
+    return SmoothFocusGroup(
       child: CustomScrollView(
         slivers: [
           if (movies.isNotEmpty) section('Films', movies),
