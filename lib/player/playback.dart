@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -102,6 +103,24 @@ final class Playback {
           logLevel: MPVLogLevel.error,
         ),
       ) {
+    if (Platform.isLinux) {
+      // Sans interop de décodage matériel : libmpv chargerait VA-API en
+      // créant le rendu OpenGL, et `vaInitialize` plante sans pilote VA
+      // (WSL, compositeur sans périphérique DRM). La vidéo reste rendue en
+      // OpenGL. Posé avant le contrôleur, qui attend la même initialisation
+      // (`then` passe avant lui) ; `setProperty` attendrait sinon le
+      // contrôleur, déjà attaché.
+      final native = player.platform! as NativePlayer;
+      unawaited(
+        native.waitForPlayerInitialization.then(
+          (_) => native.setProperty(
+            'gpu-hwdec-interop',
+            'no',
+            waitForInitialization: false,
+          ),
+        ),
+      );
+    }
     controller = VideoController(player);
   }
 
