@@ -11,6 +11,9 @@ import 'package:media_kit/media_kit.dart';
 class _FakePlayer implements Player {
   final calls = <Symbol>[];
 
+  /// Positions demandées par `seek`, dans l'ordre.
+  final seeks = <Duration>[];
+
   @override
   final state = const PlayerState(
     playing: true,
@@ -23,6 +26,9 @@ class _FakePlayer implements Player {
   @override
   dynamic noSuchMethod(Invocation invocation) {
     calls.add(invocation.memberName);
+    if (invocation.memberName == #seek) {
+      seeks.add(invocation.positionalArguments.first as Duration);
+    }
     return Future<void>.value();
   }
 }
@@ -77,11 +83,63 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     expect(player.calls, [#playOrPause, #playOrPause]);
 
-    // Contrôles masqués : le focus revient sur l'image, ← recule.
+    // Contrôles masqués : le focus revient sur l'image, ← les réaffiche,
+    // puis recule.
     await tester.pump(const Duration(seconds: 4));
     expect(focused(), 'vidéo');
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     expect(player.calls.last, #seek);
+  });
+
+  testWidgets('télécommande : ⏪ ⏩ sautent de 10 s, où que soit le focus', (
+    tester,
+  ) async {
+    await pumpControls(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.mediaFastForward);
+    // Sur un bouton aussi.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    expect(focused(), 'lecture');
+    await tester.sendKeyEvent(LogicalKeyboardKey.mediaRewind);
+    // Position fixe du faux lecteur (0) : ⏪ s'arrête au début.
+    expect(player.seeks, [const Duration(seconds: 10), Duration.zero]);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.mediaPause);
+    await tester.sendKeyEvent(LogicalKeyboardKey.mediaPlay);
+    expect(player.calls, containsAllInOrder([#pause, #play]));
+  });
+
+  testWidgets('← → sur l\'image : contrôles masqués, le premier appui les '
+      'affiche sans bouger la vidéo', (tester) async {
+    await pumpControls(tester);
+    await tester.pump(const Duration(seconds: 4));
+    double opacity() => tester
+        .widget<AnimatedOpacity>(
+          find
+              .descendant(
+                of: find.byType(PlayerControls),
+                matching: find.byType(AnimatedOpacity),
+              )
+              .first,
+        )
+        .opacity;
+    expect(opacity(), 0, reason: 'contrôles masqués');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    expect(player.seeks, isEmpty);
+    await tester.pump();
+    expect(opacity(), 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    expect(player.seeks, [const Duration(seconds: 10)]);
+
+    // Maintenue, contrôles masqués : le premier événement affiche, les
+    // répétitions sautent.
+    await tester.pump(const Duration(seconds: 4));
+    player.seeks.clear();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+    expect(player.seeks, [const Duration(seconds: 10)]);
   });
 
   testWidgets('télécommande : ↑ ↓ traversent la barre de progression', (

@@ -23,6 +23,11 @@ import '../format.dart';
 /// - Télécommande (Android) : OK (pause), ← → (±10 s), ↑ ↓ vont aux boutons,
 ///   où les flèches passent de l'un à l'autre ; retour quitte le lecteur.
 ///   Quand les contrôles se masquent, le focus revient sur l'image.
+/// - Sur l'image, contrôles masqués, le premier ← → les affiche sans bouger
+///   la vidéo ; les suivants sautent. OK, Espace et les touches média
+///   agissent dès le premier appui.
+/// - Touches média, où que soit le focus : ⏪ ⏩ (±10 s), lecture, pause,
+///   lecture/pause.
 class PlayerControls extends StatefulWidget {
   const PlayerControls({
     super.key,
@@ -130,6 +135,8 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
+    // Lu avant _show() : contrôles masqués, ← → les affichent seulement.
+    final wasVisible = _visible;
     // Toute touche réaffiche les contrôles : Tab ne doit pas activer un
     // bouton invisible.
     _show();
@@ -143,9 +150,17 @@ class _PlayerControlsState extends State<PlayerControls> {
         key == LogicalKeyboardKey.arrowDown;
 
     if (onVideo && key == LogicalKeyboardKey.arrowLeft) {
-      _seekBy(-_step);
+      if (wasVisible) _seekBy(-_step);
     } else if (onVideo && key == LogicalKeyboardKey.arrowRight) {
+      if (wasVisible) _seekBy(_step);
+    } else if (key == LogicalKeyboardKey.mediaRewind) {
+      _seekBy(-_step);
+    } else if (key == LogicalKeyboardKey.mediaFastForward) {
       _seekBy(_step);
+    } else if (key == LogicalKeyboardKey.mediaPlay) {
+      if (!repeat) _player.play();
+    } else if (key == LogicalKeyboardKey.mediaPause) {
+      if (!repeat) _player.pause();
     } else if (onVideo &&
         vertical &&
         defaultTargetPlatform == TargetPlatform.android) {
