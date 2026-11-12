@@ -108,7 +108,11 @@ class _HistoryRow extends ConsumerWidget {
             ),
             // La fiche : celle du film, ou celle de la série pour un épisode. Elle
             // recharge le reste depuis le serveur.
-            onTap: () => openDetails(context, historyEntry(item)),
+            onTap: () => openDetails(
+              context,
+              historyEntry(item),
+              episode: item.isEpisode ? item : null,
+            ),
           ),
         ),
         IconButton(

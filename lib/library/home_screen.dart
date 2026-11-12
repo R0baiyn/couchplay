@@ -144,7 +144,11 @@ class HomeScreen extends ConsumerWidget {
               title: entry.item.shortTitle,
               imageUrl: entry.item.poster,
               progress: entry.finished ? null : entry.fraction,
-              onTap: () => openDetails(context, historyEntry(entry.item)),
+              onTap: () => openDetails(
+                context,
+                historyEntry(entry.item),
+                episode: entry.item.isEpisode ? entry.item : null,
+              ),
             ),
         ],
       );

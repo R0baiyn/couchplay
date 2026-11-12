@@ -7,6 +7,7 @@ import '../focus_ring.dart';
 import '../search/search_index.dart';
 import '../server/models.dart';
 import '../settings/settings_screen.dart';
+import '../library/library.dart';
 import 'catalog_providers.dart';
 import 'catalog_repository.dart';
 import 'catalog_settings.dart';
@@ -16,13 +17,18 @@ import 'series_screen.dart';
 import 'status_views.dart';
 import 'versions.dart';
 
-/// Ouvre la fiche d'un film ou d'une série.
-void openDetails(BuildContext context, CatalogEntry entry) => Navigator.push(
+/// Ouvre la fiche d'un film ou d'une série. [episode] : pour une série, la
+/// fiche s'ouvre sur cet épisode (saison choisie, page défilée, focus).
+void openDetails(
+  BuildContext context,
+  CatalogEntry entry, {
+  PlayItem? episode,
+}) => Navigator.push(
   context,
   MaterialPageRoute<void>(
     builder: (_) => switch (entry.kind) {
       ContentKind.movies => MovieScreen(entry: entry),
-      ContentKind.series => SeriesScreen(item: entry.item),
+      ContentKind.series => SeriesScreen(item: entry.item, episode: episode),
     },
   ),
 );

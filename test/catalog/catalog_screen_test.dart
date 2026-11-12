@@ -13,6 +13,7 @@ import 'package:couchplay/catalog/series_screen.dart';
 import 'package:couchplay/focus_ring.dart';
 import 'package:couchplay/library/favorites_screen.dart';
 import 'package:couchplay/library/history_screen.dart';
+import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/search/search_screen.dart';
@@ -1112,6 +1113,52 @@ void main() {
         );
         // Rien à atteindre dans l'Accueil vidé : le rail reprend le focus.
         expect(focused(), 'Accueil');
+      },
+    );
+
+    testWidgets(
+      "fiche série ouverte sur un épisode : page défilée, focus dessus",
+      (tester) async {
+        await pumpTv(tester, seriesInfo: longSeries());
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeShell)),
+        );
+        expect(container, isNotNull);
+        unawaited(
+          Navigator.of(tester.element(find.byType(HomeShell))).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const SeriesScreen(
+                item: CatalogItem(
+                  kind: ContentKind.series,
+                  id: '1',
+                  name: 'Les Veilleurs',
+                ),
+                episode: PlayItem.episode(
+                  id: '7025',
+                  extension: 'mkv',
+                  name: 'Les Veilleurs',
+                  seriesId: '1',
+                  season: 1,
+                  episode: 25,
+                ),
+              ),
+            ),
+          ),
+        );
+        await settle(tester);
+        for (var i = 0; i < 20 && focused() == null; i++) {
+          await settle(tester);
+        }
+
+        expect(focused(), startsWith('25. '));
+        final box =
+            FocusManager.instance.primaryFocus!.context!.findRenderObject()!
+                as RenderBox;
+        expect(
+          box.localToGlobal(Offset.zero).dy,
+          inInclusiveRange(0, 540),
+          reason: "l'épisode est à l'écran",
+        );
       },
     );
 

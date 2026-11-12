@@ -16,20 +16,49 @@ import 'status_views.dart';
 
 /// Fiche d'une série : en-tête, choix de la saison, liste des épisodes.
 class SeriesScreen extends ConsumerStatefulWidget {
-  const SeriesScreen({super.key, required this.item});
+  const SeriesScreen({super.key, required this.item, this.episode});
 
   final CatalogItem item;
+
+  /// Épisode à montrer à l'ouverture : sa saison, la page défilée jusqu'à lui
+  /// et le focus dessus (télécommande).
+  final PlayItem? episode;
 
   @override
   ConsumerState<SeriesScreen> createState() => _SeriesScreenState();
 }
 
 class _SeriesScreenState extends ConsumerState<SeriesScreen> {
-  int? _season;
+  late int? _season = widget.episode?.season;
   final _scroll = ScrollController();
+  final _target = FocusNode(debugLabel: 'épisode demandé');
+  var _revealing = false;
+
+  /// Défile jusqu'à l'épisode demandé puis lui donne le focus. La liste est
+  /// paresseuse : tant qu'il n'est pas construit, on avance d'un écran et on
+  /// réessaie à l'image suivante.
+  void _reveal([int attempt = 0]) {
+    if (!mounted || attempt > 40) return;
+    final context = _target.context;
+    if (context != null) {
+      Scrollable.ensureVisible(context, alignment: 0.3);
+      _target.requestFocus();
+      return;
+    }
+    if (_scroll.hasClients) {
+      _scroll.jumpTo(
+        (_scroll.position.pixels + _scroll.position.viewportDimension).clamp(
+          0,
+          _scroll.position.maxScrollExtent,
+        ),
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(attempt + 1));
+  }
 
   @override
   void dispose() {
+    _target.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -69,6 +98,10 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         series.seasons.where((s) => s.number > 0).firstOrNull ??
         series.seasons.firstOrNull;
     final progress = ref.watch(libraryProvider.select((l) => l.progress));
+    if (widget.episode != null && !_revealing) {
+      _revealing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
     return CustomScrollView(
       controller: _scroll,
       slivers: [
@@ -121,6 +154,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                         poster: widget.item.poster,
                       );
                 return _EpisodeTile(
+                  focusNode: episode.id == widget.episode?.id ? _target : null,
                   episode: episode,
                   progress: item == null ? null : progress[item.key],
                   onPlay: item == null
@@ -143,12 +177,14 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
 
 class _EpisodeTile extends StatelessWidget {
   const _EpisodeTile({
+    this.focusNode,
     required this.episode,
     required this.progress,
     required this.onPlay,
     required this.onWatched,
   });
 
+  final FocusNode? focusNode;
   final Episode episode;
   final Progress? progress;
 
@@ -174,6 +210,7 @@ class _EpisodeTile extends StatelessWidget {
         children: [
           Expanded(
             child: InkWell(
+              focusNode: focusNode,
               onTap: onPlay,
               // Rayon de la carte, qui coupe ce qui dépasse.
               child: FocusRing(
