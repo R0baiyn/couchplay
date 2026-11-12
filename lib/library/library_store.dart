@@ -186,6 +186,13 @@ final class LibraryNotifier extends Notifier<Library> {
     return _set(library);
   }
 
+  /// Efface la progression d'une ligne de l'historique : reprise et marque
+  /// « vu » comprises.
+  Future<void> removeProgress(String key) => _set(state.withoutProgress(key));
+
+  /// « Effacer l'historique » : la progression entière, les favoris restent.
+  Future<void> clearHistory() => _set(state.withoutHistory());
+
   Future<void> _set(Library next) {
     state = next;
     return _store?.save(next) ?? Future.value();

@@ -331,4 +331,85 @@ void main() {
       expect(File('${file.path}.bak').readAsBytesSync(), bytes);
     });
   });
+
+  group('historique', () {
+    final base = const Library()
+        .withProgress(_progress(_movie, minutesLater: 1))
+        .withProgress(_progress(_episode('7', 1, 2), minutesLater: 3))
+        .withProgress(
+          _progress(_episode('8', 1, 3), hidden: true, minutesLater: 2),
+        )
+        .withProgress(
+          _progress(
+            const PlayItem.movie(id: '2', extension: 'mkv', name: 'Vu'),
+            position: 3000,
+            watched: true,
+          ),
+        );
+
+    test('tout y figure, du plus récent au plus ancien', () {
+      expect(base.history.map((p) => p.item.key), [
+        'episode:7',
+        'episode:8',
+        'movie:1',
+        'movie:2',
+      ]);
+      // « Continuer à regarder » ne garde ni le retiré ni le vu (episode:8, movie:2).
+      expect(base.continueWatching.map((p) => p.item.key), [
+        'episode:7',
+        'movie:1',
+      ]);
+    });
+
+    test('retirer une ligne efface sa progression, pas les autres', () {
+      final next = base.withoutProgress('movie:1');
+      expect(next.progress.keys, isNot(contains('movie:1')));
+      expect(next.progress, hasLength(3));
+    });
+
+    test("retirer un épisode change « Continuer » et l'épisode proposé", () {
+      final visible = base.withProgress(
+        _progress(_episode('8', 1, 3), minutesLater: 2),
+      );
+      expect(visible.continueWatching.map((p) => p.item.key), [
+        'episode:7',
+        'movie:1',
+      ]);
+      final next = visible.withoutProgress('episode:7');
+      // L'épisode regardé en dernier devient le précédent.
+      expect(next.continueWatching.map((p) => p.item.key), [
+        'episode:8',
+        'movie:1',
+      ]);
+    });
+
+    test('effacer vide la progression, les favoris restent', () {
+      final next = base
+          .withFavorite(Favorite(key: 'movie:1', name: 'Mirage', addedAt: _t0))
+          .withoutHistory();
+      expect(next.history, isEmpty);
+      expect(next.favorites.keys, ['movie:1']);
+    });
+
+    test("un library.json écrit avant se relit à l'identique", () {
+      final json = {
+        'version': 1,
+        'favorites': {
+          'movie:1': {'name': 'Mirage', 'addedAt': '2026-11-02T20:00:00.000Z'},
+        },
+        'progress': {
+          'movie:1': {
+            'name': 'Mirage',
+            'extension': 'mkv',
+            'position': 600,
+            'duration': 3000,
+            'watched': false,
+            'hidden': false,
+            'updatedAt': '2026-11-02T20:00:00.000Z',
+          },
+        },
+      };
+      expect(Library.fromJson(json).toJson(), json);
+    });
+  });
 }

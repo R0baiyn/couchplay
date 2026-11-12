@@ -279,6 +279,19 @@ final class Library {
     progress: {...progress, entry.item.key: entry},
   );
 
+  /// Sans la progression de [key] : plus de reprise, plus de marque « vu ».
+  Library withoutProgress(String key) =>
+      Library(favorites: favorites, progress: {...progress}..remove(key));
+
+  /// Historique vidé, favoris intacts.
+  Library withoutHistory() => Library(favorites: favorites);
+
+  /// Historique : tout ce qui a été lu, retirés de « Continuer à regarder »
+  /// et vus compris, du plus récent au plus ancien.
+  List<Progress> get history =>
+      progress.values.toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
   /// « Continuer à regarder », du plus récent au plus ancien : les films
   /// commencés (30 s ou plus) et pas finis, et une entrée par série, son
   /// épisode regardé en dernier quel que soit son numéro, même à peine

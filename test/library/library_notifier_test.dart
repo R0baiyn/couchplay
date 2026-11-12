@@ -134,4 +134,28 @@ void main() {
       {'episode:x', 'movie:1'},
     );
   });
+
+  test('retirer une ligne et effacer, conservés au redémarrage', () async {
+    final first = await container();
+    final library = first.read(libraryProvider.notifier);
+    await library.addFavorite(key: 'movie:1', name: 'Mirage');
+    for (final item in [episode('a', '45'), episode('b', '9')]) {
+      await library.saveProgress(
+        item,
+        position: const Duration(seconds: 600),
+        duration: const Duration(seconds: 3000),
+      );
+    }
+    await library.removeProgress('episode:a');
+    first.dispose();
+
+    final second = await container();
+    expect(second.read(libraryProvider).progress.keys, ['episode:b']);
+    await second.read(libraryProvider.notifier).clearHistory();
+    second.dispose();
+
+    final third = await container();
+    expect(third.read(libraryProvider).progress, isEmpty);
+    expect(third.read(libraryProvider).favorites.keys, ['movie:1']);
+  });
 }
