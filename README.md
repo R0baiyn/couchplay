@@ -12,6 +12,18 @@ flutter build windows
 flutter build apk
 ```
 
+## Linux
+
+Chaque release contient `couchplay-<version>-linux-x64.tar.gz`. Dépendances à l'exécution (Debian, Ubuntu) :
+
+```sh
+sudo apt-get install -y libgtk-3-0 libmpv2 libsecret-1-0 gnome-keyring
+```
+
+Un trousseau de clés (gnome-keyring, KWallet) doit tourner pour stocker les comptes. Extraire l'archive puis lancer `./couchplay` depuis le dossier extrait. La mise à jour n'est pas automatique : l'app signale la nouvelle version et ouvre la page de la release.
+
+Pour compiler : `sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev libsecret-1-dev`, puis `flutter build linux --release`.
+
 ## Essayer sans le vrai serveur
 
 `tools/faux-serveur.py` imite le serveur du fournisseur (Python 3.10+, sans dépendance) :
