@@ -875,8 +875,8 @@ void main() {
         return handled;
       }
 
-      // Le lecteur (ici un écran qui en tient lieu) ouvert depuis l'Accueil
-      // se ferme seul ; le retour suivant reste dans l'app.
+      // Le lecteur (ici un écran qui en tient lieu) ouvert depuis l'Accueil :
+      // un retour le ferme seul, sans armer la sortie.
       unawaited(
         Navigator.of(
           tester.element(find.byType(HomeShell)),
