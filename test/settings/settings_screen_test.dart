@@ -1,3 +1,4 @@
+import 'package:couchplay/settings/app_settings.dart';
 import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:flutter/material.dart';
@@ -16,5 +17,23 @@ void main() {
     await pumpSettings(tester);
     await tester.scrollUntilVisible(find.text('Version 0.1.0'), 100);
     expect(find.text('Version 0.1.0'), findsOneWidget);
+  });
+
+  testWidgets('l\'interrupteur « Mode debug » bascule le réglage', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+    final context = tester.element(find.byType(SettingsScreen));
+    final container = ProviderScope.containerOf(context);
+    expect(container.read(appSettingsProvider).debug, isFalse);
+
+    await tester.scrollUntilVisible(find.text('Mode debug'), 100);
+    await tester.tap(find.text('Mode debug'));
+    await tester.pump();
+    expect(container.read(appSettingsProvider).debug, isTrue);
+    expect(
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+      true,
+    );
   });
 }

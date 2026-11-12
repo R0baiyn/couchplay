@@ -13,6 +13,7 @@ import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
 import 'app.dart';
 import 'server/cloudflare_dns.dart';
+import 'settings/app_settings.dart';
 import 'television.dart';
 import 'update/android_installer.dart';
 import 'update/updater.dart';
@@ -38,6 +39,9 @@ Future<void> main() async {
       overrides: [
         accountStoreProvider.overrideWithValue(accounts),
         accountFilesProvider.overrideWithValue(files),
+        appSettingsFileProvider.overrideWithValue(
+          File('${support.path}${Platform.pathSeparator}settings.json'),
+        ),
         appVersionProvider.overrideWithValue(package.version),
         televisionProvider.overrideWithValue(television),
         if (installer != null)

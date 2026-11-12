@@ -7,6 +7,7 @@ import '../catalog/catalog_settings_screen.dart';
 import '../focus_ring.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
+import 'app_settings.dart';
 
 /// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
 /// réglages en bas de ce rail plutôt que dans l'en-tête de chaque onglet :
@@ -118,10 +119,27 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          const _DebugTile(),
           const Divider(),
           const _VersionTile(),
         ],
       ),
+    );
+  }
+}
+
+/// Interrupteur du mode debug : infos techniques dans le lecteur.
+class _DebugTile extends ConsumerWidget {
+  const _DebugTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.bug_report_outlined),
+      title: const FocusRing(child: Text('Mode debug')),
+      subtitle: const Text('Infos techniques dans le lecteur'),
+      value: ref.watch(appSettingsProvider.select((s) => s.debug)),
+      onChanged: ref.read(appSettingsProvider.notifier).setDebug,
     );
   }
 }
