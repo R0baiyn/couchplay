@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../focus_ring.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'catalog_settings.dart';
@@ -49,13 +50,13 @@ class CatalogSettingsScreen extends ConsumerWidget {
         children: [
           SwitchListTile(
             autofocus: true,
-            title: const Text('Afficher le contenu adulte'),
+            title: const FocusRing(child: Text('Afficher le contenu adulte')),
             value: filter.showAdult,
             onChanged: notifier.setShowAdult,
           ),
           const Divider(),
           ListTile(
-            title: const Text('Pays et langues affichés'),
+            title: const FocusRing(child: Text('Pays et langues affichés')),
             subtitle: Text(
               filter.tags.isEmpty
                   ? 'Aucun coché : tout est affiché.'
@@ -64,14 +65,14 @@ class CatalogSettingsScreen extends ConsumerWidget {
           ),
           for (final tag in tags)
             CheckboxListTile(
-              title: Text(_tagNames[tag] ?? tag),
+              title: FocusRing(child: Text(_tagNames[tag] ?? tag)),
               subtitle: _tagNames.containsKey(tag) ? Text(tag) : null,
               value: filter.tags.contains(tag),
               onChanged: (shown) => notifier.setTag(tag, shown: shown ?? false),
             ),
           const Divider(),
           ListTile(
-            title: const Text('Catégories une par une'),
+            title: const FocusRing(child: Text('Catégories une par une')),
             subtitle: const Text('Pour afficher ou masquer une catégorie'),
             trailing: filter.overrides.isEmpty
                 ? null
@@ -122,13 +123,13 @@ class _CategoryChoices extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final visible = filter.apply(kind, categories).length;
     return ExpansionTile(
-      title: Text(title),
+      title: FocusRing(child: Text(title)),
       subtitle: Text('$visible affichées sur ${categories.length}'),
       children: [
         for (final category in categories)
           CheckboxListTile(
             dense: true,
-            title: Text(category.name),
+            title: FocusRing(child: Text(category.name)),
             value: filter.isVisible(kind, category),
             onChanged: (shown) => ref
                 .read(catalogFilterProvider.notifier)

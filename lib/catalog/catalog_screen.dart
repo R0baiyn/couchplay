@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../focus_ring.dart';
 import '../search/search_index.dart';
 import '../server/models.dart';
 import '../settings/settings_screen.dart';
@@ -102,7 +103,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             return ListTile(
               autofocus: current,
               selected: current,
-              title: Text(category.name),
+              title: FocusRing(child: Text(category.name)),
               trailing: current ? const Icon(Icons.check) : null,
               onTap: () => Navigator.pop(context, category.id),
             );
@@ -278,7 +279,7 @@ class _CategoryList extends StatelessWidget {
         itemBuilder: (context, index) {
           final category = categories[index];
           return ListTile(
-            title: Text(category.name),
+            title: FocusRing(child: Text(category.name)),
             selected: category.id == selectedId,
             onTap: () => onSelect(category.id),
           );

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
 import '../catalog/versions.dart';
+import '../focus_ring.dart';
 import '../server/models.dart';
 import 'library_store.dart';
 
@@ -39,14 +40,17 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: SegmentedButton<ContentKind?>(
                 segments: const [
-                  ButtonSegment(value: null, label: Text('Tout')),
+                  ButtonSegment(
+                    value: null,
+                    label: FocusRing(child: Text('Tout')),
+                  ),
                   ButtonSegment(
                     value: ContentKind.movies,
-                    label: Text('Films'),
+                    label: FocusRing(child: Text('Films')),
                   ),
                   ButtonSegment(
                     value: ContentKind.series,
-                    label: Text('Séries'),
+                    label: FocusRing(child: Text('Séries')),
                   ),
                 ],
                 selected: {_kind},

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../catalog/status_views.dart';
+import '../focus_ring.dart';
 import '../format.dart';
 import '../server/models.dart';
 import 'account_store.dart';
@@ -81,7 +82,9 @@ class _Details extends StatelessWidget {
           children: [
             for (final (label, value) in rows)
               ListTile(
-                title: Text(label, style: theme.textTheme.labelLarge),
+                title: FocusRing(
+                  child: Text(label, style: theme.textTheme.labelLarge),
+                ),
                 subtitle: Text(value, style: theme.textTheme.bodyLarge),
               ),
           ],

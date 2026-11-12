@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../focus_ring.dart';
 import '../library/favorite_button.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
@@ -152,7 +153,7 @@ class _VersionPicker extends StatelessWidget {
         children: [
           for (final (index, version) in versions.indexed)
             ChoiceChip(
-              label: Text(labels[index]),
+              label: FocusRing(child: Text(labels[index])),
               selected: version.id == selected.id,
               onSelected: (_) => onSelect(version.id),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../focus_ring.dart';
 import 'account.dart';
 import 'account_store.dart';
 import 'login_screen.dart';
@@ -95,7 +96,7 @@ class AccountsScreen extends ConsumerWidget {
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                     ),
-                    title: Text(account.name),
+                    title: FocusRing(child: Text(account.name)),
                     subtitle: Text(account.host),
                     selected: account.id == state.activeId,
                     onTap: () => _write(

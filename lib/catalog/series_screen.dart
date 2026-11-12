@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../focus_ring.dart';
 import '../library/favorite_button.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
@@ -88,7 +89,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                   children: [
                     for (final s in series.seasons)
                       ChoiceChip(
-                        label: Text(s.name),
+                        label: FocusRing(child: Text(s.name)),
                         selected: s == season,
                         onSelected: (_) => setState(() => _season = s.number),
                       ),
@@ -172,74 +173,78 @@ class _EpisodeTile extends StatelessWidget {
           Expanded(
             child: InkWell(
               onTap: onPlay,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 12,
-                  children: [
-                    SizedBox(
-                      width: 160,
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              PosterImage(url: e.image, icon: Icons.tv),
-                              // Commencé : où on en est, en bas de la vignette.
-                              if (!watched && fraction > 0)
-                                Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: LinearProgressIndicator(
-                                    value: fraction,
+              // Rayon de la carte, qui coupe ce qui dépasse.
+              child: FocusRing(
+                radius: 12,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 12,
+                    children: [
+                      SizedBox(
+                        width: 160,
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                PosterImage(url: e.image, icon: Icons.tv),
+                                // Commencé : où on en est, en bas de la vignette.
+                                if (!watched && fraction > 0)
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: LinearProgressIndicator(
+                                      value: fraction,
+                                    ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        spacing: 4,
-                        children: [
-                          Row(
-                            spacing: 6,
-                            children: [
-                              if (watched)
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 18,
-                                  semanticLabel: 'Vu',
-                                  color: theme.colorScheme.primary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: 4,
+                          children: [
+                            Row(
+                              spacing: 6,
+                              children: [
+                                if (watched)
+                                  Icon(
+                                    Icons.check_circle,
+                                    size: 18,
+                                    semanticLabel: 'Vu',
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    '${e.number}. ${e.title}',
+                                    style: theme.textTheme.titleSmall,
+                                  ),
                                 ),
-                              Expanded(
-                                child: Text(
-                                  '${e.number}. ${e.title}',
-                                  style: theme.textTheme.titleSmall,
-                                ),
+                              ],
+                            ),
+                            if (minutes != null && minutes > 0)
+                              Text(
+                                '$minutes min',
+                                style: theme.textTheme.bodySmall,
                               ),
-                            ],
-                          ),
-                          if (minutes != null && minutes > 0)
-                            Text(
-                              '$minutes min',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          if (e.plot case final plot?)
-                            Text(
-                              plot,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                        ],
+                            if (e.plot case final plot?)
+                              Text(
+                                plot,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -253,8 +258,10 @@ class _EpisodeTile extends StatelessWidget {
               itemBuilder: (_) => [
                 PopupMenuItem(
                   value: !watched,
-                  child: Text(
-                    watched ? 'Marquer comme non vu' : 'Marquer comme vu',
+                  child: FocusRing(
+                    child: Text(
+                      watched ? 'Marquer comme non vu' : 'Marquer comme vu',
+                    ),
                   ),
                 ),
               ],

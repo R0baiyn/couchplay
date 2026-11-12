@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../accounts/account_status_screen.dart';
 import '../accounts/accounts_screen.dart';
 import '../catalog/catalog_settings_screen.dart';
+import '../focus_ring.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
 
@@ -52,10 +53,13 @@ class SettingsButton extends StatelessWidget {
             InkWell(
               onTap: () => _open(context),
               customBorder: const StadiumBorder(),
-              child: SizedBox(
-                width: 56,
-                height: 32,
-                child: Icon(Icons.settings_outlined, color: color),
+              child: FocusRing(
+                radius: 16,
+                child: SizedBox(
+                  width: 56,
+                  height: 32,
+                  child: Icon(Icons.settings_outlined, color: color),
+                ),
               ),
             ),
             Text(
@@ -82,7 +86,7 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             autofocus: true,
             leading: const Icon(Icons.manage_accounts),
-            title: const Text('Comptes'),
+            title: const FocusRing(child: Text('Comptes')),
             subtitle: const Text('Ajouter, modifier ou changer de compte'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
@@ -92,7 +96,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.verified_user_outlined),
-            title: const Text('Abonnement'),
+            title: const FocusRing(child: Text('Abonnement')),
             subtitle: const Text('Statut, expiration, connexions'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
@@ -104,7 +108,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.filter_list),
-            title: const Text('Catalogue'),
+            title: const FocusRing(child: Text('Catalogue')),
             subtitle: const Text('Pays affichés, contenu adulte, catégories'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
@@ -163,7 +167,7 @@ class _VersionTileState extends ConsumerState<_VersionTile> {
     final updater = ref.watch(updaterProvider);
     return ListTile(
       leading: const Icon(Icons.info_outline),
-      title: Text('Version $version'),
+      title: FocusRing(child: Text('Version $version')),
       subtitle: updater == null
           ? null
           : const Text('Rechercher des mises à jour'),

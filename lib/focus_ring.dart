@@ -66,7 +66,11 @@ class _FocusRingState extends State<FocusRing> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final node = Focus.maybeOf(context);
+    // Une zone (écran, rail) n'est pas un élément : pas d'anneau autour.
+    final node = switch (Focus.maybeOf(context)) {
+      FocusScopeNode() => null,
+      final node => node,
+    };
     if (node == _node) return;
     _node?.removeListener(_update);
     _node = node?..addListener(_update);
