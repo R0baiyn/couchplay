@@ -1,7 +1,7 @@
 name: release
 
 # Un tag v* publie la release : Windows (zip portable et installateur) et
-# Android (un APK par architecture). Lancé à la main, il construit tout sans
+# Android (un APK par architecture) et Linux (archive tar.gz). Lancé à la main, il construit tout sans
 # rien publier ; les fichiers restent un jour dans les artefacts du run.
 on:
   push:
@@ -163,8 +163,47 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.8
+          channel: stable
+          cache: true
+
+      - name: Dépendances de compilation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev libsecret-1-dev
+
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build linux --release
+
+      # Archive faite depuis le dossier bundle : le binaire garde son droit
+      # d'exécution. Le nom finit par -linux-x64.tar.gz : l'avis de mise à
+      # jour de l'app le cherche.
+      - name: Archive
+        run: |
+          mkdir dist
+          tar -czf "dist/couchplay-$VERSION-linux-x64.tar.gz" -C build/linux/x64/release/bundle .
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
   release:
-    needs: [windows, android]
+    needs: [windows, android, linux]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
