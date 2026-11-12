@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../focus_ring.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../search/search_index.dart';
@@ -119,9 +120,9 @@ class _EntryTile extends ConsumerWidget {
   }
 }
 
-/// Une affiche et son titre ; un cadre net quand elle a le focus (clavier,
-/// télécommande).
-class PosterTile extends StatefulWidget {
+/// Une affiche et son titre ; l'anneau autour de l'affiche quand elle a le
+/// focus (clavier, télécommande).
+class PosterTile extends StatelessWidget {
   const PosterTile({
     super.key,
     required this.title,
@@ -147,87 +148,76 @@ class PosterTile extends StatefulWidget {
   final bool favorite;
   final bool watched;
 
-  @override
-  State<PosterTile> createState() => _PosterTileState();
-}
-
-class _PosterTileState extends State<PosterTile> {
-  /// Cadre de focus autour de l'affiche, transparent sans focus.
-  static const _border = 3.0;
+  /// Place de l'anneau autour de l'affiche, vide sans focus.
+  static final _border = focusRing.width;
 
   /// Marge autour du titre.
   static const _titleMargin = 8.0;
 
-  var _focused = false;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final progress = widget.progress;
+    final progress = this.progress;
     return InkWell(
-      onTap: widget.onTap,
-      onLongPress: widget.onMenu,
-      onSecondaryTap: widget.onMenu,
-      onFocusChange: (focused) => setState(() => _focused = focused),
+      onTap: onTap,
+      onLongPress: onMenu,
+      onSecondaryTap: onMenu,
       borderRadius: BorderRadius.circular(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AspectRatio(
             aspectRatio: 2 / 3,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _focused
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
-                  width: _border,
+            child: FocusRing(
+              hug: true,
+              child: Padding(
+                padding: EdgeInsets.all(_border),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: progress == null && !favorite && !watched
+                      ? PosterImage(url: imageUrl, deferred: true)
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            PosterImage(url: imageUrl, deferred: true),
+                            if (progress != null)
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: LinearProgressIndicator(value: progress),
+                              ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Row(
+                                spacing: 4,
+                                children: [
+                                  if (watched)
+                                    const _Badge(Icons.check, 'Déjà vu'),
+                                  if (favorite)
+                                    const _Badge(
+                                      Icons.favorite,
+                                      'Dans ma liste',
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: progress == null && !widget.favorite && !widget.watched
-                    ? PosterImage(url: widget.imageUrl, deferred: true)
-                    : Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          PosterImage(url: widget.imageUrl, deferred: true),
-                          if (progress != null)
-                            Align(
-                              alignment: Alignment.bottomCenter,
-                              child: LinearProgressIndicator(value: progress),
-                            ),
-                          Positioned(
-                            top: 6,
-                            right: 6,
-                            child: Row(
-                              spacing: 4,
-                              children: [
-                                if (widget.watched)
-                                  const _Badge(Icons.check, 'Déjà vu'),
-                                if (widget.favorite)
-                                  const _Badge(Icons.favorite, 'Dans ma liste'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
               ),
             ),
           ),
           // Même écart entre l'image et le titre qu'entre le titre et le bas
-          // de la case : le cadre transparent compte déjà pour une part.
+          // de la case : la place de l'anneau compte déjà pour une part.
           Padding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               _titleMargin,
               _titleMargin - _border,
               _titleMargin,
               _titleMargin,
             ),
             child: Text(
-              widget.title,
+              title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall,
