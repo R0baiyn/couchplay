@@ -66,6 +66,17 @@ class HistoryScreen extends ConsumerWidget {
   }
 }
 
+/// De quoi ouvrir la fiche : celle du film, ou celle de la série pour un
+/// épisode. Elle recharge le reste depuis le serveur.
+CatalogEntry historyEntry(PlayItem item) => CatalogEntry([
+  CatalogItem(
+    kind: item.isEpisode ? ContentKind.series : ContentKind.movies,
+    id: item.seriesId ?? item.id,
+    name: item.name,
+    poster: item.poster,
+  ),
+]);
+
 class _HistoryRow extends ConsumerWidget {
   const _HistoryRow(this.entry, {super.key});
 
@@ -78,37 +89,36 @@ class _HistoryRow extends ConsumerWidget {
         ? 'Vu'
         : '${formatTime(entry.position)}'
               '${entry.duration > Duration.zero ? ' / ${formatTime(entry.duration)}' : ''}';
-    return ListTile(
-      title: FocusRing(
-        child: Text(
-          item.isEpisode
-              ? '${item.name} · S${item.season}E${item.episode}'
-              : item.name,
-        ),
-      ),
-      subtitle: Text(
-        '${item.episodeTitle == null ? '' : '${item.episodeTitle} · '}'
-        '${formatDate(entry.updatedAt)} · $state',
-      ),
-      // La fiche : celle du film, ou celle de la série pour un épisode. Elle
-      // recharge le reste depuis le serveur.
-      onTap: () => openDetails(
-        context,
-        CatalogEntry([
-          CatalogItem(
-            kind: item.isEpisode ? ContentKind.series : ContentKind.movies,
-            id: item.seriesId ?? item.id,
-            name: item.name,
-            poster: item.poster,
+    // La ✕ à côté de la ligne et non en `trailing` : dedans, elle serait
+    // dans le rectangle de la ligne, et → ne la trouverait pas (télécommande).
+    return Row(
+      children: [
+        Expanded(
+          child: ListTile(
+            title: FocusRing(
+              child: Text(
+                item.isEpisode
+                    ? '${item.name} · S${item.season}E${item.episode}'
+                    : item.name,
+              ),
+            ),
+            subtitle: Text(
+              '${item.episodeTitle == null ? '' : '${item.episodeTitle} · '}'
+              '${formatDate(entry.updatedAt)} · $state',
+            ),
+            // La fiche : celle du film, ou celle de la série pour un épisode. Elle
+            // recharge le reste depuis le serveur.
+            onTap: () => openDetails(context, historyEntry(item)),
           ),
-        ]),
-      ),
-      trailing: IconButton(
-        tooltip: 'Retirer de l\'historique',
-        icon: const Icon(Icons.close),
-        onPressed: () =>
-            ref.read(libraryProvider.notifier).removeProgress(item.key),
-      ),
+        ),
+        IconButton(
+          tooltip: 'Retirer de l\'historique',
+          icon: const Icon(Icons.close),
+          onPressed: () =>
+              ref.read(libraryProvider.notifier).removeProgress(item.key),
+        ),
+        const SizedBox(width: 8),
+      ],
     );
   }
 }
