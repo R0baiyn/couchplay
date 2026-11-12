@@ -28,6 +28,8 @@ import '../format.dart';
 ///   agissent dès le premier appui.
 /// - Touches média, où que soit le focus : ⏪ ⏩ (±10 s), lecture, pause,
 ///   lecture/pause.
+/// - Barre de progression avec le focus : ← → (±10 s) ; maintenue, le pas
+///   passe à 30 s puis à 60 s.
 class PlayerControls extends StatefulWidget {
   const PlayerControls({
     super.key,
@@ -434,10 +436,59 @@ class _ProgressBarState extends State<_ProgressBar> {
   double? _held;
   Timer? _release;
 
+  // ← → avec le focus : 10 s par appui ; maintenue, la touche se répète et
+  // le pas grandit. Seuils comptés en répétitions (≈ 20 par seconde sous
+  // Android, ≈ 30 sous Windows), car les tests n'ont pas d'horloge.
+  static const _keyStep = 10;
+  static const _fasterAfterRepeats = 10;
+  static const _fasterStep = 30;
+  static const _fastestAfterRepeats = 30;
+  static const _fastestStep = 60;
+
+  // Reçoit ← → avant les raccourcis du Slider (5 % du film par appui).
+  late final _focus = FocusNode(debugLabel: 'progression', onKeyEvent: _onKey);
+  var _repeats = 0;
+
   @override
   void dispose() {
     _release?.cancel();
+    _focus.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    final sign = key == LogicalKeyboardKey.arrowLeft
+        ? -1
+        : key == LogicalKeyboardKey.arrowRight
+        ? 1
+        : 0;
+    final state = widget.player.state;
+    final max = state.duration.inSeconds;
+    if (sign == 0 || event is KeyUpEvent || max <= 0) {
+      return KeyEventResult.ignored;
+    }
+    _repeats = event is KeyRepeatEvent ? _repeats + 1 : 0;
+    final step = _repeats >= _fastestAfterRepeats
+        ? _fastestStep
+        : _repeats >= _fasterAfterRepeats
+        ? _fasterStep
+        : _keyStep;
+    // Depuis la position visée, pas celle de la vidéo, en retard pendant un
+    // maintien.
+    final from = _held ?? state.position.inSeconds.toDouble();
+    _seekTo((from + sign * step).clamp(0, max).toDouble());
+    return KeyEventResult.handled;
+  }
+
+  void _seekTo(double seconds) {
+    widget.player.seek(Duration(seconds: seconds.round()));
+    _release?.cancel();
+    setState(() => _held = seconds);
+    _release = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _held = null);
+    });
+    widget.onSeek();
   }
 
   @override
@@ -459,6 +510,7 @@ class _ProgressBarState extends State<_ProgressBar> {
                 Text(formatTime(Duration(seconds: current.round()))),
                 Expanded(
                   child: Slider(
+                    focusNode: _focus,
                     value: max > 0 ? current.clamp(0, max) : 0,
                     max: max > 0 ? max : 1,
                     onChanged: max > 0
@@ -468,12 +520,7 @@ class _ProgressBarState extends State<_ProgressBar> {
                             widget.onSeek();
                           }
                         : null,
-                    onChangeEnd: (value) {
-                      player.seek(Duration(seconds: value.round()));
-                      _release = Timer(const Duration(milliseconds: 800), () {
-                        if (mounted) setState(() => _held = null);
-                      });
-                    },
+                    onChangeEnd: _seekTo,
                   ),
                 ),
                 Text(formatTime(Duration(seconds: max.round()))),

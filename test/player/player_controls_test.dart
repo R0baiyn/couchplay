@@ -142,6 +142,55 @@ void main() {
     expect(player.seeks, [const Duration(seconds: 10)]);
   });
 
+  /// Met le focus sur la barre de progression, par le bouton « Avancer ».
+  Future<void> focusProgress(WidgetTester tester) async {
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<Slider>(),
+      isNotNull,
+    );
+  }
+
+  testWidgets('barre de progression : un appui = 10 s', (tester) async {
+    await pumpControls(tester);
+    await focusProgress(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    expect(player.seeks, const [
+      Duration(seconds: 10),
+      Duration(seconds: 20),
+      Duration(seconds: 10),
+    ]);
+  });
+
+  testWidgets('barre de progression : maintenue, le pas grandit', (
+    tester,
+  ) async {
+    await pumpControls(tester);
+    await focusProgress(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+    for (var i = 0; i < 60; i++) {
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+
+    final steps = [
+      for (var i = 0; i < player.seeks.length; i++)
+        (player.seeks[i] - (i == 0 ? Duration.zero : player.seeks[i - 1]))
+            .inSeconds,
+    ];
+    expect(steps, hasLength(61));
+    // Jamais en arrière, et 10 s, puis 30 s, puis 60 s.
+    expect(steps.toSet().toList(), [10, 30, 60]);
+    expect(steps.first, 10);
+    expect(steps.last, 60);
+  });
+
   testWidgets('télécommande : ↑ ↓ traversent la barre de progression', (
     tester,
   ) async {
