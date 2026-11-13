@@ -92,7 +92,19 @@ void main() {
 
     test('un contenu corrompu donne une liste vide, sans planter', () async {
       FlutterSecureStorage.setMockInitialValues({'accounts': '{pas du json'});
-      expect((await AccountStore.open()).current.accounts, isEmpty);
+      final store = await AccountStore.open();
+      expect(store.current.accounts, isEmpty);
+      expect(store.unreadable, isTrue);
+    });
+
+    test('lecture impossible : marquée illisible, sans planter', () async {
+      final store = await AccountStore.open(_FailingStorage());
+      expect(store.current.accounts, isEmpty);
+      expect(store.unreadable, isTrue);
+    });
+
+    test('sans données ou lues : pas illisible', () async {
+      expect((await AccountStore.open()).unreadable, isFalse);
     });
   });
 
@@ -181,4 +193,18 @@ void main() {
       expect(files.of('orphelin').existsSync(), isFalse);
     },
   );
+}
+
+/// Stockage dont la lecture échoue (déchiffrement, keystore passager).
+final class _FailingStorage extends FlutterSecureStorage {
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) => Future.error(const FileSystemException('déchiffrement'));
 }

@@ -77,7 +77,7 @@ final class AccountsState {
 /// Un seul enregistrement contient tous les comptes et le compte actif : une
 /// écriture les change ensemble, sans état intermédiaire incohérent.
 final class AccountStore {
-  AccountStore._(this._storage, this._current);
+  AccountStore._(this._storage, this._current, {this.unreadable = false});
 
   static const _key = 'accounts';
 
@@ -88,21 +88,27 @@ final class AccountStore {
   /// Dernier état enregistré (ou lu à l'ouverture, avant le premier rendu).
   AccountsState get current => _current;
 
+  /// Vrai si l'enregistrement existait mais n'a pas pu être lu : l'état sans
+  /// compte ne dit alors rien des dossiers de données, qu'il faut garder.
+  final bool unreadable;
+
   static Future<AccountStore> open([
     FlutterSecureStorage storage = const FlutterSecureStorage(),
   ]) async {
-    var state = const AccountsState();
     try {
       final raw = await storage.read(key: _key);
-      if (raw != null) state = AccountsState.fromJson(jsonDecode(raw));
+      final state = raw == null
+          ? const AccountsState()
+          : AccountsState.fromJson(jsonDecode(raw));
+      return AccountStore._(storage, state);
     } on Exception catch (e) {
       // JSON corrompu, ou déchiffrement impossible (profil copié sur une
       // autre machine) : on repart sans compte plutôt que de planter. La
       // prochaine écriture remplace l'enregistrement illisible.
       // Le contenu n'est jamais loggé : il porte les mots de passe.
       log('Comptes illisibles, ignorés', error: e.runtimeType);
+      return AccountStore._(storage, const AccountsState(), unreadable: true);
     }
-    return AccountStore._(storage, state);
   }
 
   Future<void> save(AccountsState state) async {
