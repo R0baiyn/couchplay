@@ -10,14 +10,24 @@ import 'doh_root.dart';
 /// d'accès, qui peut bloquer ou détourner certains noms. Pas de repli sur le
 /// DNS du système : si Cloudflare ne répond pas, la connexion échoue.
 final class CloudflareDns {
-  CloudflareDns({Future<String> Function(String server, String host)? query})
-    : _query = query ?? https;
+  CloudflareDns({
+    Future<String> Function(String server, String host)? query,
+    DateTime Function()? now,
+  }) : _query = query ?? https,
+       _now = now ?? DateTime.now;
 
   static const _servers = ['1.1.1.1', '1.0.0.1'];
   static const _service = 'cloudflare-dns.com';
 
   final Future<String> Function(String server, String host) _query;
-  final _cache = <String, ({InternetAddress address, DateTime until})>{};
+  final DateTime Function() _now;
+
+  /// Adresse de chaque nom ; `null` : échec récent, gardé [_failureDelay]
+  /// pour qu'un hôte mort ne coûte pas deux requêtes par affiche.
+  final _cache = <String, ({InternetAddress? address, DateTime until})>{};
+
+  /// Court : un réseau revenu doit resservir vite.
+  static const _failureDelay = Duration(seconds: 10);
   final _pending = <String, Future<InternetAddress>>{};
 
   /// Adresse IPv4 de [host]. Une adresse IP est rendue telle quelle.
@@ -27,8 +37,11 @@ final class CloudflareDns {
     }
     if (host == 'localhost') return Future.value(InternetAddress.loopbackIPv4);
     final cached = _cache[host];
-    if (cached != null && DateTime.now().isBefore(cached.until)) {
-      return Future.value(cached.address);
+    if (cached != null && _now().isBefore(cached.until)) {
+      return switch (cached.address) {
+        final address? => Future.value(address),
+        null => Future.error(_notFound(host)),
+      };
     }
     // Plusieurs connexions simultanées : une seule requête.
     // Accolades : rendre la valeur retirée ferait attendre la requête par
@@ -44,15 +57,19 @@ final class CloudflareDns {
         final (address, ttl) = parseAnswer(await _query(server, host));
         _cache[host] = (
           address: address,
-          until: DateTime.now().add(Duration(seconds: ttl.clamp(60, 3600))),
+          until: _now().add(Duration(seconds: ttl.clamp(60, 3600))),
         );
         return address;
       } on Exception catch (e) {
         log('DNS Cloudflare $server : $host', error: e.runtimeType);
       }
     }
-    throw SocketException('Nom introuvable par Cloudflare : $host');
+    _cache[host] = (address: null, until: _now().add(_failureDelay));
+    throw _notFound(host);
   }
+
+  static SocketException _notFound(String host) =>
+      SocketException('Nom introuvable par Cloudflare : $host');
 
   /// Première adresse IPv4 d'une réponse JSON de Cloudflare, et sa durée de
   /// validité en secondes. Les alias (CNAME) qui la précèdent sont sautés.

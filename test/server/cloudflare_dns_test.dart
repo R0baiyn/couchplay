@@ -77,18 +77,61 @@ void main() {
     expect(asked, 1);
   });
 
-  test("un échec n'est pas gardé : la demande suivante repart", () async {
+  test('un échec est gardé 10 s : un hôte mort ne coûte pas une requête '
+      'par affiche', () async {
+    var now = DateTime(2026);
     var asked = 0;
     final dns = CloudflareDns(
+      now: () => now,
       query: (_, _) async {
         asked++;
         throw const SocketException('hors ligne');
       },
     );
+    for (var i = 0; i < 10; i++) {
+      await expectLater(dns.lookup('a.com'), throwsA(isA<SocketException>()));
+    }
+    // Deux serveurs essayés, une seule fois.
+    expect(asked, 2);
+    now = now.add(const Duration(seconds: 11));
     await expectLater(dns.lookup('a.com'), throwsA(isA<SocketException>()));
-    await expectLater(dns.lookup('a.com'), throwsA(isA<SocketException>()));
-    // Deux serveurs essayés par demande.
     expect(asked, 4);
+  });
+
+  test('durée du cache : TTL borné entre 60 s et 1 h', () async {
+    var now = DateTime(2026);
+    final ttl = {'court.com': 5, 'long.com': 999999};
+    final asked = <String>[];
+    final dns = CloudflareDns(
+      now: () => now,
+      query: (_, host) async {
+        asked.add(host);
+        return _answer([
+          {'type': 1, 'TTL': ttl[host]!, 'data': '203.0.113.7'},
+        ]);
+      },
+    );
+    Future<void> both() async {
+      await dns.lookup('court.com');
+      await dns.lookup('long.com');
+    }
+
+    await both();
+    now = now.add(const Duration(seconds: 59));
+    await both();
+    expect(asked, ['court.com', 'long.com']);
+    now = now.add(const Duration(seconds: 2));
+    await both();
+    expect(asked, ['court.com', 'long.com', 'court.com']);
+    now = now.add(const Duration(hours: 1));
+    await both();
+    expect(asked, [
+      'court.com',
+      'long.com',
+      'court.com',
+      'court.com',
+      'long.com',
+    ]);
   });
 
   group('resolveForPlayer', () {
