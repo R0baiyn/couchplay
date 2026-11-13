@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../accounts/account_store.dart';
 import '../accounts/server_session.dart';
 import '../catalog/catalog_providers.dart';
+import '../catalog/status_views.dart';
 import '../format.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
@@ -430,7 +431,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           if (error != null)
             CallbackShortcuts(
               bindings: _escape,
-              child: _ErrorPanel(message: error, onRetry: _open, onExit: _exit),
+              // Texte blanc sur le fond noir du lecteur.
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(color: Colors.white),
+                child: ErrorView(message: error, onRetry: _open, onExit: _exit),
+              ),
             )
           else ...[
             PlayerControls(
@@ -469,50 +474,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _ErrorPanel extends StatelessWidget {
-  const _ErrorPanel({
-    required this.message,
-    required this.onRetry,
-    required this.onExit,
-  });
-
-  final String message;
-  final VoidCallback onRetry;
-  final VoidCallback onExit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 16,
-          children: [
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 12,
-              children: [
-                OutlinedButton(onPressed: onExit, child: const Text('Retour')),
-                FilledButton(
-                  autofocus: true,
-                  onPressed: onRetry,
-                  child: const Text('Réessayer'),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -3,19 +3,34 @@ import 'package:flutter/material.dart';
 import '../format.dart';
 import '../server/server_client.dart';
 
-/// Message d'erreur et bouton « Réessayer ».
+/// Message d'erreur, bouton « Réessayer » et, avec [onExit], « Retour ».
 ///
 /// Seuls les messages du client serveur s'affichent : une autre erreur
-/// pourrait contenir une URL avec identifiants.
+/// pourrait contenir une URL avec identifiants. [message], s'il est donné,
+/// remplace celui de [error].
 class ErrorView extends StatelessWidget {
-  const ErrorView({super.key, required this.error, required this.onRetry});
+  const ErrorView({
+    super.key,
+    this.error,
+    this.message,
+    required this.onRetry,
+    this.onExit,
+  });
 
-  final Object error;
+  final Object? error;
+  final String? message;
   final VoidCallback onRetry;
+  final VoidCallback? onExit;
 
   @override
   Widget build(BuildContext context) {
     final error = this.error;
+    final onExit = this.onExit;
+    final retry = FilledButton(
+      autofocus: true,
+      onPressed: onRetry,
+      child: const Text('Réessayer'),
+    );
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -24,14 +39,26 @@ class ErrorView extends StatelessWidget {
           spacing: 16,
           children: [
             Text(
-              error is ServerException ? error.message : 'Erreur inattendue',
+              message ??
+                  (error is ServerException
+                      ? error.message
+                      : 'Erreur inattendue'),
               textAlign: TextAlign.center,
             ),
-            FilledButton(
-              autofocus: true,
-              onPressed: onRetry,
-              child: const Text('Réessayer'),
-            ),
+            if (onExit == null)
+              retry
+            else
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 12,
+                children: [
+                  OutlinedButton(
+                    onPressed: onExit,
+                    child: const Text('Retour'),
+                  ),
+                  retry,
+                ],
+              ),
           ],
         ),
       ),
