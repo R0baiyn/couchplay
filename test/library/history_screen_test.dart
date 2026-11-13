@@ -58,9 +58,13 @@ void main() {
             duration: const Duration(minutes: 90),
           ),
         );
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 20)),
-        );
+        // Attend que l'horloge ait avancé : l'ordre repose sur `updatedAt`.
+        final saved = DateTime.now();
+        await tester.runAsync(() async {
+          while (!DateTime.now().isAfter(saved)) {
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+          }
+        });
       }
 
       await tester.pumpWidget(

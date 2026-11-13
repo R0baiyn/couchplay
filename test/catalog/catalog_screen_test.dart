@@ -124,7 +124,8 @@ void main() {
     bool loading() => ContentKind.values.any(
       (kind) => container.read(catalogIndexProvider(kind)).isLoading,
     );
-    for (var i = 0; i < 100 && loading(); i++) {
+    for (var i = 0; loading(); i++) {
+      if (i == 100) fail('le catalogue ne se charge pas');
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 30)),
       );
@@ -1253,8 +1254,9 @@ void main() {
     expect(find.byType(MovieScreen), findsNothing);
     expect(rail().selectedIndex, 1);
 
-    // Puis l'onglet Films ramène à l'Accueil, sans quitter.
-    expect(await back(), isTrue);
+    // Retour de l'onglet vers l'Accueil : déjà vérifié par le test du focus TV.
+    await tester.tap(find.text('Accueil'));
+    await settle(tester);
     expect(rail().selectedIndex, 0);
 
     // À l'Accueil, retour quitte l'app (le système reprend la main).

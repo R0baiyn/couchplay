@@ -4,6 +4,7 @@ import 'package:couchplay/logging.dart';
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,7 +12,7 @@ import '../support/fake_server.dart';
 
 // Avec & et # : ils doivent être encodés dans l'URL.
 const _user = 'jean dupont';
-const _pass = 'p&ss#1';
+const _pass = 'p&s#1';
 
 ServerClient _client(HttpClientAdapter adapter) => ServerClient(
   host: 'http://example.com:80',
@@ -153,33 +154,31 @@ void main() {
     });
   });
 
-  test(
-    'requêtes espacées d\'au moins 250 ms, la première sans attente',
-    () async {
-      final starts = <DateTime>[];
+  test("requêtes espacées d'au moins 250 ms, la première sans attente", () {
+    // Minuteries factices : l'attente ne dépend plus de la minuterie Windows.
+    fakeAsync((async) {
+      final starts = <Duration>[];
       final adapter = FakeAdapter((_) async {
-        starts.add(DateTime.now());
+        starts.add(async.elapsed);
         return ResponseBody.fromString(
           '{"user_info":{"auth":1,"status":"Active"}}',
           200,
         );
       });
       final client = _client(adapter);
-      final first = DateTime.now();
-      await Future.wait([for (var i = 0; i < 3; i++) client.accountInfo()]);
+      Future.wait([for (var i = 0; i < 3; i++) client.accountInfo()]);
+      async.elapse(const Duration(seconds: 2));
 
-      expect(
-        starts.first.difference(first),
-        lessThan(ServerClient.minInterval),
-      );
+      expect(starts, hasLength(3));
+      expect(starts.first, Duration.zero);
       for (var i = 1; i < starts.length; i++) {
         expect(
-          starts[i].difference(starts[i - 1]),
+          starts[i] - starts[i - 1],
           greaterThanOrEqualTo(const Duration(milliseconds: 240)),
         );
       }
-    },
-  );
+    });
+  });
 
   test('403 : accès refusé, pas identifiants refusés', () async {
     await expectLater(
@@ -220,11 +219,11 @@ void main() {
       final client = _client(FakeAdapter.replying(''));
       expect(
         client.streamUri(ContentKind.movies, '144015', 'mkv').toString(),
-        'http://example.com/movie/jean%20dupont/p%26ss%231/144015.mkv', // pre-push:allow : valeur de test fictive
+        'http://example.com/movie/jean%20dupont/p%26s%231/144015.mkv', // pre-push:allow : valeur de test fictive
       );
       expect(
         client.streamUri(ContentKind.series, '6912', 'mkv').path,
-        '/series/jean%20dupont/p%26ss%231/6912.mkv', // pre-push:allow : valeur de test fictive
+        '/series/jean%20dupont/p%26s%231/6912.mkv', // pre-push:allow : valeur de test fictive
       );
     });
 

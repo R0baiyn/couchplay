@@ -288,6 +288,7 @@ void main() {
       for (var i = 0; i < 250 && subject.progress.value == 0; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
+      expect(subject.progress.value, greaterThan(0));
       subject.cancel();
       await expectLater(
         done,

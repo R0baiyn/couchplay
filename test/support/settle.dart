@@ -19,4 +19,5 @@ Future<void> settle(WidgetTester tester) async {
         .evaluate();
     if (i > 2 && loading.isEmpty && !tester.binding.hasScheduledFrame) return;
   }
+  fail('settle : le chargement ne se termine pas');
 }

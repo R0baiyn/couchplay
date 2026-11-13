@@ -16,6 +16,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_server.dart';
+import '../support/settle.dart';
 
 void main() {
   late FakeAdapter server;
@@ -220,12 +221,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Se connecter'));
-      for (var i = 0; i < 5; i++) {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 20)),
-        );
-        await tester.pump(const Duration(milliseconds: 50));
-      }
+      await settle(tester);
       final active = container.read(activeAccountProvider)!;
       expect(active.name, 'Salon');
       expect(active.username, 'moi');
