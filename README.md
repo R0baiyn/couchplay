@@ -1,10 +1,19 @@
 # CouchPlay
 
-Lecteur vidéo personnel pour Windows et Android, écrit en Flutter.
+Lecteur vidéo personnel pour Windows, Android et Android TV, écrit en Flutter.
+
+## Installer
+
+Télécharger la dernière version dans les [Releases](https://github.com/R0baiyn/couchplay/releases) :
+
+- Windows : `couchplay-<version>-windows-setup.exe` (installateur) ou `couchplay-<version>-windows-portable.zip` (sans installation) ;
+- Android et Android TV : `couchplay-<version>-android-arm64.apk` pour la plupart des appareils, `couchplay-<version>-android-armv7.apk` pour les plus anciens.
+
+Ensuite l'app se met à jour seule : elle propose chaque nouvelle version au démarrage.
 
 ## Compiler
 
-Prérequis : Flutter stable, Visual Studio Build Tools avec la charge « Développement desktop en C++ » (Windows), SDK Android avec le NDK (Android).
+Prérequis : Flutter 3.47.8 (stable), Visual Studio Build Tools avec la charge « Développement desktop en C++ » (Windows), SDK Android avec le NDK (Android).
 
 ```sh
 flutter pub get
