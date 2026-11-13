@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../format.dart';
+import '../logging.dart';
 import 'tech_info.dart';
 
 /// Contrôles du lecteur, par-dessus la vidéo.
@@ -556,20 +557,25 @@ class _VolumeButtonState extends State<_VolumeButton> {
 /// Ajoute à la lecture en cours les sous-titres d'un fichier choisi par
 /// l'utilisateur (.srt, .ass, .vtt…). Le texte est passé à mpv plutôt que
 /// le chemin : sous Android, le fichier choisi n'a pas toujours de chemin.
+/// Un échec (sélecteur, lecture, mpv) est seulement journalisé.
 Future<void> loadSubtitleFile(Player player) async {
-  final file = (await FilePicker.pickFiles(
-    dialogTitle: 'Fichier de sous-titres',
-  )).firstOrNull;
-  if (file == null) return;
-  final bytes = await file.xFile.readAsBytes();
-  String text;
   try {
-    text = utf8.decode(bytes);
-  } on FormatException {
-    // Beaucoup de vieux .srt français sont en Windows-1252.
-    text = latin1.decode(bytes);
+    final file = (await FilePicker.pickFiles(
+      dialogTitle: 'Fichier de sous-titres',
+    )).firstOrNull;
+    if (file == null) return;
+    final bytes = await file.xFile.readAsBytes();
+    String text;
+    try {
+      text = utf8.decode(bytes);
+    } on FormatException {
+      // Beaucoup de vieux .srt français sont en Windows-1252.
+      text = latin1.decode(bytes);
+    }
+    await player.setSubtitleTrack(SubtitleTrack.data(text, title: file.name));
+  } on Exception catch (e) {
+    log('Sous-titres non chargés', error: e.runtimeType);
   }
-  await player.setSubtitleTrack(SubtitleTrack.data(text, title: file.name));
 }
 
 /// Menus Audio et Sous-titres, d'après les pistes du fichier.
@@ -636,7 +642,7 @@ class _TracksMenu extends StatelessWidget {
                 onSelected: player.setSubtitleTrack,
                 itemBuilder: (_) => [
                   PopupMenuItem(
-                    onTap: () => loadSubtitleFile(player),
+                    onTap: () => unawaited(loadSubtitleFile(player)),
                     child: const ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.upload_file),
