@@ -7,6 +7,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/catalog/catalog_index.dart';
+import 'package:couchplay/home_shell.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';

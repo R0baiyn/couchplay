@@ -6,6 +6,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/login_screen.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
+import 'package:couchplay/home_shell.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/television.dart';
 import 'package:dio/dio.dart';

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:couchplay/app.dart';
+import 'package:couchplay/home_shell.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
