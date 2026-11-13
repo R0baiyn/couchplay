@@ -75,16 +75,19 @@ class DetailsHeader extends StatelessWidget {
         // aucune hauteur.
         return Stack(
           children: [
+            Positioned.fill(child: PosterImage(url: backdrop)),
+            // Fondu vers le fond de l'écran, en bas de l'image : un dégradé
+            // peint par-dessus, pas un masque (un saveLayer par image pendant
+            // le défilement, coûteux sur une TV).
             Positioned.fill(
-              child: ShaderMask(
-                // Fondu vers le fond de l'écran, en bas de l'image.
-                shaderCallback: (rect) => const LinearGradient(
-                  begin: Alignment.center,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.white, Colors.transparent],
-                ).createShader(rect),
-                blendMode: BlendMode.dstIn,
-                child: PosterImage(url: backdrop),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.center,
+                    end: Alignment.bottomCenter,
+                    colors: [surface.withValues(alpha: 0), surface],
+                  ),
+                ),
               ),
             ),
             // Voile : le texte reste lisible sur n'importe quelle image.
