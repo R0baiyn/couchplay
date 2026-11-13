@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account_files.dart';
@@ -32,5 +33,16 @@ void main() {
     await Future.wait([for (var i = 0; i < 5; i++) writer.write(file, '$i')]);
     expect(file.readAsStringSync(), '4');
     expect(root.listSync(), hasLength(1));
+  });
+
+  test('flushAll attend les écritures de toutes les files', () async {
+    final first = File('${root.path}/library.json');
+    final second = File('${root.path}/settings.json');
+    unawaited(SerialFileWriter(failure: 'non écrit').write(first, 'a'));
+    unawaited(SerialFileWriter(failure: 'non écrit').write(second, 'b'));
+
+    await SerialFileWriter.flushAll();
+    expect(first.readAsStringSync(), 'a');
+    expect(second.readAsStringSync(), 'b');
   });
 }

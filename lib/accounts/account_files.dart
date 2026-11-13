@@ -101,11 +101,21 @@ final class SerialFileWriter {
 
   Future<void> _pending = Future.value();
 
-  Future<void> write(File file, String text) =>
-      _pending = _pending.then((_) async {
-        final error = await _writeInIsolate(file.path, text);
-        if (error != null) log(failure, error: error.osError?.errorCode);
-      });
+  /// Écritures pas encore faites, toutes files confondues.
+  static final _inFlight = <Future<void>>{};
+
+  Future<void> write(File file, String text) {
+    final done = _pending = _pending.then((_) async {
+      final error = await _writeInIsolate(file.path, text);
+      if (error != null) log(failure, error: error.osError?.errorCode);
+    });
+    _inFlight.add(done);
+    return done.whenComplete(() => _inFlight.remove(done));
+  }
+
+  /// Attend toutes les écritures demandées jusqu'ici : avant de quitter
+  /// l'app sans passer par sa fermeture normale.
+  static Future<void> flushAll() => Future.wait(_inFlight.toList());
 }
 
 // Fonction de premier niveau : l'isolate ne reçoit que ses paramètres.

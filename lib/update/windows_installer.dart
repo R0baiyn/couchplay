@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../accounts/account_files.dart';
 import 'updater.dart';
 import 'hidden_process.dart';
 
@@ -74,6 +75,12 @@ final class WindowsInstaller implements Installer {
   @override
   Future<void> installNow() async {
     await _file('relaunch').create();
+    // Réglages et bibliothèque encore en file : écrits avant de quitter, sans
+    // bloquer l'installation sur un disque qui ne répond plus.
+    await SerialFileWriter.flushAll().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {},
+    );
     exit(0);
   }
 
