@@ -84,6 +84,10 @@ void main() {
         redact('{"username":"a\\"b","password":1234,"x":1}'),
         '{"username":"***","password":"***","x":1}',
       );
+      expect(
+        redact('{"Username":null,"PASSWORD":true}'),
+        '{"Username":"***","PASSWORD":"***"}',
+      );
       // Aperçu coupé à 120 caractères au milieu de la valeur.
       expect(redact('{"password":"$pass'), '{"password":"***"');
     });
