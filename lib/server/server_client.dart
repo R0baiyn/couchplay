@@ -106,15 +106,18 @@ final class ServerClient {
   /// fiches à la chaîne ne bombarde pas le serveur et son pare-feu (4
   /// requêtes par seconde au plus).
   static const minInterval = Duration(milliseconds: 250);
-  DateTime _nextSlot = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Horloge monotone : une heure système qui recule ne fait pas attendre.
+  final _clock = Stopwatch()..start();
+  var _nextSlot = Duration.zero;
 
   /// Attend le tour de cette requête : chacune part au moins [minInterval]
   /// après la précédente. Sans attente, aucune minuterie n'est créée.
   Future<void> _waitTurn() async {
-    final now = DateTime.now();
-    final start = _nextSlot.isAfter(now) ? _nextSlot : now;
-    _nextSlot = start.add(minInterval);
-    if (start.isAfter(now)) await Future<void>.delayed(start.difference(now));
+    final now = _clock.elapsed;
+    final start = _nextSlot > now ? _nextSlot : now;
+    _nextSlot = start + minInterval;
+    if (start > now) await Future<void>.delayed(start - now);
   }
 
   /// Vérifie les identifiants et renvoie l'état de l'abonnement.
