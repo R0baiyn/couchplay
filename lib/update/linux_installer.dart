@@ -7,16 +7,16 @@ Future<void> _xdgOpen(Uri page) => Process.run('xdg-open', [page.toString()]);
 
 /// Sous Linux, rien ne s'installe tout seul : l'app annonce la version (si
 /// son archive est publiée) et ouvre la page de la release. Seuls
-/// [assetSuffix] et [open] servent ; le reste de [Installer] n'est jamais
-/// appelé.
+/// [assetSuffix] et [openPage] servent ; le reste de [Installer] n'est
+/// jamais appelé.
 final class LinuxInstaller implements Installer {
   /// `open` remplace `xdg-open` (tests).
   LinuxInstaller({this._open = _xdgOpen});
 
   final Future<void> Function(Uri page) _open;
 
-  /// Ouvre [page], la release de la mise à jour.
-  Future<void> open(Uri page) => _open(page);
+  @override
+  Future<void> Function(Uri page) get openPage => _open;
 
   @override
   String get assetSuffix => '-linux-x64.tar.gz';

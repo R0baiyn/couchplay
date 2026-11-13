@@ -28,6 +28,9 @@ final class _FakeInstaller implements Installer {
   String get assetSuffix => '-android-arm64.apk';
 
   @override
+  Future<void> Function(Uri page)? get openPage => null;
+
+  @override
   String get later => 'au prochain démarrage de CouchPlay';
 
   @override

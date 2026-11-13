@@ -33,6 +33,9 @@ final class _FakeInstaller implements Installer {
   String get assetSuffix => '-windows-portable.zip';
 
   @override
+  Future<void> Function(Uri page)? get openPage => null;
+
+  @override
   String get later => 'plus tard';
 
   @override
@@ -211,6 +214,19 @@ void main() {
     test('ni l\'un ni l\'autre (build local) : pas de mise à jour', () {
       expect(installer(), isNull);
     });
+  });
+
+  test('seul Linux ouvre la page de la release au lieu d\'installer', () {
+    final temp = Directory.systemTemp;
+    expect(LinuxInstaller().openPage, isNotNull);
+    expect(WindowsInstaller(portable: true, appDir: temp).openPage, isNull);
+    expect(
+      AndroidInstaller(
+        assetSuffix: '-android-arm64.apk',
+        workDir: temp,
+      ).openPage,
+      isNull,
+    );
   });
 
   group('prepare', () {

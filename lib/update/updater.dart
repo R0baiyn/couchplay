@@ -113,6 +113,11 @@ abstract interface class Installer {
   /// Fin du nom du fichier de cette variante : `-windows-setup.exe`…
   String get assetSuffix;
 
+  /// Ouvre la page de la release quand l'app ne s'installe pas seule
+  /// (Linux) : le dialogue ne propose que cette page, et ni [prepared] ni
+  /// [installNow] ne sont appelés. `null` quand l'app s'installe seule.
+  Future<void> Function(Uri page)? get openPage;
+
   /// Quand s'installe une mise à jour remise à plus tard : la fin de « elle
   /// s'installera … ».
   String get later;

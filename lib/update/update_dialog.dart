@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../logging.dart';
-import 'linux_installer.dart';
 import 'updater.dart';
 
 /// « Version X disponible » et ses notes. « Mettre à jour » l'installe tout
@@ -17,8 +16,8 @@ Future<void> showUpdateDialog(
   Updater updater,
   Update update,
 ) async {
-  if (updater.installer case final LinuxInstaller linux) {
-    return _showLinuxDialog(context, linux, update);
+  if (updater.installer.openPage case final openPage?) {
+    return _showPageDialog(context, openPage, update);
   }
   final now = await showDialog<bool>(
     context: context,
@@ -124,9 +123,9 @@ Future<void> showUpdateDialog(
   }
 }
 
-Future<void> _showLinuxDialog(
+Future<void> _showPageDialog(
   BuildContext context,
-  LinuxInstaller installer,
+  Future<void> Function(Uri page) openPage,
   Update update,
 ) async {
   final page = update.page;
@@ -153,7 +152,7 @@ Future<void> _showLinuxDialog(
   );
   if (open != true || page == null) return;
   try {
-    await installer.open(page);
+    await openPage(page);
   } on Exception catch (e) {
     // Sans xdg-open, l'app continue : la release reste sur GitHub.
     log('Ouverture de la page de mise à jour', error: e.runtimeType);

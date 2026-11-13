@@ -31,6 +31,9 @@ final class AndroidInstaller implements Installer {
   @override
   final String assetSuffix;
 
+  @override
+  Future<void> Function(Uri page)? get openPage => null;
+
   /// `<cache>/update` : le dossier que voit `MainActivity.kt`.
   @override
   final Directory workDir;

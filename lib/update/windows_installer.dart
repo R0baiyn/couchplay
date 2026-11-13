@@ -46,6 +46,9 @@ final class WindowsInstaller implements Installer {
       portable ? '-windows-portable.zip' : '-windows-setup.exe';
 
   @override
+  Future<void> Function(Uri page)? get openPage => null;
+
+  @override
   String get later => 'à la fermeture de CouchPlay';
 
   @override
