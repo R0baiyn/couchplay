@@ -48,7 +48,6 @@ app.*.map.json
 .widget_preview/
 
 # Secrets et sondes locales : ne jamais versionner
-.env
 *.env
 probe/
 android/key.properties
