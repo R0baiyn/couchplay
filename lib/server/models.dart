@@ -76,9 +76,14 @@ final class CatalogItem {
 
   final ItemName? _parsedName;
 
+  /// Décomposition des entrées faites à la main, calculée une fois : le
+  /// constructeur reste `const`, donc pas de champ `late`.
+  static final _parsedLater = Expando<ItemName>();
+
   /// [name] décomposé. Les listes du serveur le calculent au décodage ; une
-  /// entrée faite à la main (favori) le calcule à la demande.
-  ItemName get parsedName => _parsedName ?? ItemName.parse(name);
+  /// entrée faite à la main (favori, historique) le calcule au premier accès.
+  ItemName get parsedName =>
+      _parsedName ?? (_parsedLater[this] ??= ItemName.parse(name));
 }
 
 /// En-tête commun des fiches film et série.

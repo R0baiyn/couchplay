@@ -140,4 +140,15 @@ void main() {
       expect(series.seasons[2].episodes.map((e) => e.id), ['d', 'c']);
     });
   });
+
+  test('entrée faite à la main : nom décomposé une seule fois', () {
+    const item = CatalogItem(
+      kind: ContentKind.movies,
+      id: '1',
+      name: 'FR · Horizon (2024) HD VF',
+    );
+    final first = item.parsedName;
+    expect(first.year, 2024);
+    expect(identical(item.parsedName, first), isTrue);
+  });
 }
