@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../focus_ring.dart';
-import '../search/search_index.dart';
+import 'catalog_index.dart';
 import '../server/models.dart';
 import '../settings/settings_screen.dart';
 import '../library/library.dart';

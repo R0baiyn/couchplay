@@ -8,7 +8,7 @@ import '../library/favorite_button.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../player/player_screen.dart';
-import '../search/search_index.dart';
+import 'catalog_index.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'details_view.dart';

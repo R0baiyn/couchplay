@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../focus_ring.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
-import '../search/search_index.dart';
+import 'catalog_index.dart';
 import '../server/models.dart';
 import 'versions.dart';
 

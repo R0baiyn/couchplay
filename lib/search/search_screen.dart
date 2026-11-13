@@ -12,6 +12,7 @@ import '../catalog/versions.dart';
 import '../server/models.dart';
 import '../settings/settings_screen.dart';
 import '../text_entry.dart';
+import '../catalog/catalog_index.dart';
 import 'search_index.dart';
 
 /// Onglet Recherche : tout le catalogue visible, films puis séries.

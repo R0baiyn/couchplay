@@ -11,7 +11,7 @@ import 'catalog/catalog_screen.dart';
 import 'focus_ring.dart';
 import 'focus_scroll.dart';
 import 'library/home_screen.dart';
-import 'search/search_index.dart';
+import 'catalog/catalog_index.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'settings/settings_screen.dart';

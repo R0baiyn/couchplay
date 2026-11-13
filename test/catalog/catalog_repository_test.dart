@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:couchplay/catalog/catalog_cache.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
-import 'package:couchplay/search/search_index.dart';
+import 'package:couchplay/catalog/catalog_index.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';

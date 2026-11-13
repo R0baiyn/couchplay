@@ -4,6 +4,7 @@ import 'package:couchplay/catalog/catalog_cache.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
 import 'package:couchplay/catalog/category_filter.dart';
 import 'package:couchplay/catalog/versions.dart';
+import 'package:couchplay/catalog/catalog_index.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/server/item_name.dart';
 import 'package:couchplay/server/models.dart';
