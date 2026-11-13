@@ -1,8 +1,9 @@
 name: release
 
 # Un tag v* publie la release : Windows (zip portable et installateur) et
-# Android (un APK par architecture) et Linux (archive tar.gz). Lancé à la main, il construit tout sans
-# rien publier ; les fichiers restent un jour dans les artefacts du run.
+# Android (un APK par architecture). Linux (archive tar.gz) est construit mais
+# pas publié. Lancé à la main, il construit tout sans rien publier ; les
+# fichiers restent un jour dans les artefacts du run.
 on:
   push:
     tags: ['v*']
