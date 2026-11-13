@@ -1,3 +1,4 @@
+import 'package:couchplay/player/player_screen.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/player/player_controls.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,5 +93,66 @@ void main() {
       expect(trackLabel(index: 2), 'Piste 3');
       expect(trackLabel(index: 0, codec: 'subrip'), 'Piste 1 (subrip)');
     });
+  });
+
+  test('un abandon ne relance pas d\'essai', () async {
+    var calls = 0;
+    await expectLater(
+      withRetries(() async {
+        calls++;
+        throw const PlaybackAbandoned();
+      }, sleep: (_) async {}),
+      throwsA(isA<PlaybackAbandoned>()),
+    );
+    expect(calls, 1);
+  });
+
+  group('trackProperties', () {
+    const url = 'http://serveur.test/f.mkv';
+
+    test('par défaut : audio français, pas de sous-titres', () {
+      final request = PlayRequest(
+        title: 't',
+        url: Uri.parse(url),
+        userAgent: 'u',
+      );
+      expect(trackProperties(request), {
+        'alang': 'fr,fre,fra,fr-FR',
+        'aid': 'auto',
+        'sid': 'no',
+      });
+    });
+
+    test('langues de l\'épisode précédent gardées', () {
+      final request = PlayRequest(
+        title: 't',
+        url: Uri.parse(url),
+        userAgent: 'u',
+        audioLanguage: 'eng',
+        subtitleLanguage: 'fre',
+      );
+      expect(trackProperties(request), {
+        'alang': 'eng',
+        'aid': 'auto',
+        'slang': 'fre',
+        'sid': 'auto',
+      });
+    });
+  });
+
+  test('isStreamFailure : erreurs du flux seulement', () {
+    expect(isStreamFailure('error', 'stream'), isTrue);
+    expect(isStreamFailure('error', 'ffmpeg'), isTrue);
+    expect(isStreamFailure('error', 'demux'), isTrue);
+    expect(isStreamFailure('warn', 'stream'), isFalse);
+    expect(isStreamFailure('error', 'vo'), isFalse);
+  });
+
+  test('endedEarly : coupé plus de 30 s avant la fin', () {
+    const minute = Duration(minutes: 1);
+    expect(endedEarly(const Duration(seconds: 10), minute), isTrue);
+    expect(endedEarly(const Duration(seconds: 30), minute), isFalse);
+    expect(endedEarly(minute, minute), isFalse);
+    expect(endedEarly(const Duration(seconds: 10), Duration.zero), isFalse);
   });
 }

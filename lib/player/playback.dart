@@ -72,9 +72,15 @@ final class PlaybackFailed implements Exception {
   String toString() => message;
 }
 
+/// L'ouverture a été remplacée (arrêt, autre ouverture) avant de démarrer :
+/// rien à signaler, le flux n'est plus le nôtre.
+final class PlaybackAbandoned implements Exception {
+  const PlaybackAbandoned();
+}
+
 /// Lance [attempt] ; en cas d'échec, réessaie après [delay], au plus
 /// [retries] fois. La dernière erreur remonte, et tout de suite une vidéo
-/// illisible : réessayer n'y changerait rien.
+/// illisible ou un abandon : réessayer n'y changerait rien.
 Future<T> withRetries<T>(
   Future<T> Function() attempt, {
   int retries = 2,
@@ -85,11 +91,34 @@ Future<T> withRetries<T>(
     try {
       return await attempt();
     } on Exception catch (e) {
-      if (tried >= retries || (e is PlaybackFailed && e.unreadable)) rethrow;
+      if (tried >= retries ||
+          e is PlaybackAbandoned ||
+          (e is PlaybackFailed && e.unreadable)) {
+        rethrow;
+      }
       await sleep(delay);
     }
   }
 }
+
+/// Propriétés mpv des pistes pour [request], dans l'ordre où les poser :
+/// langue audio demandée, sinon le français ; sous-titres de la langue
+/// demandée, sinon aucun.
+Map<String, String> trackProperties(PlayRequest request) {
+  final subtitles = request.subtitleLanguage;
+  return {
+    'alang': request.audioLanguage ?? 'fr,fre,fra,fr-FR',
+    'aid': 'auto',
+    'slang': ?subtitles,
+    'sid': subtitles == null ? 'no' : 'auto',
+  };
+}
+
+/// Ligne du journal de mpv qui signale un flux refusé ou coupé (un refus
+/// http n'arrive parfois que là).
+bool isStreamFailure(String level, String prefix) =>
+    level == 'error' &&
+    (prefix == 'stream' || prefix == 'ffmpeg' || prefix == 'demux');
 
 /// Seul propriétaire du lecteur de l'app (règle 3) : un seul flux à la fois.
 /// Ouvrir un flux remplace le précédent, qui est fermé d'abord.
@@ -142,7 +171,8 @@ final class Playback {
 
   /// Ouvre [request] ; lève [PlaybackFailed] si le flux ne démarre pas
   /// après les nouvelles tentatives (refus du serveur, réseau coupé…).
-  /// Rien ne reste alors en cours de chargement.
+  /// Rien ne reste alors en cours de chargement. Lève [PlaybackAbandoned]
+  /// si une ouverture plus récente, ou un arrêt, prend la main entre-temps.
   Future<void> open(PlayRequest request) async {
     final generation = ++_generation;
     _abandonStart();
@@ -156,11 +186,11 @@ final class Playback {
     try {
       await withRetries(() async {
         // Une ouverture plus récente, ou un arrêt, a pris la main.
-        if (generation != _generation) return;
+        if (generation != _generation) throw const PlaybackAbandoned();
         await _start(media, request.secrets);
       });
     } on Exception catch (e) {
-      if (generation != _generation) return;
+      if (generation != _generation) throw const PlaybackAbandoned();
       // mpv peut encore être en train de se connecter : on coupe, pour ne
       // pas garder l'unique connexion derrière le message d'erreur.
       await player.stop();
@@ -176,14 +206,9 @@ final class Playback {
   Future<void> _tracks(PlayRequest request) async {
     final native = player.platform;
     if (native is! NativePlayer) return;
-    await native.setProperty(
-      'alang',
-      request.audioLanguage ?? 'fr,fre,fra,fr-FR',
-    );
-    await native.setProperty('aid', 'auto');
-    final subtitles = request.subtitleLanguage;
-    if (subtitles != null) await native.setProperty('slang', subtitles);
-    await native.setProperty('sid', subtitles == null ? 'no' : 'auto');
+    for (final MapEntry(:key, :value) in trackProperties(request).entries) {
+      await native.setProperty(key, value);
+    }
   }
 
   Future<void> _start(Media media, List<String> secrets) async {
@@ -217,12 +242,9 @@ final class Playback {
       }),
       // Un refus http (403, 404…) n'arrive parfois que dans le journal.
       player.stream.log.listen((entry) {
-        final failure =
-            entry.level == 'error' &&
-            (entry.prefix == 'stream' ||
-                entry.prefix == 'ffmpeg' ||
-                entry.prefix == 'demux');
-        if (opened && failure) fail('${entry.prefix}: ${entry.text}');
+        if (opened && isStreamFailure(entry.level, entry.prefix)) {
+          fail('${entry.prefix}: ${entry.text}');
+        }
       }),
     ];
     try {
@@ -245,7 +267,7 @@ final class Playback {
   void _abandonStart() {
     final starting = _starting;
     if (starting != null && !starting.isCompleted) {
-      starting.completeError(const PlaybackFailed());
+      starting.completeError(const PlaybackAbandoned());
     }
     _starting = null;
   }

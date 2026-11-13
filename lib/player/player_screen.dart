@@ -19,6 +19,7 @@ import '../server/models.dart';
 import '../television.dart';
 import 'playback.dart';
 import 'player_controls.dart';
+import 'tech_info.dart';
 
 /// Ouvre le lecteur sur un film ou un épisode du compte actif. Un contenu
 /// commencé propose de reprendre ou de recommencer ; avec [resume], la
@@ -94,6 +95,12 @@ Future<PlayRequest?> _requestFor(
     start: start,
   );
 }
+
+/// Fin du fichier bien avant la fin annoncée (plus de 30 s) : le serveur a
+/// coupé. Sans durée connue, on ne peut rien dire.
+bool endedEarly(Duration position, Duration duration) =>
+    duration > Duration.zero &&
+    position < duration - const Duration(seconds: 30);
 
 /// Lecture plein cadre. La position est enregistrée toutes les 10 s, à la
 /// pause et à la sortie. Quitter l'écran arrête le flux.
@@ -171,6 +178,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
       if (track.subtitle.id == 'no') {
         _subtitleLanguage = null;
+        _subtitleTitle = null;
       } else if (track.subtitle.language case final language?) {
         _subtitleLanguage = language;
         _subtitleTitle = track.subtitle.title;
@@ -213,7 +221,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _onHide() {
     if (!_mobile || !mounted) return;
     _save();
-    unawaited(_playback.stop(_ticket));
+    // Sans ticket, rien n'a été ouvert ici : le flux en cours n'est pas le nôtre.
+    if (_ticket case final ticket?) unawaited(_playback.stop(ticket));
     final route = ModalRoute.of(context);
     final navigator = Navigator.of(context);
     if (route != null && route.isActive) {
@@ -226,9 +235,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// appareil, réseau). On le dit au lieu de laisser une image figée.
   void _onCompleted(bool completed) {
     final state = _playback.player.state;
-    final cutShort =
-        state.duration > Duration.zero &&
-        state.position < state.duration - const Duration(seconds: 30);
+    final cutShort = endedEarly(state.position, state.duration);
     if (!mounted) return;
     // Retour en arrière pendant le compte à rebours : on regarde encore.
     if (!completed) {
@@ -312,7 +319,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         subtitleLanguage: _subtitleLanguage,
         start: _resumeAt,
       );
-    } on SocketException {
+    } on Exception {
+      // Seule la résolution du nom par Cloudflare peut échouer ici.
       if (mounted) {
         setState(() {
           _opening = false;
@@ -328,15 +336,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return;
     }
     final opening = _playback.open(request);
-    _ticket = _playback.ticket;
+    final ticket = _ticket = _playback.ticket;
+    // Une ouverture remplacée (écran fermé, épisode suivant lancé) ne touche
+    // plus à l'écran ni au flux : ils ne sont plus les siens.
+    bool current() => mounted && ticket == _ticket;
     try {
       await opening;
       _resumeAt = null;
-      _matchTracksByTitle();
+      if (current()) _matchTracksByTitle();
+    } on PlaybackAbandoned {
+      return;
     } on PlaybackFailed catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (current()) setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _opening = false);
+      if (current()) setState(() => _opening = false);
     }
   }
 
@@ -345,20 +358,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _matchTracksByTitle() {
     final player = _playback.player;
     final tracks = player.state.tracks;
-    final audio = tracks.audio.where((t) => t.language == _audioLanguage);
-    if (_audioLanguage != null && audio.length > 1) {
-      final same = audio.where((t) => t.title == _audioTitle).firstOrNull;
-      if (same != null) unawaited(player.setAudioTrack(same));
-    }
-    final subtitles = tracks.subtitle.where(
-      (t) => t.language == _subtitleLanguage,
+    final audio = sameTitleTrack(
+      tracks.audio,
+      language: _audioLanguage,
+      title: _audioTitle,
+      languageOf: (t) => t.language,
+      titleOf: (t) => t.title,
     );
-    if (_subtitleLanguage != null && subtitles.length > 1) {
-      final same = subtitles
-          .where((t) => t.title == _subtitleTitle)
-          .firstOrNull;
-      if (same != null) unawaited(player.setSubtitleTrack(same));
-    }
+    if (audio != null) unawaited(player.setAudioTrack(audio));
+    final subtitle = sameTitleTrack(
+      tracks.subtitle,
+      language: _subtitleLanguage,
+      title: _subtitleTitle,
+      languageOf: (t) => t.language,
+      titleOf: (t) => t.title,
+    );
+    if (subtitle != null) unawaited(player.setSubtitleTrack(subtitle));
   }
 
   Future<void> _setFullscreen(bool on) async {
@@ -386,7 +401,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     unawaited(_playing?.cancel());
     unawaited(_track?.cancel());
     _save();
-    unawaited(_playback.stop(_ticket));
+    if (_ticket case final ticket?) unawaited(_playback.stop(ticket));
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
     super.dispose();
   }

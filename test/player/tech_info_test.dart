@@ -104,4 +104,35 @@ void main() {
     expect(find.textContaining('1920 × 1080 · h264'), findsOneWidget);
     expect(find.textContaining('aac · 5.1'), findsOneWidget);
   });
+
+  group('sameTitleTrack', () {
+    AudioTrack? pick(
+      List<AudioTrack> tracks,
+      String? language,
+      String? title,
+    ) => sameTitleTrack(
+      tracks,
+      language: language,
+      title: title,
+      languageOf: (t) => t.language,
+      titleOf: (t) => t.title,
+    );
+
+    const full = AudioTrack('1', 'Complets', 'fre');
+    const forced = AudioTrack('2', 'Forcés', 'fre');
+    const english = AudioTrack('3', 'Complets', 'eng');
+
+    test('plusieurs pistes de la langue : celle du même titre', () {
+      expect(pick([forced, full, english], 'fre', 'Complets'), same(full));
+    });
+
+    test('une seule piste de la langue : rien à changer', () {
+      expect(pick([full, english], 'fre', 'Complets'), isNull);
+    });
+
+    test('aucun titre identique, ou pas de langue : rien à changer', () {
+      expect(pick([forced, full], 'fre', 'Autre'), isNull);
+      expect(pick([forced, full], null, 'Complets'), isNull);
+    });
+  });
 }

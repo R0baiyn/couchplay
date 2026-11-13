@@ -22,6 +22,23 @@ T? _active<T>(
       real.first;
 }
 
+/// Piste de [language] qui porte [title], seulement quand cette langue a
+/// plusieurs pistes : mpv prend la première, il faut alors celle du même nom
+/// que la précédente (sous-titres complets ou seulement les passages
+/// étrangers…). `null` : rien à changer.
+T? sameTitleTrack<T>(
+  List<T> tracks, {
+  required String? language,
+  required String? title,
+  required String? Function(T) languageOf,
+  required String? Function(T) titleOf,
+}) {
+  if (language == null) return null;
+  final candidates = tracks.where((t) => languageOf(t) == language).toList();
+  if (candidates.length < 2) return null;
+  return candidates.where((t) => titleOf(t) == title).firstOrNull;
+}
+
 String? _bitrate(num? bitsPerSecond) {
   if (bitsPerSecond == null || bitsPerSecond <= 0) return null;
   if (bitsPerSecond >= 1e6) {
