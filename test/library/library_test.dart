@@ -321,6 +321,17 @@ void main() {
       skip: !Platform.isWindows,
     );
 
+    test('lecture refusée par le système : laissé en place', () async {
+      // Un dossier à la place du fichier : erreur système qui n'est pas un
+      // verrou (accès refusé sous Windows).
+      Directory(file.path).createSync();
+      final store = LibraryStore(file);
+      expect(store.load().favorites, isEmpty);
+      await store.save(const Library().withProgress(_progress(_movie)));
+      expect(File('${file.path}.bak').existsSync(), isFalse);
+      expect(Directory(file.path).existsSync(), isTrue);
+    });
+
     test('mal encodé : mis de côté aussi, jamais écrasé', () async {
       // UTF-16 avec BOM, comme un fichier réenregistré par un éditeur.
       const bytes = [0xFF, 0xFE, 0x7B, 0x00];

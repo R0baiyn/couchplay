@@ -29,19 +29,21 @@ final class LibraryStore {
       } on PathNotFoundException {
         return const Library();
       } on FileSystemException catch (e) {
-        // Texte mal encodé, entre autres : pas un verrou.
-        if (!_locked.contains(e.osError?.errorCode)) return _setAside();
+        // Sans erreur système : texte mal encodé, le fichier est illisible.
+        final code = e.osError?.errorCode;
+        if (code == null) return _setAside();
         // Verrou : sous Windows, une écriture de l'app (renommage du fichier
         // temporaire) ou un antivirus bloque la lecture quelques
-        // millisecondes. Le fichier n'est pas illisible : on réessaie, puis
-        // on le laisse en place sans plus rien écrire jusqu'au prochain
-        // lancement.
-        if (attempt < 5) {
+        // millisecondes. On réessaie.
+        if (_locked.contains(code) && attempt < 5) {
           sleep(const Duration(milliseconds: 20));
           continue;
         }
+        // Verrou qui dure, accès refusé passager… : le fichier n'est pas
+        // illisible. On le laisse en place sans plus rien écrire jusqu'au
+        // prochain lancement.
         _readOnly = true;
-        log('Bibliothèque verrouillée, lue vide', error: e.osError?.errorCode);
+        log('Bibliothèque non lue, lue vide', error: code);
         return const Library();
       } on Exception {
         return _setAside();
