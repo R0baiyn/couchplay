@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -53,6 +54,68 @@ void main() {
     final dns = CloudflareDns(query: (_, _) async => fail('aucune requête'));
     expect((await dns.lookup('192.168.1.42')).address, '192.168.1.42');
     expect((await dns.lookup('localhost')).isLoopback, isTrue);
+  });
+
+  test('requêtes simultanées pour un même nom : une seule question', () async {
+    final answer = Completer<String>();
+    var asked = 0;
+    final dns = CloudflareDns(
+      query: (_, _) {
+        asked++;
+        return answer.future;
+      },
+    );
+    final first = dns.lookup('serveur.com');
+    final second = dns.lookup('serveur.com');
+    answer.complete(
+      _answer([
+        {'type': 1, 'TTL': 300, 'data': '203.0.113.7'},
+      ]),
+    );
+    expect((await first).address, '203.0.113.7');
+    expect((await second).address, '203.0.113.7');
+    expect(asked, 1);
+  });
+
+  test("un échec n'est pas gardé : la demande suivante repart", () async {
+    var asked = 0;
+    final dns = CloudflareDns(
+      query: (_, _) async {
+        asked++;
+        throw const SocketException('hors ligne');
+      },
+    );
+    await expectLater(dns.lookup('a.com'), throwsA(isA<SocketException>()));
+    await expectLater(dns.lookup('a.com'), throwsA(isA<SocketException>()));
+    // Deux serveurs essayés par demande.
+    expect(asked, 4);
+  });
+
+  group('resolveForPlayer', () {
+    test('HTTPS ou adresse IP : URL inchangée, sans en-tête Host', () async {
+      for (final url in [
+        'https://serveur.com/a.mkv',
+        'http://192.0.2.7:80/a',
+      ]) {
+        final (resolved, headers) = await resolveForPlayer(Uri.parse(url));
+        expect(resolved, Uri.parse(url));
+        expect(headers, isEmpty);
+      }
+    });
+
+    test("HTTP : adresse résolue dans l'URL, Host avec le port", () async {
+      // `localhost` est résolu sans requête : pas de réseau dans ce test.
+      final (resolved, headers) = await resolveForPlayer(
+        Uri.parse('http://localhost:8080/movie/a.mkv'),
+      );
+      expect(resolved, Uri.parse('http://127.0.0.1:8080/movie/a.mkv'));
+      expect(headers, {'Host': 'localhost:8080'});
+
+      final (_, noPort) = await resolveForPlayer(
+        Uri.parse('http://localhost/a.mkv'),
+      );
+      expect(noPort, {'Host': 'localhost'});
+    });
   });
 
   // Vraies requêtes à Cloudflare : lancées seulement avec RESEAU=1
