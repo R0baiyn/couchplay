@@ -177,8 +177,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   final _rail = FocusScopeNode(debugLabel: 'rail');
   final _content = FocusScopeNode(debugLabel: 'onglet');
 
-  final _indexes = <ProviderSubscription<Object?>>[];
-
   @override
   void initState() {
     super.initState();
@@ -189,8 +187,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // chargement commence.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Écoutes fermées par Riverpod au démontage de l'état.
       for (final kind in ContentKind.values) {
-        _indexes.add(ref.listenManual(catalogIndexProvider(kind), (_, _) {}));
+        ref.listenManual(catalogIndexProvider(kind), (_, _) {});
       }
       // Sur TV, on voit tout de suite où est le focus : sur l'onglet choisi.
       if (ref.read(televisionProvider)) _focusTab();
@@ -221,9 +220,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
     _exitArmed?.cancel();
-    for (final index in _indexes) {
-      index.close();
-    }
     _searchField.dispose();
     _rail.dispose();
     _content.dispose();
