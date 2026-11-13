@@ -19,6 +19,8 @@ final class LibraryStore {
   /// vide ; un fichier corrompu est mis de côté en `library.json.bak`, pour
   /// ne pas perdre de trace, et l'app repart de zéro.
   Library load() {
+    // Écriture encore en file : le fichier n'est pas à jour.
+    if (_unwritten[file.path] case final pending?) return pending;
     // Lecture synchrone : quelques dizaines de Ko, nécessaires avant
     // d'afficher l'accueil.
     for (var attempt = 1; ; attempt++) {
@@ -70,16 +72,34 @@ final class LibraryStore {
     return const Library();
   }
 
-  final _writer = SerialFileWriter(failure: 'Bibliothèque non écrite');
+  /// Une seule file par fichier : le magasin est recréé à chaque changement
+  /// de compte, et deux files pourraient écrire le même fichier dans le
+  /// désordre (compte A, puis B, puis A).
+  static final _writers = <String, SerialFileWriter>{};
+
+  /// Par fichier, dernière bibliothèque confiée à la file et pas encore
+  /// écrite : [load] la rend à la place du fichier.
+  static final _unwritten = <String, Library>{};
+
   var _readOnly = false;
 
   /// Écrit [library] (voir [SerialFileWriter]).
   Future<void> save(Library library) {
     if (_readOnly) return Future.value();
-    return _writer.write(
-      file,
-      const JsonEncoder.withIndent(' ').convert(library.toJson()),
+    final path = file.path;
+    _unwritten[path] = library;
+    final writer = _writers.putIfAbsent(
+      path,
+      () => SerialFileWriter(failure: 'Bibliothèque non écrite'),
     );
+    return writer
+        .write(
+          file,
+          const JsonEncoder.withIndent(' ').convert(library.toJson()),
+        )
+        .whenComplete(() {
+          if (identical(_unwritten[path], library)) _unwritten.remove(path);
+        });
   }
 }
 

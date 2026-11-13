@@ -279,6 +279,16 @@ void main() {
       ]);
     });
 
+    test('écriture encore en file : relue telle qu\'enregistrée', () async {
+      // Retour rapide sur un compte : un nouveau magasin relit le fichier
+      // avant que la dernière écriture du précédent soit faite.
+      final saving = LibraryStore(file)
+          .save(const Library().withProgress(_progress(_movie)));
+      expect(LibraryStore(file).load().progress.keys, ['movie:1']);
+      await saving;
+      expect(LibraryStore(file).load().progress.keys, ['movie:1']);
+    });
+
     test('corrompu : mis de côté en .bak, puis bibliothèque vide', () {
       file.writeAsStringSync('{"version":1,"favorites":{');
       expect(LibraryStore(file).load().favorites, isEmpty);
