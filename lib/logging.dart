@@ -19,6 +19,12 @@ final _userInfo = RegExp(
 final _streamPath = RegExp(
   '(/(?:movie|series|live|timeshift)/)$_segment/$_segment(?=/)',
 );
+// Réponse JSON du serveur : "username":"…", valeur échappée, nombre ou
+// chaîne coupée par un aperçu tronqué.
+final _jsonCredentials = RegExp(
+  r'''("(?:username|password)"\s*:\s*)(?:"(?:[^"\\]|\\.)*"?|[^,}\]\s]+)''',
+  caseSensitive: false,
+);
 // Direct sans préfixe : http://hôte:port/U/P/42 ou /42.ts
 final _shortLivePath = RegExp(
   '(://$_segment/)$_segment/$_segment'
@@ -33,6 +39,7 @@ final _shortLivePath = RegExp(
 String redact(String text, {Iterable<String> secrets = const []}) {
   var result = text
       .replaceAllMapped(_queryCredentials, (m) => '${m[1]}$_mask')
+      .replaceAllMapped(_jsonCredentials, (m) => '${m[1]}"$_mask"')
       .replaceAllMapped(_userInfo, (m) => '${m[1]}$_mask:$_mask@')
       .replaceAllMapped(_streamPath, (m) => '${m[1]}$_mask/$_mask')
       .replaceAllMapped(_shortLivePath, (m) => '${m[1]}$_mask/$_mask');

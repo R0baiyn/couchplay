@@ -75,6 +75,19 @@ void main() {
       expect(message, 'mot de passe refusé : *** (***)');
     });
 
+    test('masque les identifiants sous forme JSON, même tronqués', () {
+      expect(
+        redact('{"user_info":{"username":"$user","password" : "$pass"}}'),
+        '{"user_info":{"username":"***","password" : "***"}}',
+      );
+      expect(
+        redact('{"username":"a\\"b","password":1234,"x":1}'),
+        '{"username":"***","password":"***","x":1}',
+      );
+      // Aperçu coupé à 120 caractères au milieu de la valeur.
+      expect(redact('{"password":"$pass'), '{"password":"***"');
+    });
+
     test(
       'ignore les secrets vides et laisse un texte sans identifiant intact',
       () {
