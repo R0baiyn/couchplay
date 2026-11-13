@@ -1,6 +1,6 @@
 import 'package:couchplay/player/player_screen.dart';
+import 'package:couchplay/player/player_tracks.dart';
 import 'package:couchplay/player/playback.dart';
-import 'package:couchplay/player/player_controls.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
