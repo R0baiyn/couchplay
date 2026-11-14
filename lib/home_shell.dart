@@ -75,9 +75,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Écoutes fermées par Riverpod au démontage de l'état.
-      for (final kind in ContentKind.values) {
-        ref.listenManual(catalogIndexProvider(kind), (_, _) {});
-      }
+      _indexes = [
+        for (final kind in ContentKind.values)
+          ref.listenManual(catalogIndexProvider(kind), (_, _) {}),
+      ];
+      _pauseIndexes(!(ModalRoute.of(context)?.isCurrent ?? false));
       // Sur TV, on voit tout de suite où est le focus : sur l'onglet choisi.
       if (ref.read(televisionProvider)) _focusTab();
     });
@@ -233,6 +235,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return true;
   }
 
+  /// Écoutes qui gardent les index chargés.
+  var _indexes = const <ProviderSubscription<Object?>>[];
+  var _indexesPaused = false;
+
+  /// En pause quand l'accueil est caché (réglages du catalogue, lecteur) :
+  /// les écrans de l'accueil le sont aussi (Riverpod les met en pause), donc
+  /// plus personne n'attend l'index. Cinq catégories cochées dans les
+  /// réglages le refont alors une fois au retour, pas cinq fois. Une fiche
+  /// ouverte surveille l'index elle-même : il reste à jour pour elle.
+  void _pauseIndexes(bool pause) {
+    if (pause == _indexesPaused) return;
+    _indexesPaused = pause;
+    for (final subscription in _indexes) {
+      pause ? subscription.pause() : subscription.resume();
+    }
+  }
+
   // Créés une fois : changer d'onglet, ou ouvrir et fermer une fiche (la
   // route de l'accueil change d'état), ne reconstruit pas les onglets.
   final _built = <int, Widget>{};
@@ -247,7 +266,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     // Dépendance à la route : reconstruit quand l'accueil revient devant.
-    if (ModalRoute.of(context)?.isCurrent ?? false) _offerUpdate();
+    final current = ModalRoute.of(context)?.isCurrent ?? false;
+    _pauseIndexes(!current);
+    if (current) _offerUpdate();
     // Retour (Android, télécommande, Échap) depuis un autre onglet : revient
     // à l'Accueil. Seul l'Accueil quitte l'app ; sur TV, au 2e appui.
     final tv = ref.watch(televisionProvider);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:couchplay/accounts/server_session.dart';
@@ -5,8 +6,10 @@ import 'package:couchplay/catalog/catalog_cache.dart';
 import 'package:couchplay/catalog/catalog_providers.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
 import 'package:couchplay/catalog/catalog_settings.dart';
+import 'package:couchplay/catalog/catalog_settings_screen.dart';
 import 'package:couchplay/home_shell.dart';
 import 'package:couchplay/server/models.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -71,5 +74,32 @@ void main() {
     }
     // Un calcul de l'index des films par clic, aucun pour les séries.
     expect(loads, 5);
+  });
+
+  testWidgets("réglages ouverts : les clics sont regroupés, l'index se refait "
+      'une fois au retour', (tester) async {
+    await pumpCountingApp(tester);
+    final shell = tester.element(find.byType(HomeShell));
+    final container = ProviderScope.containerOf(shell);
+    unawaited(
+      Navigator.of(shell).push(
+        MaterialPageRoute<void>(builder: (_) => const CatalogSettingsScreen()),
+      ),
+    );
+    await settle(tester);
+    const category = Category(id: '619', name: 'Films 4K');
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => container
+            .read(catalogFilterProvider.notifier)
+            .setCategory(ContentKind.movies, category, shown: i.isOdd),
+      );
+      await settle(tester);
+    }
+    expect(loads, 0, reason: 'accueil masqué : index en pause');
+
+    Navigator.of(shell).pop();
+    await settle(tester);
+    expect(loads, 1);
   });
 }
