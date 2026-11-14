@@ -72,9 +72,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     if (_refreshing) return;
     setState(() => _refreshing = true);
     try {
-      await ref.read(categoriesProvider(_kind).notifier).refresh();
-      // Après les catégories : l'index, qui en dépend, ne se refait qu'une
-      // fois avec les nouvelles.
+      // Catégories d'abord, puis l'index, refait une fois avec elles.
       await ref.read(catalogIndexProvider(_kind).notifier).refresh();
     } finally {
       if (mounted) setState(() => _refreshing = false);

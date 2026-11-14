@@ -94,12 +94,19 @@ class CatalogIndexNotifier extends AsyncNotifier<Loaded<KindIndex>> {
     return repository.all(kind, indexParser(kind, visible), refresh: refresh);
   }
 
-  /// « Actualiser » : redemande la liste complète au serveur. Les données
-  /// affichées restent en place pendant le chargement. Une erreur reste dans
-  /// l'état, pour les écrans qui la montrent, sans être relancée ici.
+  /// « Actualiser » : redemande au serveur les catégories, puis la liste
+  /// complète. Les données affichées restent en place pendant le chargement.
+  /// Une erreur reste dans l'état, pour les écrans qui la montrent, sans être
+  /// relancée ici.
   Future<void> refresh() async {
+    // Marqué avant : les nouvelles catégories relancent l'index, qui
+    // demande alors la liste au serveur, au lieu de décoder le cache pour
+    // rien avant un second calcul.
     _stale = true;
-    ref.invalidateSelf();
+    await ref.read(categoriesProvider(kind).notifier).refresh();
+    if (!ref.mounted) return;
+    // Pas relancé par les catégories : relancé ici, une seule fois.
+    if (_stale) ref.invalidateSelf();
     try {
       await future;
     } on Object {
