@@ -1,54 +1,18 @@
-import 'dart:io';
-
-import 'package:couchplay/accounts/account.dart';
-import 'package:couchplay/accounts/account_files.dart';
-import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/library/history_screen.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../support/library_container.dart';
 
 void main() {
   testWidgets(
     'télécommande : → depuis une ligne atteint sa ✕, Entrée la retire',
     (tester) async {
-      final root = Directory.systemTemp.createTempSync('couchplay_history_');
-      addTearDown(() {
-        try {
-          root.deleteSync(recursive: true);
-        } on FileSystemException {
-          // Écriture encore en cours sous Windows : le dossier reste, sans effet.
-        }
-      });
-      FlutterSecureStorage.setMockInitialValues({});
-      final (store, files) = (await tester.runAsync(() async {
-        final store = await AccountStore.open();
-        await store.save(
-          const AccountsState().withAccount(
-            const Account(
-              id: 'a',
-              name: 'a',
-              host: 'http://example.com',
-              username: 'u',
-              password: 'p',
-              userAgent: defaultUserAgent,
-            ),
-          ),
-        );
-        final files = AccountFiles(Directory('${root.path}/accounts'));
-        await files.sync({'a'});
-        return (store, files);
-      }))!;
-      final container = ProviderContainer.test(
-        overrides: [
-          accountStoreProvider.overrideWithValue(store),
-          accountFilesProvider.overrideWithValue(files),
-        ],
-      );
+      final container = await libraryContainer(tester);
       final library = container.read(libraryProvider.notifier);
       for (final name in ['Ancien', 'Récent']) {
         await tester.runAsync(
@@ -86,4 +50,35 @@ void main() {
       expect(find.text('Ancien'), findsOneWidget);
     },
   );
+
+  testWidgets("un favori ajouté ne refait pas l'historique", (tester) async {
+    final container = await libraryContainer(tester);
+    final library = container.read(libraryProvider.notifier);
+    await tester.runAsync(
+      () => library.saveProgress(
+        const PlayItem.movie(id: '1', extension: 'mkv', name: 'Horizon'),
+        position: const Duration(minutes: 10),
+        duration: const Duration(minutes: 90),
+      ),
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: HistoryScreen()),
+      ),
+    );
+    var builds = 0;
+    debugOnRebuildDirtyWidget = (element, _) {
+      if (element.widget is HistoryScreen) builds++;
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = null);
+
+    for (final key in ['movie:2', 'movie:3', 'movie:4']) {
+      await tester.runAsync(() => library.addFavorite(key: key, name: key));
+      await tester.pump();
+    }
+
+    expect(builds, 0);
+    expect(find.text('Horizon'), findsOneWidget);
+  });
 }

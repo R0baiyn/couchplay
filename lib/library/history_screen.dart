@@ -16,9 +16,10 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // La progression seule ; build ne tourne qu'à son changement, le tri
-    // aussi.
-    final entries = ref.watch(libraryProvider.select((l) => l.history));
+    // La progression seule (même map tant qu'elle ne change pas) : un favori
+    // ajouté ne refait ni l'écran ni le tri.
+    final progress = ref.watch(libraryProvider.select((l) => l.progress));
+    final entries = Library(progress: progress).history;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historique'),
