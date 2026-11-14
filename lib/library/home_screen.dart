@@ -109,10 +109,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
               ],
             ),
-          if (seen.isNotEmpty) ...[
-            header('Vus'),
-            _entryRow(context, 'seen', seen),
-          ],
+          if (seen.isNotEmpty) ...[header('Vus'), _seenRow(context, seen)],
           // Tout en bas, sous toutes les rangées : la liste complète.
           if (hasHistory)
             Padding(
@@ -136,26 +133,25 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Rangée d'une liste de progressions : les [_rowLength] plus récentes ;
-  /// l'écran Historique les a toutes. Une affiche ouvre la fiche du film, ou
-  /// celle de la série pour un épisode.
-  Widget _entryRow(BuildContext context, String row, List<Progress> entries) =>
-      _PosterRow(
-        children: [
-          for (final entry in entries.take(_rowLength))
-            _tile(
-              key: ValueKey('$row:${entry.item.key}'),
-              title: entry.item.shortTitle,
-              imageUrl: entry.item.poster,
-              progress: entry.finished ? null : entry.fraction,
-              onTap: () => openDetails(
-                context,
-                CatalogEntry([entry.item.catalogItem]),
-                episode: entry.item.isEpisode ? entry.item : null,
-              ),
-            ),
-        ],
-      );
+  /// Rangée « Vus » : les [_rowLength] plus récents ; l'écran Historique les
+  /// a tous. Une affiche ouvre la fiche du film, ou celle de la série pour un
+  /// épisode.
+  Widget _seenRow(BuildContext context, List<Progress> entries) => _PosterRow(
+    children: [
+      for (final entry in entries.take(_rowLength))
+        _tile(
+          key: ValueKey('seen:${entry.item.key}'),
+          title: entry.item.shortTitle,
+          imageUrl: entry.item.poster,
+          progress: entry.finished ? null : entry.fraction,
+          onTap: () => openDetails(
+            context,
+            CatalogEntry([entry.item.catalogItem]),
+            episode: entry.item.isEpisode ? entry.item : null,
+          ),
+        ),
+    ],
+  );
 
   /// « Retirer » : l'entrée quitte la rangée, la progression reste.
   /// ponytail: appui long ou clic droit seulement ; une touche de menu de
@@ -178,7 +174,7 @@ class HomeScreen extends ConsumerWidget {
 
 const _tileWidth = 130.0;
 
-/// Affiches par rangée « Historique » et « Vus » : elles restent courtes.
+/// Affiches de la rangée « Vus » : elle reste courte.
 const _rowLength = 20;
 
 Widget _tile({
