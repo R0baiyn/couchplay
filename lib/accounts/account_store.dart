@@ -112,6 +112,21 @@ final class AccountStore {
   }
 }
 
+/// Au démarrage, range les dossiers de données d'après les comptes lus.
+///
+/// Sans aucun compte, rien n'est rangé : un stockage illisible peut aussi
+/// revenir vide sans erreur (Android efface sa clé, Windows son fichier au
+/// lancement suivant), et ses dossiers doivent rester. La suppression du
+/// dernier compte efface déjà son dossier elle-même ([AccountsNotifier.remove]).
+Future<void> syncAccountFolders(
+  AccountStore accounts,
+  AccountFiles files,
+) async {
+  final ids = {for (final a in accounts.current.accounts) a.id};
+  if (accounts.unreadable || ids.isEmpty) return;
+  await files.sync(ids);
+}
+
 /// Ouvert dans `main()` avant le premier rendu, puis injecté via un override.
 final accountStoreProvider = Provider<AccountStore>(
   (ref) => throw UnimplementedError('accountStoreProvider doit être surchargé'),

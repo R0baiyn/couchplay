@@ -193,6 +193,35 @@ void main() {
       expect(files.of('orphelin').existsSync(), isFalse);
     },
   );
+
+  test('stockage vidé par le système : aucun dossier effacé', () async {
+    // Android (resetOnError) efface la clé illisible et `read` rend `null`
+    // sans erreur ; Windows aussi, au lancement suivant.
+    FlutterSecureStorage.setMockInitialValues({});
+    final root = Directory.systemTemp.createTempSync('couchplay_reset_');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final files = AccountFiles(Directory('${root.path}/accounts'));
+    files.of('compte').createSync(recursive: true);
+
+    await syncAccountFolders(await AccountStore.open(), files);
+
+    expect(files.of('compte').existsSync(), isTrue);
+  });
+
+  test('comptes lus : les dossiers orphelins sont rangés', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final root = Directory.systemTemp.createTempSync('couchplay_tidy_');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final files = AccountFiles(Directory('${root.path}/accounts'));
+    files.of('orphelin').createSync(recursive: true);
+    final store = await AccountStore.open();
+    await store.save(const AccountsState().withAccount(_account('garde')));
+
+    await syncAccountFolders(store, files);
+
+    expect(files.of('garde').existsSync(), isTrue);
+    expect(files.of('orphelin').existsSync(), isFalse);
+  });
 }
 
 /// Stockage dont la lecture échoue (déchiffrement, keystore passager).

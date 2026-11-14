@@ -33,11 +33,8 @@ Future<void> main() async {
     isTelevision(),
   ).wait;
   final files = AccountFiles(Directory('${support.path}/accounts'));
-  // En tâche de fond : ne retarde pas le premier rendu. Comptes illisibles :
-  // aucun ménage, leurs dossiers de données restent.
-  if (!accounts.unreadable) {
-    unawaited(files.sync({for (final a in accounts.current.accounts) a.id}));
-  }
+  // En tâche de fond : ne retarde pas le premier rendu.
+  unawaited(syncAccountFolders(accounts, files));
   runApp(
     ProviderScope(
       overrides: [
