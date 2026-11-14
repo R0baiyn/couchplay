@@ -235,6 +235,11 @@ void main() {
       expect(await storage.read(key: 'accounts.bak'), '{pas du json');
       final reopened = (await AccountStore.open()).current;
       expect(reopened.accounts.map((x) => x.id), ['c']);
+
+      // Supprimer un compte efface aussi la copie : elle peut porter ses
+      // identifiants.
+      await container.read(accountsProvider.notifier).remove('c');
+      expect(await storage.read(key: 'accounts.bak'), isNull);
     });
 
     test(

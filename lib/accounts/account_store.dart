@@ -82,7 +82,9 @@ final class AccountStore {
   static const _key = 'accounts';
 
   /// Copie d'un enregistrement déchiffré mais corrompu, gardée avant qu'une
-  /// écriture le remplace. Elle reste dans le stockage chiffré.
+  /// écriture le remplace. Elle reste dans le stockage chiffré, et part avec
+  /// la suppression d'un compte ([forgetBackup]) : elle peut porter ses
+  /// identifiants.
   static const _backupKey = 'accounts.bak';
 
   /// Sur erreur de déchiffrement, le plugin Android effaçait lui-même tout
@@ -93,9 +95,9 @@ final class AccountStore {
 
   final FlutterSecureStorage _storage;
 
-  /// Le même stockage, qui repart de zéro s'il ne peut plus rien déchiffrer
-  /// (Android, clé du Keystore perdue) : sinon aucun compte ne pourrait plus
-  /// jamais être enregistré.
+  /// Le même stockage, qui repart de zéro si le plugin Android n'a pas pu
+  /// s'initialiser (clé du Keystore perdue) : sinon aucun compte ne pourrait
+  /// plus jamais être enregistré. Ailleurs, simple nouvelle tentative.
   final FlutterSecureStorage _resetting;
 
   AccountsState _current;
@@ -163,6 +165,8 @@ final class AccountStore {
     }
   }
 
+  Future<void> forgetBackup() => _storage.delete(key: _backupKey);
+
   Future<void> save(AccountsState state) async {
     final value = jsonEncode(state.toJson());
     try {
@@ -215,6 +219,7 @@ final class AccountsNotifier extends Notifier<AccountsState> {
   /// Efface les identifiants du compte, puis son dossier de données.
   Future<void> remove(String id) async {
     await _commit((s) => s.without(id));
+    await ref.read(accountStoreProvider).forgetBackup();
     try {
       await ref.read(accountFilesProvider).delete(id);
     } on FileSystemException catch (e) {
