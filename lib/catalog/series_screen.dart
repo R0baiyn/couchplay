@@ -70,7 +70,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       appBar: DetailsAppBar(
         scroll: _scroll,
         child: AppBar(
-          title: Text(widget.item.name),
+          title: Text(widget.item.parsedName.display),
           actions: [
             FavoriteButton(
               favoriteKey: widget.item.libraryKey,

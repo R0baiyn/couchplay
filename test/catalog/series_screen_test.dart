@@ -1,6 +1,7 @@
 import 'package:couchplay/catalog/series_screen.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
+import 'package:couchplay/server/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -52,5 +53,26 @@ void main() {
     expect(screenBuilds, 0);
     // L'épisode, lui, montre où on en est.
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
+  });
+
+  testWidgets('titre de la fiche : le nom propre, sans les étiquettes', (
+    tester,
+  ) async {
+    await pumpApp(tester, openMovies: false);
+    Navigator.of(tester.element(find.byType(Scaffold).first)).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const SeriesScreen(
+          item: CatalogItem(
+            kind: ContentKind.series,
+            id: '1',
+            name: 'FR - Les Veilleurs (2024) HD VF',
+          ),
+        ),
+      ),
+    );
+    await settle(tester);
+
+    expect(find.text('Les Veilleurs (2024)'), findsOneWidget);
+    expect(find.text('FR - Les Veilleurs (2024) HD VF'), findsNothing);
   });
 }
