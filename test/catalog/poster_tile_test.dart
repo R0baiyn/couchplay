@@ -1,4 +1,5 @@
 import 'package:couchplay/catalog/poster_grid.dart';
+import 'package:couchplay/confirm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,58 +69,84 @@ void main() {
     expect((menus, taps), (0, 1));
   });
 
-  // Relevé sur l'émulateur TV avec un clavier USB maintenu : un appui, puis
-  // des dizaines de répétitions, puis le relâchement. Une fois le menu ouvert,
-  // ces répétitions ne doivent pas activer son premier bouton (« Retirer »).
-  testWidgets('OK maintenu : le menu ouvert ne reçoit pas les répétitions', (
-    tester,
-  ) async {
-    var removed = 0;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: SizedBox(
-              width: 170,
-              child: PosterTile(
-                title: 'Horizon',
-                imageUrl: null,
-                onTap: () {},
-                onMenu: () => showDialog<void>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    actions: [
-                      TextButton(
-                        autofocus: true,
-                        onPressed: () => removed++,
-                        child: const Text('Retirer'),
-                      ),
-                    ],
+  // Séquence relevée sur l'émulateur TV (clavier USB maintenu, puis getevent
+  // sur le clavier de la fenêtre) : un appui, des répétitions, un relâchement,
+  // sans paires appui/relâchement. Le menu s'ouvre pendant le maintien et ne
+  // reçoit rien de lui ; « Retirer » a le focus, le cas le plus dangereux.
+  group('maintien de OK sur une tuile à menu', () {
+    late bool? answer;
+
+    Future<void> pumpMenuTile(
+      WidgetTester tester, {
+      bool cancelFirst = false,
+    }) async {
+      answer = null;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: SizedBox(
+                width: 170,
+                child: PosterTile(
+                  title: 'Horizon',
+                  imageUrl: null,
+                  onTap: () {},
+                  onMenu: () async => answer = await confirm(
+                    context,
+                    title: 'Horizon',
+                    content: 'Retirer ?',
+                    action: 'Retirer',
+                    focusCancel: cancelFirst,
+                    focusAction: !cancelFirst,
                   ),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump();
-
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
-    for (var i = 0; i < 5; i++) {
-      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.enter);
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
     }
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
 
-    expect(find.text('Retirer'), findsOneWidget);
-    expect(removed, 0);
+    Future<void> holdUntilMenu(WidgetTester tester) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
+      for (var i = 0; i < 5; i++) {
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.enter);
+        await tester.pump();
+      }
+    }
 
-    // Un appui suivant, court, agit normalement sur le menu.
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump();
-    expect(removed, 1);
+    testWidgets('le dialogue s’ouvre touche enfoncée, sans rien valider', (
+      tester,
+    ) async {
+      await pumpMenuTile(tester);
+      await holdUntilMenu(tester);
+      expect(find.text('Retirer ?'), findsOneWidget);
+      expect(answer, isNull);
+
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(find.text('Retirer ?'), findsOneWidget);
+      expect(answer, isNull);
+    });
+
+    testWidgets('après le relâchement, un nouvel appui valide', (tester) async {
+      await pumpMenuTile(tester);
+      await holdUntilMenu(tester);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(answer, isTrue);
+    });
+
+    testWidgets('« Annuler » d’abord : un nouvel appui annule', (tester) async {
+      await pumpMenuTile(tester, cancelFirst: true);
+      await holdUntilMenu(tester);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(answer, isFalse);
+    });
   });
 }

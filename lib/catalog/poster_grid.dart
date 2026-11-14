@@ -286,10 +286,8 @@ class _RemoteKeys extends StatefulWidget {
 }
 
 class _RemoteKeysState extends State<_RemoteKeys> {
-  /// OK enfoncé et pas encore relâché : [_held] une fois que la touche
-  /// répète (maintenue).
+  /// OK enfoncé, ni relâché ni maintenu : la fiche s'ouvre au relâchement.
   var _pressed = false;
-  var _held = false;
 
   static bool _isOk(LogicalKeyboardKey key) =>
       key == LogicalKeyboardKey.select ||
@@ -315,15 +313,17 @@ class _RemoteKeysState extends State<_RemoteKeys> {
     switch (event) {
       case KeyDownEvent():
         _pressed = true;
-        _held = false;
       case KeyRepeatEvent():
-        // Le menu s'ouvre au relâchement : ouvert plus tôt, il recevrait les
-        // répétitions suivantes et activerait son premier bouton.
-        if (_pressed) _held = true;
+        // Maintenu : le menu s'ouvre sans attendre le relâchement. Son
+        // dialogue avale la fin du maintien (voir `confirm`).
+        if (_pressed) {
+          _pressed = false;
+          onMenu();
+        }
       case KeyUpEvent():
         final press = _pressed;
         _pressed = false;
-        if (press) (_held ? onMenu : widget.onTap)();
+        if (press) widget.onTap();
     }
     return KeyEventResult.handled;
   }

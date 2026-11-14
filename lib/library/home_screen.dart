@@ -184,7 +184,7 @@ class HomeScreen extends ConsumerWidget {
       title: entry.item.name,
       content: 'Retirer de « Continuer à regarder » ?',
       action: 'Retirer',
-      focusAction: true,
+      focusCancel: true,
     );
     if (hide) await ref.read(libraryProvider.notifier).hide(entry);
   }
