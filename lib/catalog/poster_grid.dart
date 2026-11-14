@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../focus_ring.dart';
@@ -141,7 +142,8 @@ class PosterTile extends StatelessWidget {
   /// Part regardée, en barre au bas de l'affiche.
   final double? progress;
 
-  /// Appui long ou clic droit : les actions secondaires.
+  /// Appui long, clic droit, OK maintenu ou touche Menu : les actions
+  /// secondaires.
   final VoidCallback? onMenu;
 
   /// Pastilles en haut à droite : dans « Ma liste », déjà vu.
@@ -187,75 +189,145 @@ class PosterTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final progress = this.progress;
-    return InkWell(
+    return _RemoteKeys(
       onTap: onTap,
-      onLongPress: onMenu,
-      onSecondaryTap: onMenu,
-      borderRadius: BorderRadius.circular(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AspectRatio(
-            aspectRatio: 2 / 3,
-            child: FocusRing(
-              hug: true,
-              child: Padding(
-                padding: EdgeInsets.all(_border),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
-                  child: progress == null && !favorite && !watched
-                      ? PosterImage(url: imageUrl, deferred: true)
-                      : Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            PosterImage(url: imageUrl, deferred: true),
-                            if (progress != null)
-                              Align(
-                                alignment: Alignment.bottomCenter,
-                                child: LinearProgressIndicator(value: progress),
+      onMenu: onMenu,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onMenu,
+        onSecondaryTap: onMenu,
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 2 / 3,
+              child: FocusRing(
+                hug: true,
+                child: Padding(
+                  padding: EdgeInsets.all(_border),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: progress == null && !favorite && !watched
+                        ? PosterImage(url: imageUrl, deferred: true)
+                        : Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              PosterImage(url: imageUrl, deferred: true),
+                              if (progress != null)
+                                Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: LinearProgressIndicator(
+                                    value: progress,
+                                  ),
+                                ),
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Row(
+                                  spacing: 4,
+                                  children: [
+                                    if (watched)
+                                      const _Badge(Icons.check, 'Déjà vu'),
+                                    if (favorite)
+                                      const _Badge(
+                                        Icons.favorite,
+                                        'Dans ma liste',
+                                      ),
+                                  ],
+                                ),
                               ),
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: Row(
-                                spacing: 4,
-                                children: [
-                                  if (watched)
-                                    const _Badge(Icons.check, 'Déjà vu'),
-                                  if (favorite)
-                                    const _Badge(
-                                      Icons.favorite,
-                                      'Dans ma liste',
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
             ),
-          ),
-          // Même écart entre l'image et le titre qu'entre le titre et le bas
-          // de la case : la place de l'anneau compte déjà pour une part.
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              _titleMargin,
-              _titleMargin - _border,
-              _titleMargin,
-              _titleMargin,
+            // Même écart entre l'image et le titre qu'entre le titre et le bas
+            // de la case : la place de l'anneau compte déjà pour une part.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                _titleMargin,
+                _titleMargin - _border,
+                _titleMargin,
+                _titleMargin,
+              ),
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall,
+              ),
             ),
-            child: Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Télécommande : OK maintenu ouvre le menu de la tuile (les répétitions de
+/// la touche ne sont plus des clics), OK appuyé ouvre la fiche au relâchement,
+/// la touche Menu ouvre le menu. Sans menu, OK reste un appui court et ses
+/// répétitions sont ignorées.
+class _RemoteKeys extends StatefulWidget {
+  const _RemoteKeys({
+    required this.onTap,
+    required this.onMenu,
+    required this.child,
+  });
+
+  final VoidCallback onTap;
+  final VoidCallback? onMenu;
+  final Widget child;
+
+  @override
+  State<_RemoteKeys> createState() => _RemoteKeysState();
+}
+
+class _RemoteKeysState extends State<_RemoteKeys> {
+  /// OK enfoncé, ni relâché ni maintenu : la fiche s'ouvre au relâchement.
+  var _pressed = false;
+
+  static bool _isOk(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.select ||
+      key == LogicalKeyboardKey.enter ||
+      key == LogicalKeyboardKey.numpadEnter;
+
+  KeyEventResult _onKey(FocusNode _, KeyEvent event) {
+    final onMenu = widget.onMenu;
+    final key = event.logicalKey;
+    if (onMenu != null &&
+        key == LogicalKeyboardKey.contextMenu &&
+        event is KeyDownEvent) {
+      onMenu();
+      return KeyEventResult.handled;
+    }
+    if (!_isOk(key)) return KeyEventResult.ignored;
+    if (event is KeyRepeatEvent) {
+      if (_pressed && onMenu != null) {
+        _pressed = false;
+        onMenu();
+      }
+      return KeyEventResult.handled;
+    }
+    if (onMenu == null) return KeyEventResult.ignored;
+    if (event is KeyDownEvent) {
+      _pressed = true;
+    } else if (_pressed) {
+      _pressed = false;
+      widget.onTap();
+    }
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    canRequestFocus: false,
+    skipTraversal: true,
+    onKeyEvent: _onKey,
+    child: widget.child,
+  );
 }
 
 /// Pastille ronde et sombre : lisible sur n'importe quelle affiche.

@@ -9,6 +9,7 @@ import 'package:couchplay/app.dart';
 import 'package:couchplay/catalog/catalog_index.dart';
 import 'package:couchplay/catalog/catalog_screen.dart';
 import 'package:couchplay/home_shell.dart';
+import 'package:couchplay/library/home_screen.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
@@ -158,7 +159,12 @@ Future<Map<Object?, Object?>> savedProgress(
 /// Un texte dans la rangée « Continuer à regarder » (la première rangée) :
 /// l'historique et « Vus » répètent les mêmes titres plus bas.
 Finder inContinue(String text) => find.descendant(
-  of: find.byType(SingleChildScrollView).first,
+  of: find
+      .descendant(
+        of: find.byType(HomeScreen),
+        matching: find.byType(SingleChildScrollView),
+      )
+      .first,
   matching: find.text(text),
 );
 
