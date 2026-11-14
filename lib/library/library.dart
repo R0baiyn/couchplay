@@ -46,6 +46,15 @@ final class PlayItem {
   /// Titre des affiches : le film, ou la série et `S1E2`.
   String get shortTitle => isEpisode ? '$name · S${season}E$episode' : name;
 
+  /// De quoi ouvrir la fiche : celle du film, ou celle de la série pour un
+  /// épisode. Elle recharge le reste depuis le serveur.
+  CatalogItem get catalogItem => CatalogItem(
+    kind: isEpisode ? ContentKind.series : ContentKind.movies,
+    id: seriesId ?? id,
+    name: name,
+    poster: poster,
+  );
+
   /// Titre affiché dans le lecteur : avec celui de l'épisode, s'il en a un.
   String get title =>
       episodeTitle == null ? shortTitle : '$shortTitle · $episodeTitle';

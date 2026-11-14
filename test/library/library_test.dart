@@ -441,4 +441,12 @@ void main() {
       expect(Library.fromJson(json).toJson(), json);
     });
   });
+
+  test('catalogItem : le film, ou la série d’un épisode', () {
+    expect(_movie.catalogItem.kind, ContentKind.movies);
+    expect(_movie.catalogItem.id, '1');
+    final series = _episode('7', 1, 2).catalogItem;
+    expect(series.kind, ContentKind.series);
+    expect(series.id, '45');
+  });
 }

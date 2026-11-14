@@ -150,7 +150,7 @@ class HomeScreen extends ConsumerWidget {
               progress: entry.finished ? null : entry.fraction,
               onTap: () => openDetails(
                 context,
-                historyEntry(entry.item),
+                CatalogEntry([entry.item.catalogItem]),
                 episode: entry.item.isEpisode ? entry.item : null,
               ),
             ),

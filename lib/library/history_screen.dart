@@ -6,7 +6,6 @@ import '../catalog/versions.dart';
 import '../confirm.dart';
 import '../focus_ring.dart';
 import '../format.dart';
-import '../server/models.dart';
 import 'library.dart';
 import 'library_store.dart';
 
@@ -55,17 +54,6 @@ class HistoryScreen extends ConsumerWidget {
   }
 }
 
-/// De quoi ouvrir la fiche : celle du film, ou celle de la série pour un
-/// épisode. Elle recharge le reste depuis le serveur.
-CatalogEntry historyEntry(PlayItem item) => CatalogEntry([
-  CatalogItem(
-    kind: item.isEpisode ? ContentKind.series : ContentKind.movies,
-    id: item.seriesId ?? item.id,
-    name: item.name,
-    poster: item.poster,
-  ),
-]);
-
 class _HistoryRow extends ConsumerWidget {
   const _HistoryRow(this.entry, {super.key});
 
@@ -93,7 +81,7 @@ class _HistoryRow extends ConsumerWidget {
             // recharge le reste depuis le serveur.
             onTap: () => openDetails(
               context,
-              historyEntry(item),
+              CatalogEntry([item.catalogItem]),
               episode: item.isEpisode ? item : null,
             ),
           ),
