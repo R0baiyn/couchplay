@@ -84,13 +84,7 @@ class _HistoryRow extends ConsumerWidget {
       children: [
         Expanded(
           child: ListTile(
-            title: FocusRing(
-              child: Text(
-                item.isEpisode
-                    ? '${item.name} · S${item.season}E${item.episode}'
-                    : item.name,
-              ),
-            ),
+            title: FocusRing(child: Text(item.shortTitle)),
             subtitle: Text(
               '${item.episodeTitle == null ? '' : '${item.episodeTitle} · '}'
               '${formatDate(entry.updatedAt)} · $state',
