@@ -97,7 +97,6 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         series.seasons.where((s) => s.number == _season).firstOrNull ??
         series.seasons.where((s) => s.number > 0).firstOrNull ??
         series.seasons.firstOrNull;
-    final progress = ref.watch(libraryProvider.select((l) => l.progress));
     if (widget.episode != null && !_revealing) {
       _revealing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
@@ -156,7 +155,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                 return _EpisodeTile(
                   focusNode: episode.id == widget.episode?.id ? _target : null,
                   episode: episode,
-                  progress: item == null ? null : progress[item.key],
+                  item: item,
                   onPlay: item == null
                       ? null
                       : () => openPlayer(context, ref, item),
@@ -175,25 +174,33 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
+/// Surveille sa seule progression : la fiche, montée sous le lecteur, ne se
+/// refait pas à chaque enregistrement (toutes les 10 s).
+class _EpisodeTile extends ConsumerWidget {
   const _EpisodeTile({
     this.focusNode,
     required this.episode,
-    required this.progress,
+    required this.item,
     required this.onPlay,
     required this.onWatched,
   });
 
   final FocusNode? focusNode;
   final Episode episode;
-  final Progress? progress;
+
+  /// `null` si le fichier de l'épisode est inconnu : ni lecture ni suivi.
+  final PlayItem? item;
 
   /// `null` si le fichier de l'épisode est inconnu.
   final VoidCallback? onPlay;
   final ValueChanged<bool>? onWatched;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = item?.key;
+    final progress = key == null
+        ? null
+        : ref.watch(libraryProvider.select((l) => l.progress[key]));
     final theme = Theme.of(context);
     final e = episode;
     final minutes = e.duration?.inMinutes;
