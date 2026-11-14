@@ -253,68 +253,57 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   Widget _bars(BuildContext context) {
     const shade = [Colors.black87, Colors.transparent];
-    Widget bar(Widget child) => MouseRegion(
+    // Barre du haut ou du bas : dégradé vers l'image, marges du système de
+    // son côté seulement.
+    Widget bar(Widget child, {required bool top}) => MouseRegion(
       onEnter: (_) => _overBars = true,
       onExit: (_) => _overBars = false,
-      child: child,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+            end: top ? Alignment.bottomCenter : Alignment.topCenter,
+            colors: shade,
+          ),
+        ),
+        child: SafeArea(top: top, bottom: !top, child: child),
+      ),
     );
     return Column(
       children: [
         bar(
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: shade,
+          top: true,
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Retour',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onExit,
               ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Retour',
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: widget.onExit,
-                  ),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  TechInfo(player: _player),
-                ],
+              Expanded(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
-            ),
+              TechInfo(player: _player),
+            ],
           ),
         ),
         // Laisse passer clics et touchers vers les gestes de l'image.
         const Spacer(),
         bar(
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: shade,
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ProgressBar(player: _player, onSeek: _show),
-                    _buttons(),
-                  ],
-                ),
-              ),
+          top: false,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ProgressBar(player: _player, onSeek: _show),
+                _buttons(),
+              ],
             ),
           ),
         ),
