@@ -108,6 +108,9 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                   // Celle de la liste : la fiche affichée peut encore être
                   // celle d'une autre version.
                   extension: selected.extension ?? details.value?.extension,
+                  // Sans extension dans la liste, seule sa fiche la donne :
+                  // rien à dire tant qu'elle charge.
+                  loading: details.isLoading,
                   poster: poster,
                 ),
               ],
@@ -169,11 +172,13 @@ class _PlayButton extends ConsumerWidget {
   const _PlayButton({
     required this.item,
     required this.extension,
+    required this.loading,
     required this.poster,
   });
 
   final CatalogItem item;
   final String? extension;
+  final bool loading;
   final String? poster;
 
   @override
@@ -182,7 +187,9 @@ class _PlayButton extends ConsumerWidget {
     return FilledButton.icon(
       autofocus: true,
       icon: const Icon(Icons.play_arrow),
-      label: Text(extension == null ? 'Fichier introuvable' : 'Lecture'),
+      label: Text(
+        extension == null && !loading ? 'Fichier introuvable' : 'Lecture',
+      ),
       onPressed: extension == null
           ? null
           : () => openPlayer(
