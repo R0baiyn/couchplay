@@ -16,6 +16,18 @@ Future<bool> isTelevision() async {
   return await channel.invokeMethod<bool>('isTelevision') ?? false;
 }
 
+/// Sens d'un appui (ou d'une répétition) de flèche ; `null` pour une autre
+/// touche ou un relâchement.
+TraversalDirection? arrowDirection(KeyEvent event) => event is KeyUpEvent
+    ? null
+    : switch (event.logicalKey) {
+        LogicalKeyboardKey.arrowUp => TraversalDirection.up,
+        LogicalKeyboardKey.arrowDown => TraversalDirection.down,
+        LogicalKeyboardKey.arrowLeft => TraversalDirection.left,
+        LogicalKeyboardKey.arrowRight => TraversalDirection.right,
+        _ => null,
+      };
+
 /// Sur TV, ↑ ↓ sans rien à atteindre dans ce sens font défiler la page :
 /// le résumé d'une fiche, sous le dernier bouton, se lit à la télécommande.
 /// Placé au-dessus des écrans, il passe après leurs propres touches (lecteur,
@@ -29,16 +41,14 @@ class TvArrowKeys extends ConsumerWidget {
   static const _page = 0.8;
 
   static KeyEventResult _onKey(FocusNode _, KeyEvent event) {
-    if (event is KeyUpEvent) return KeyEventResult.ignored;
-    final down = event.logicalKey == LogicalKeyboardKey.arrowDown;
-    if (!down && event.logicalKey != LogicalKeyboardKey.arrowUp) {
+    final direction = arrowDirection(event);
+    final down = direction == TraversalDirection.down;
+    if (!down && direction != TraversalDirection.up) {
       return KeyEventResult.ignored;
     }
     final focused = FocusManager.instance.primaryFocus;
     if (focused == null) return KeyEventResult.ignored;
-    if (focused.focusInDirection(
-      down ? TraversalDirection.down : TraversalDirection.up,
-    )) {
+    if (focused.focusInDirection(direction!)) {
       return KeyEventResult.handled;
     }
     final context = focused.context;

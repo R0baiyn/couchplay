@@ -113,9 +113,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.dispose();
   }
 
-  static bool _isDown(KeyEvent event, LogicalKeyboardKey key) =>
-      event is! KeyUpEvent && event.logicalKey == key;
-
   /// Les éléments que les flèches atteignent dans [scope], de haut en bas
   /// puis de gauche à droite.
   static List<FocusNode> _reachable(FocusScopeNode scope) =>
@@ -126,7 +123,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         });
 
   KeyEventResult _railKey(FocusNode _, KeyEvent event) {
-    if (!_isDown(event, LogicalKeyboardKey.arrowRight)) {
+    if (arrowDirection(event) != TraversalDirection.right) {
       return KeyEventResult.ignored;
     }
     final last = _content.focusedChild;
@@ -145,17 +142,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return KeyEventResult.handled;
   }
 
-  static final _arrows = {
-    LogicalKeyboardKey.arrowUp,
-    LogicalKeyboardKey.arrowDown,
-    LogicalKeyboardKey.arrowLeft,
-    LogicalKeyboardKey.arrowRight,
-  };
-
   KeyEventResult _contentKey(FocusNode _, KeyEvent event) {
-    if (event is KeyUpEvent || !_arrows.contains(event.logicalKey)) {
-      return KeyEventResult.ignored;
-    }
+    final direction = arrowDirection(event);
+    if (direction == null) return KeyEventResult.ignored;
     final focused = FocusManager.instance.primaryFocus;
     // La zone elle-même a le focus : l'élément qui l'avait a disparu (liste
     // vidée, tuile retirée). Une flèche le redonne au premier élément de
@@ -170,9 +159,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       }
       return KeyEventResult.handled;
     }
-    if (event.logicalKey != LogicalKeyboardKey.arrowLeft) {
-      return KeyEventResult.ignored;
-    }
+    if (direction != TraversalDirection.left) return KeyEventResult.ignored;
     if (focused == null || !focused.focusInDirection(TraversalDirection.left)) {
       _focusTab();
     }
