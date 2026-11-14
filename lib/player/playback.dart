@@ -61,9 +61,13 @@ final class PlaybackFailed implements Exception {
     caseSensitive: false,
   );
 
+  // Sous Windows, ffmpeg ne nomme pas l'erreur de connexion (« tcp:
+  // Connection to tcp://… failed: Error number -138 occurred ») : c'est la
+  // forme de la ligne qui compte. Un refus du serveur, lui, ne donne au
+  // niveau error que « Failed to open ».
   static final _network = RegExp(
-    r'timed out|timeout|connection refused|connection reset|unreachable|'
-    r'broken pipe|resolve',
+    r'connection to \S+ failed|timed out|timeout|connection refused|'
+    r'connection reset|unreachable|broken pipe|resolve',
     caseSensitive: false,
   );
 

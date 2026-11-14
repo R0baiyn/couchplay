@@ -72,6 +72,27 @@ void main() {
     }
   });
 
+  test('serveur arrêté, textes réels de libmpv sous Windows', () {
+    // Relevés avec la libmpv livrée : connexion refusée sur un port fermé,
+    // puis réponse 403 (seul « Failed to open » arrive au niveau error).
+    const host = '127.0.0.1';
+    final stopped = [
+      'ffmpeg: tcp: Connection to tcp://$host:1 failed: '
+          'Error number -138 occurred',
+      'tcp: Connection to tcp://$host:1 failed: Error number -138 occurred',
+    ];
+    for (final reason in stopped) {
+      final failed = PlaybackFailed.fromMpv(reason);
+      expect(failed.network, isTrue, reason: reason);
+      expect(failed.message, isNot(contains('abonnement')));
+    }
+    final refused = PlaybackFailed.fromMpv(
+      'stream: Failed to open http://$host:8080/movie/***/***/1.mkv.',
+    );
+    expect(refused.network, isFalse);
+    expect(refused.message, contains('abonnement'));
+  });
+
   test('vidéo illisible : autre message, pas de nouvel essai', () async {
     // Message réel de mpv sur Android pour une vidéo en 4:4:4.
     final unreadable = PlaybackFailed.fromMpv('Could not open codec.');
