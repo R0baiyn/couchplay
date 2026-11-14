@@ -286,8 +286,10 @@ class _RemoteKeys extends StatefulWidget {
 }
 
 class _RemoteKeysState extends State<_RemoteKeys> {
-  /// OK enfoncé, ni relâché ni maintenu : la fiche s'ouvre au relâchement.
+  /// OK enfoncé et pas encore relâché : [_held] une fois que la touche
+  /// répète (maintenue).
   var _pressed = false;
+  var _held = false;
 
   static bool _isOk(LogicalKeyboardKey key) =>
       key == LogicalKeyboardKey.select ||
@@ -304,19 +306,24 @@ class _RemoteKeysState extends State<_RemoteKeys> {
       return KeyEventResult.handled;
     }
     if (!_isOk(key)) return KeyEventResult.ignored;
-    if (event is KeyRepeatEvent) {
-      if (_pressed && onMenu != null) {
-        _pressed = false;
-        onMenu();
-      }
-      return KeyEventResult.handled;
+    if (onMenu == null) {
+      // Un appui court reste celui d'InkWell ; ses répétitions sont avalées.
+      return event is KeyRepeatEvent
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
     }
-    if (onMenu == null) return KeyEventResult.ignored;
-    if (event is KeyDownEvent) {
-      _pressed = true;
-    } else if (_pressed) {
-      _pressed = false;
-      widget.onTap();
+    switch (event) {
+      case KeyDownEvent():
+        _pressed = true;
+        _held = false;
+      case KeyRepeatEvent():
+        // Le menu s'ouvre au relâchement : ouvert plus tôt, il recevrait les
+        // répétitions suivantes et activerait son premier bouton.
+        if (_pressed) _held = true;
+      case KeyUpEvent():
+        final press = _pressed;
+        _pressed = false;
+        if (press) (_held ? onMenu : widget.onTap)();
     }
     return KeyEventResult.handled;
   }

@@ -67,4 +67,59 @@ void main() {
     await hold(tester, LogicalKeyboardKey.select);
     expect((menus, taps), (0, 1));
   });
+
+  // Relevé sur l'émulateur TV avec un clavier USB maintenu : un appui, puis
+  // des dizaines de répétitions, puis le relâchement. Une fois le menu ouvert,
+  // ces répétitions ne doivent pas activer son premier bouton (« Retirer »).
+  testWidgets('OK maintenu : le menu ouvert ne reçoit pas les répétitions', (
+    tester,
+  ) async {
+    var removed = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: SizedBox(
+              width: 170,
+              child: PosterTile(
+                title: 'Horizon',
+                imageUrl: null,
+                onTap: () {},
+                onMenu: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    actions: [
+                      TextButton(
+                        autofocus: true,
+                        onPressed: () => removed++,
+                        child: const Text('Retirer'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
+    for (var i = 0; i < 5; i++) {
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(find.text('Retirer'), findsOneWidget);
+    expect(removed, 0);
+
+    // Un appui suivant, court, agit normalement sur le menu.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(removed, 1);
+  });
 }
