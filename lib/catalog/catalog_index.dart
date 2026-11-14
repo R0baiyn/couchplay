@@ -5,6 +5,7 @@ import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'catalog_repository.dart';
 import 'catalog_settings.dart';
+import 'category_filter.dart';
 import 'versions.dart';
 
 /// Films ou séries des catégories visibles, tirés de la liste complète :
@@ -83,7 +84,10 @@ class CatalogIndexNotifier extends AsyncNotifier<Loaded<KindIndex>> {
   @override
   Future<Loaded<KindIndex>> build() async {
     final repository = ref.watch(catalogRepositoryProvider);
-    final filter = ref.watch(catalogFilterProvider);
+    // Seulement ce qui touche ce type, en une clé comparable : cocher une
+    // catégorie de séries ne refait pas l'index des films.
+    ref.watch(catalogFilterProvider.select((f) => _filterKey(f, kind)));
+    final filter = ref.read(catalogFilterProvider);
     final categories = ref.watch(categoriesProvider(kind).future);
     final refresh = _stale;
     _stale = false;
@@ -92,6 +96,20 @@ class CatalogIndexNotifier extends AsyncNotifier<Loaded<KindIndex>> {
         category.id,
     };
     return repository.all(kind, indexParser(kind, visible), refresh: refresh);
+  }
+
+  /// Ce dont dépend `filter.apply(kind, …)` : pays, adulte, et les choix
+  /// forcés des catégories de [kind] seulement.
+  static String _filterKey(CatalogFilter filter, ContentKind kind) {
+    final prefix = CatalogFilter.overrideKey(kind, '');
+    return [
+      ([...filter.tags]..sort()).join(','),
+      filter.showAdult,
+      ([
+        for (final MapEntry(:key, :value) in filter.overrides.entries)
+          if (key.startsWith(prefix)) '$key=$value',
+      ]..sort()).join(','),
+    ].join('|');
   }
 
   /// « Actualiser » : redemande au serveur les catégories, puis la liste
