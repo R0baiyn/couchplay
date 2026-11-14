@@ -1,7 +1,9 @@
 name: release
 
-# Un tag v* publie la release : Windows (zip portable et installateur) et
-# Android (un APK par architecture). Linux (archive tar.gz) est construit mais
+# Un tag v* crée la release en brouillon : Windows (zip portable et
+# installateur) et Android (un APK par architecture). Elle n'est visible de
+# personne, mises à jour comprises, tant qu'elle n'est pas publiée à la main
+# sur GitHub (« Publish release »). Linux (archive tar.gz) est construit mais
 # pas publié. Lancé à la main, il construit tout sans rien publier ; les
 # fichiers restent un jour dans les artefacts du run.
 on:
@@ -231,4 +233,4 @@ jobs:
         run: |
           # Le checkout ne garde pas le message du tag annoté : les notes en viennent.
           git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
-          gh release create "$GITHUB_REF_NAME" dist/* --title "CouchPlay $GITHUB_REF_NAME" --notes-from-tag
+          gh release create "$GITHUB_REF_NAME" dist/* --title "CouchPlay $GITHUB_REF_NAME" --draft --notes-from-tag
