@@ -27,12 +27,7 @@ final class AccountsState {
   final List<Account> accounts;
   final String? activeId;
 
-  Account? get active {
-    for (final account in accounts) {
-      if (account.id == activeId) return account;
-    }
-    return null;
-  }
+  Account? get active => accounts.where((a) => a.id == activeId).firstOrNull;
 
   /// Ajoute [account], ou remplace celui qui a le même `id`.
   AccountsState withAccount(Account account, {bool activate = false}) {

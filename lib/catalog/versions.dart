@@ -16,12 +16,7 @@ final class CatalogEntry {
   String get title => item.parsedName.display;
 
   /// Affiche de la meilleure version qui en a une.
-  String? get poster {
-    for (final version in versions) {
-      if (version.poster case final poster?) return poster;
-    }
-    return null;
-  }
+  String? get poster => versions.map((v) => v.poster).nonNulls.firstOrNull;
 }
 
 /// Affiches d'une liste, dans l'ordre du serveur : les versions d'un même
