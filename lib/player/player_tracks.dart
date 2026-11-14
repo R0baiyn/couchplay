@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../logging.dart';
+import 'tech_info.dart';
 
 /// Ajoute à la lecture en cours les sous-titres d'un fichier choisi par
 /// l'utilisateur (.srt, .ass, .vtt…). Le texte est passé à mpv plutôt que
@@ -49,11 +50,11 @@ class TracksMenu extends StatelessWidget {
         builder: (context, tracks) {
           final audio = [
             for (final t in tracks.data?.audio ?? const <AudioTrack>[])
-              if (t.id != 'auto' && t.id != 'no') t,
+              if (isRealTrack(t.id)) t,
           ];
           final subtitles = [
             for (final t in tracks.data?.subtitle ?? const <SubtitleTrack>[])
-              if (t.id != 'auto' && t.id != 'no') t,
+              if (isRealTrack(t.id)) t,
           ];
           final selectedAudio = current.data?.audio.id;
           final selectedSubtitle = current.data?.subtitle.id;

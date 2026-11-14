@@ -6,6 +6,9 @@ import 'package:media_kit/media_kit.dart';
 
 import '../settings/app_settings.dart';
 
+/// Vraie piste du fichier, pas l'un des choix « auto » ou « no » de mpv.
+bool isRealTrack(String id) => id != 'auto' && id != 'no';
+
 /// Piste réellement lue : celle choisie, sinon (choix automatique) la piste
 /// par défaut du flux, sinon la première. `state.track` ne porte les codecs
 /// que pour un choix de l'utilisateur ; ceux du flux sont dans `state.tracks`.
@@ -15,7 +18,7 @@ T? _active<T>(
   String Function(T) id,
   bool? Function(T) isDefault,
 ) {
-  final real = tracks.where((t) => id(t) != 'auto' && id(t) != 'no').toList();
+  final real = tracks.where((t) => isRealTrack(id(t))).toList();
   if (real.isEmpty) return null;
   return real.where((t) => id(t) == selectedId).firstOrNull ??
       real.where((t) => isDefault(t) ?? false).firstOrNull ??

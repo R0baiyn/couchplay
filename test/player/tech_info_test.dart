@@ -135,4 +135,10 @@ void main() {
       expect(pick([forced, full], null, 'Complets'), isNull);
     });
   });
+
+  test('isRealTrack : ni auto ni no', () {
+    expect(isRealTrack('1'), isTrue);
+    expect(isRealTrack('auto'), isFalse);
+    expect(isRealTrack('no'), isFalse);
+  });
 }
