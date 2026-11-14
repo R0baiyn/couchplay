@@ -6,6 +6,7 @@ import '../catalog/catalog_providers.dart';
 import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
 import '../catalog/versions.dart';
+import '../confirm.dart';
 import '../player/player_screen.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
@@ -164,25 +165,14 @@ class HomeScreen extends ConsumerWidget {
     WidgetRef ref,
     Progress entry,
   ) async {
-    final hide = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(entry.item.name),
-        content: const Text('Retirer de « Continuer à regarder » ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            autofocus: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Retirer'),
-          ),
-        ],
-      ),
+    final hide = await confirm(
+      context,
+      title: entry.item.name,
+      content: 'Retirer de « Continuer à regarder » ?',
+      action: 'Retirer',
+      focusAction: true,
     );
-    if (hide ?? false) await ref.read(libraryProvider.notifier).hide(entry);
+    if (hide) await ref.read(libraryProvider.notifier).hide(entry);
   }
 }
 

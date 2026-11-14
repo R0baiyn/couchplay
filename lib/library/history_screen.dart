@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../catalog/catalog_screen.dart';
 import '../catalog/versions.dart';
+import '../confirm.dart';
 import '../focus_ring.dart';
 import '../format.dart';
 import '../server/models.dart';
@@ -41,28 +42,16 @@ class HistoryScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
-    final clear = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Effacer l\'historique ?'),
-        content: const Text(
+    final clear = await confirm(
+      context,
+      title: 'Effacer l\'historique ?',
+      content:
           'Les reprises et les marques « vu » sont perdues. '
           'Ma liste reste intacte.',
-        ),
-        actions: [
-          TextButton(
-            autofocus: true,
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Effacer'),
-          ),
-        ],
-      ),
+      action: 'Effacer',
+      focusCancel: true,
     );
-    if (clear ?? false) await ref.read(libraryProvider.notifier).clearHistory();
+    if (clear) await ref.read(libraryProvider.notifier).clearHistory();
   }
 }
 

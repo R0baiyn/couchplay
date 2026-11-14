@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../confirm.dart';
 import '../focus_ring.dart';
 import 'account.dart';
 import 'account_store.dart';
@@ -21,26 +22,14 @@ class AccountsScreen extends ConsumerWidget {
     WidgetRef ref,
     Account account,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Supprimer « ${account.name} » ?'),
-        content: const Text(
+    final confirmed = await confirm(
+      context,
+      title: 'Supprimer « ${account.name} » ?',
+      content:
           'Ses identifiants et ses données sur cet appareil seront effacés.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
+      action: 'Supprimer',
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
     if (!await _write(
       context,
       ref.read(accountsProvider.notifier).remove(account.id),
