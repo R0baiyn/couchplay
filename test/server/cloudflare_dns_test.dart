@@ -79,10 +79,10 @@ void main() {
 
   test('un échec est gardé 10 s : un hôte mort ne coûte pas une requête '
       'par affiche', () async {
-    var now = DateTime(2026);
+    var elapsed = Duration.zero;
     var asked = 0;
     final dns = CloudflareDns(
-      now: () => now,
+      elapsed: () => elapsed,
       query: (_, _) async {
         asked++;
         throw const SocketException('hors ligne');
@@ -93,17 +93,17 @@ void main() {
     }
     // Deux serveurs essayés, une seule fois.
     expect(asked, 2);
-    now = now.add(const Duration(seconds: 11));
+    elapsed += const Duration(seconds: 11);
     await expectLater(dns.lookup('a.com'), throwsA(isA<SocketException>()));
     expect(asked, 4);
   });
 
   test('durée du cache : TTL borné entre 60 s et 1 h', () async {
-    var now = DateTime(2026);
+    var elapsed = Duration.zero;
     final ttl = {'court.com': 5, 'long.com': 999999};
     final asked = <String>[];
     final dns = CloudflareDns(
-      now: () => now,
+      elapsed: () => elapsed,
       query: (_, host) async {
         asked.add(host);
         return _answer([
@@ -117,13 +117,13 @@ void main() {
     }
 
     await both();
-    now = now.add(const Duration(seconds: 59));
+    elapsed += const Duration(seconds: 59);
     await both();
     expect(asked, ['court.com', 'long.com']);
-    now = now.add(const Duration(seconds: 2));
+    elapsed += const Duration(seconds: 2);
     await both();
     expect(asked, ['court.com', 'long.com', 'court.com']);
-    now = now.add(const Duration(hours: 1));
+    elapsed += const Duration(hours: 1);
     await both();
     expect(asked, [
       'court.com',

@@ -12,19 +12,27 @@ import 'doh_root.dart';
 final class CloudflareDns {
   CloudflareDns({
     Future<String> Function(String server, String host)? query,
-    DateTime Function()? now,
+    Duration Function()? elapsed,
   }) : _query = query ?? https,
-       _now = now ?? DateTime.now;
+       _elapsed = elapsed ?? _monotonic();
 
   static const _servers = ['1.1.1.1', '1.0.0.1'];
   static const _service = 'cloudflare-dns.com';
 
   final Future<String> Function(String server, String host) _query;
-  final DateTime Function() _now;
+
+  /// Horloge monotone : une heure système qui recule ne prolonge ni un
+  /// échec gardé ni une adresse au-delà de son TTL.
+  final Duration Function() _elapsed;
+
+  static Duration Function() _monotonic() {
+    final clock = Stopwatch()..start();
+    return () => clock.elapsed;
+  }
 
   /// Adresse de chaque nom ; `null` : échec récent, gardé [_failureDelay]
   /// pour qu'un hôte mort ne coûte pas deux requêtes par affiche.
-  final _cache = <String, ({InternetAddress? address, DateTime until})>{};
+  final _cache = <String, ({InternetAddress? address, Duration until})>{};
 
   /// Court : un réseau revenu doit resservir vite.
   static const _failureDelay = Duration(seconds: 10);
@@ -37,7 +45,7 @@ final class CloudflareDns {
     }
     if (host == 'localhost') return Future.value(InternetAddress.loopbackIPv4);
     final cached = _cache[host];
-    if (cached != null && _now().isBefore(cached.until)) {
+    if (cached != null && _elapsed() < cached.until) {
       return switch (cached.address) {
         final address? => Future.value(address),
         null => Future.error(_notFound(host)),
@@ -57,14 +65,14 @@ final class CloudflareDns {
         final (address, ttl) = parseAnswer(await _query(server, host));
         _cache[host] = (
           address: address,
-          until: _now().add(Duration(seconds: ttl.clamp(60, 3600))),
+          until: _elapsed() + Duration(seconds: ttl.clamp(60, 3600)),
         );
         return address;
       } on Exception catch (e) {
         log('DNS Cloudflare $server : $host', error: e.runtimeType);
       }
     }
-    _cache[host] = (address: null, until: _now().add(_failureDelay));
+    _cache[host] = (address: null, until: _elapsed() + _failureDelay);
     throw _notFound(host);
   }
 
