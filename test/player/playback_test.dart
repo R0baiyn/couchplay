@@ -51,6 +51,27 @@ void main() {
     );
   });
 
+  test('coupure ou délai dépassé : message réseau, pas un refus', () {
+    for (final cut in [
+      'ffmpeg: tcp: Connection timed out',
+      'ffmpeg: tcp: Connection refused',
+      'stream: Network is unreachable',
+      'ffmpeg: Connection reset by peer',
+    ]) {
+      expect(PlaybackFailed.fromMpv(cut).network, isTrue, reason: cut);
+    }
+    const timeout = PlaybackFailed(network: true);
+    expect(timeout.message, isNot(const PlaybackFailed().message));
+    expect(timeout.message, contains('connexion'));
+    expect(timeout.message, isNot(contains('abonnement')));
+    for (final refused in [
+      'stream: HTTP error 403 Forbidden',
+      'ffmpeg: Server returned 5XX Server Error reply',
+    ]) {
+      expect(PlaybackFailed.fromMpv(refused).network, isFalse, reason: refused);
+    }
+  });
+
   test('vidéo illisible : autre message, pas de nouvel essai', () async {
     // Message réel de mpv sur Android pour une vidéo en 4:4:4.
     final unreadable = PlaybackFailed.fromMpv('Could not open codec.');

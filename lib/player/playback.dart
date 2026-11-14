@@ -45,12 +45,15 @@ final class PlayRequest {
 
 /// Le flux n'a pas pu démarrer, nouvelles tentatives comprises.
 final class PlaybackFailed implements Exception {
-  const PlaybackFailed({this.unreadable = false});
+  const PlaybackFailed({this.unreadable = false, this.network = false});
 
   /// D'après une erreur de mpv : fichier reçu mais illisible (format ou
-  /// codec non pris en charge), sinon refus ou coupure du serveur.
-  factory PlaybackFailed.fromMpv(String reason) =>
-      PlaybackFailed(unreadable: _unreadable.hasMatch(reason));
+  /// codec non pris en charge), connexion coupée ou sans réponse, sinon
+  /// refus du serveur.
+  factory PlaybackFailed.fromMpv(String reason) => PlaybackFailed(
+    unreadable: _unreadable.hasMatch(reason),
+    network: _network.hasMatch(reason),
+  );
 
   static final _unreadable = RegExp(
     r'codec|decoder|unsupported|unrecognized|recognize file format|'
@@ -58,13 +61,26 @@ final class PlaybackFailed implements Exception {
     caseSensitive: false,
   );
 
+  static final _network = RegExp(
+    r'timed out|timeout|connection refused|connection reset|unreachable|'
+    r'broken pipe|resolve',
+    caseSensitive: false,
+  );
+
   /// Le serveur a bien envoyé le fichier, mais cet appareil ne sait pas le
   /// lire : réessayer n'y change rien.
   final bool unreadable;
 
+  /// Pas de réponse à temps, ou connexion coupée : le serveur n'a rien
+  /// refusé.
+  final bool network;
+
   String get message => unreadable
       ? 'Cette vidéo ne peut pas être lue sur cet appareil : son format '
             'n\'est pas pris en charge.'
+      : network
+      ? 'La connexion au serveur a échoué (délai dépassé ou réseau coupé). '
+            'Vérifie ta connexion, puis réessaie.'
       : 'Le serveur refuse la connexion : un autre appareil utilise '
             'peut-être ton abonnement.';
 
@@ -253,7 +269,7 @@ final class Playback {
       await started;
     } on TimeoutException {
       log('Lecture', error: 'le flux ne démarre pas');
-      throw const PlaybackFailed();
+      throw const PlaybackFailed(network: true);
     } finally {
       if (identical(_starting, done)) _starting = null;
       for (final subscription in subscriptions) {
