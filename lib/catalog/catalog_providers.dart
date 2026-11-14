@@ -23,11 +23,10 @@ final catalogRepositoryProvider = Provider.autoDispose<CatalogRepository>((
     throw StateError('Aucun compte actif');
   }
   final (id, host, username) = access;
-  final folder = ref.watch(accountFilesProvider).of(id).path;
   return CatalogRepository(
     client,
     CatalogCache(
-      Directory('$folder${Platform.pathSeparator}catalog'),
+      Directory(ref.watch(accountFilesProvider).path(id, 'catalog')),
       serverKey: serverKeyOf(host, username),
     ),
   );

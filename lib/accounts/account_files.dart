@@ -25,6 +25,10 @@ final class AccountFiles {
     return Directory('${root.path}${Platform.pathSeparator}$accountId');
   }
 
+  /// Chemin de [name] (fichier ou dossier) dans le dossier du compte.
+  String path(String accountId, String name) =>
+      '${of(accountId).path}${Platform.pathSeparator}$name';
+
   /// Efface toutes les données du compte, s'il en a.
   Future<void> delete(String accountId) async {
     final directory = of(accountId);

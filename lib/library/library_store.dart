@@ -118,9 +118,8 @@ final class LibraryNotifier extends Notifier<Library> {
       _store = null;
       return const Library();
     }
-    final folder = ref.watch(accountFilesProvider).of(id).path;
     final store = _store = LibraryStore(
-      File('$folder${Platform.pathSeparator}library.json'),
+      File(ref.watch(accountFilesProvider).path(id, 'library.json')),
     );
     return store.load();
   }

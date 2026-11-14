@@ -45,4 +45,13 @@ void main() {
     expect(first.readAsStringSync(), 'a');
     expect(second.readAsStringSync(), 'b');
   });
+
+  test('path : un fichier dans le dossier du compte', () {
+    final files = AccountFiles(root);
+    expect(
+      files.path('compte', 'library.json'),
+      '${files.of('compte').path}${Platform.pathSeparator}library.json',
+    );
+    expect(() => files.path('../x', 'library.json'), throwsArgumentError);
+  });
 }

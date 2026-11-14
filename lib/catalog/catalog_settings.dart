@@ -28,8 +28,7 @@ final class CatalogFilterNotifier extends Notifier<CatalogFilter> {
       return const CatalogFilter();
     }
     final file = _file = File(
-      '${ref.watch(accountFilesProvider).of(id).path}'
-      '${Platform.pathSeparator}catalog_settings.json',
+      ref.watch(accountFilesProvider).path(id, 'catalog_settings.json'),
     );
     // Lecture synchrone : quelques centaines d'octets, et le filtre doit être
     // connu avant d'afficher la moindre catégorie.
