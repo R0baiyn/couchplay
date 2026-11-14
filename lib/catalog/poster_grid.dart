@@ -154,6 +154,35 @@ class PosterTile extends StatelessWidget {
   /// Marge autour du titre.
   static const _titleMargin = 8.0;
 
+  /// Hauteur des cases de largeur [width] dont le plus haut titre est l'un
+  /// de [titles] : pour une rangée paresseuse, qui ne mesure pas ses cases.
+  /// Mêmes règles que le `Text` du titre (style, taille du texte, gras).
+  static double heightFor(
+    BuildContext context,
+    double width,
+    Iterable<String> titles,
+  ) {
+    var style = DefaultTextStyle.of(context).style
+        .merge(Theme.of(context).textTheme.bodySmall);
+    if (MediaQuery.boldTextOf(context)) {
+      style = style.merge(const TextStyle(fontWeight: FontWeight.bold));
+    }
+    var text = 0.0;
+    for (final title in titles) {
+      final painter = TextPainter(
+        text: TextSpan(text: title, style: style),
+        maxLines: 2,
+        ellipsis: '…',
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        textHeightBehavior: DefaultTextHeightBehavior.maybeOf(context),
+      )..layout(maxWidth: width - 2 * _titleMargin);
+      if (painter.height > text) text = painter.height;
+      painter.dispose();
+    }
+    return width * 3 / 2 + 2 * _titleMargin - _border + text;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

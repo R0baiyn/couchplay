@@ -1,7 +1,9 @@
+import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/library/home_screen.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,5 +48,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Continuer à regarder'), findsOneWidget);
     expect(find.text('Horizon'), findsOneWidget);
+  });
+
+  testWidgets('« Ma liste » de 200 favoris : seules les affiches visibles '
+      'sont construites, à la hauteur exacte de la rangée', (tester) async {
+    final container = await libraryContainer(tester);
+    final library = container.read(libraryProvider.notifier);
+    await tester.runAsync(() async {
+      for (var i = 0; i < 200; i++) {
+        await library.addFavorite(
+          key: 'movie:$i',
+          // Un titre sur deux tient sur deux lignes.
+          name: i.isEven ? 'Film $i' : 'Un très long titre de film numéro $i',
+        );
+      }
+    });
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: HomeScreen()),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    final built = find.byType(PosterTile, skipOffstage: false).evaluate();
+    expect(built.length, lessThan(20));
+    // Pas de place perdue ni de débordement (qui ferait échouer le test) :
+    // le plus haut titre finit à la marge du bas de sa case.
+    double gapUnderTitle(Element tile) {
+      RenderParagraph? title;
+      void visit(Element e) {
+        if (e.renderObject case final RenderParagraph p) title = p;
+        e.visitChildren(visit);
+      }
+
+      tile.visitChildren(visit);
+      final box = tile.renderObject! as RenderBox;
+      final bottom = title!.localToGlobal(Offset(0, title!.size.height)).dy;
+      return box.localToGlobal(Offset(0, box.size.height)).dy - bottom;
+    }
+
+    expect(built.map(gapUnderTitle).reduce((a, b) => a < b ? a : b), 8);
   });
 }
