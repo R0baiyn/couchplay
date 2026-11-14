@@ -135,6 +135,37 @@ void main() {
     );
   });
 
+  test(
+    'marquer un épisode vu ou non vu ne fait pas revenir sa série',
+    () async {
+      final c = await container();
+      final library = c.read(libraryProvider.notifier);
+      final old = episode('a', '45');
+      await library.saveProgress(
+        old,
+        position: const Duration(seconds: 600),
+        duration: const Duration(seconds: 3000),
+      );
+      await library.saveProgress(
+        episode('b', '45'),
+        position: const Duration(seconds: 600),
+        duration: const Duration(seconds: 3000),
+      );
+      final before = c.read(libraryProvider).progress['episode:a']!.updatedAt;
+      await library.hide(c.read(libraryProvider).progress['episode:b']!);
+
+      await library.setWatched(old, watched: true);
+      await library.setWatched(episode('c', '45'), watched: true);
+      await library.setWatched(old, watched: false);
+
+      final progress = c.read(libraryProvider).progress;
+      expect(progress['episode:a']!.updatedAt, before);
+      expect(progress['episode:a']!.hidden, isTrue);
+      expect(progress['episode:c']!.hidden, isTrue);
+      expect(c.read(libraryProvider).continueWatching, isEmpty);
+    },
+  );
+
   test('retirer une ligne et effacer, conservés au redémarrage', () async {
     final first = await container();
     final library = first.read(libraryProvider.notifier);

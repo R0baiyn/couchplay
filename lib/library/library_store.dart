@@ -170,9 +170,16 @@ final class LibraryNotifier extends Notifier<Library> {
     );
   }
 
-  /// « Marquer comme vu / non vu », depuis la liste des épisodes.
+  /// « Marquer comme vu / non vu », depuis la liste des épisodes. Ce n'est
+  /// pas regarder : la date et le retrait de « Continuer à regarder » restent
+  /// ceux de l'entrée, ou de sa série pour un épisode encore jamais marqué.
   Future<void> setWatched(PlayItem item, {required bool watched}) {
     final previous = state.progress[item.key];
+    final seriesHidden =
+        item.seriesId != null &&
+        state.progress.values.any(
+          (p) => p.hidden && p.item.seriesId == item.seriesId,
+        );
     return _set(
       state.withProgress(
         Progress(
@@ -185,7 +192,8 @@ final class LibraryNotifier extends Notifier<Library> {
               : Duration.zero,
           duration: previous?.duration ?? Duration.zero,
           watched: watched,
-          updatedAt: DateTime.now().toUtc(),
+          hidden: previous?.hidden ?? seriesHidden,
+          updatedAt: previous?.updatedAt ?? DateTime.now().toUtc(),
         ),
       ),
     );
