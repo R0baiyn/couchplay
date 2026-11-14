@@ -323,24 +323,37 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             zone(
               _rail,
               _railKey,
-              NavigationRail(
-                selectedIndex: _index,
-                onDestinationSelected: _select,
-                labelType: NavigationRailLabelType.all,
-                // Les réglages, tout en bas du rail.
-                trailingAtBottom: true,
-                trailing: const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: SettingsButton(inRail: true),
-                ),
-                destinations: [
-                  for (final (icon, selected, label) in _tabs)
-                    NavigationRailDestination(
-                      icon: _tabIcon(icon, 56),
-                      selectedIcon: _tabIcon(selected, 56),
-                      label: Text(label),
+              // Peu de hauteur (fenêtre basse, clavier ouvert) : le rail défile
+              // au lieu de superposer les réglages aux onglets.
+              LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                ],
+                    child: IntrinsicHeight(
+                      child: NavigationRail(
+                        selectedIndex: _index,
+                        onDestinationSelected: _select,
+                        labelType: NavigationRailLabelType.all,
+                        // Les réglages, tout en bas du rail.
+                        trailingAtBottom: true,
+                        trailing: const Padding(
+                          padding: EdgeInsets.only(bottom: 16),
+                          child: SettingsButton(inRail: true),
+                        ),
+                        destinations: [
+                          for (final (icon, selected, label) in _tabs)
+                            NavigationRailDestination(
+                              icon: _tabIcon(icon, 56),
+                              selectedIcon: _tabIcon(selected, 56),
+                              label: Text(label),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
             const VerticalDivider(width: 1),

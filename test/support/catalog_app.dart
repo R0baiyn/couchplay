@@ -7,6 +7,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/catalog/catalog_index.dart';
+import 'package:couchplay/catalog/catalog_screen.dart';
 import 'package:couchplay/home_shell.dart';
 
 import 'package:couchplay/server/models.dart';
@@ -166,7 +167,13 @@ Future<void> openCategory(WidgetTester tester, String name) async {
   await tester.scrollUntilVisible(
     find.text(name),
     200,
-    scrollable: find.byType(Scrollable).first,
+    // Pas celui du rail.
+    scrollable: find
+        .descendant(
+          of: find.byType(CatalogScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
   );
   await tester.tap(find.text(name));
   await settle(tester);

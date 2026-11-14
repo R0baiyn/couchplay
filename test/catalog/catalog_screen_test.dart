@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:couchplay/catalog/catalog_screen.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
@@ -266,7 +267,13 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('AR · ARABE أفلام عربية'),
       200,
-      scrollable: find.byType(Scrollable).first,
+      // Pas celui du rail.
+      scrollable: find
+          .descendant(
+            of: find.byType(CatalogScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     expect(find.text('AR · ARABE أفلام عربية'), findsOneWidget);
   });
