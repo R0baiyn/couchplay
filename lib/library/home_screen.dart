@@ -21,7 +21,15 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final library = ref.watch(libraryProvider);
-    final started = library.continueWatching;
+    // Une série finie n'y est que si son épisode suivant est connu : sinon
+    // l'en-tête resterait au-dessus d'une rangée vide.
+    final started = [
+      for (final entry in library.continueWatching)
+        if (!entry.finished)
+          (entry: entry, next: null)
+        else if (_upNext(ref, entry) case final next?)
+          (entry: entry, next: next),
+    ];
     final favorites = library.favoritesByDate;
     final hasHistory = library.progress.isNotEmpty;
     final seen = library.seen;
@@ -49,11 +57,13 @@ class HomeScreen extends ConsumerWidget {
             header('Continuer à regarder'),
             _PosterRow(
               children: [
-                for (final entry in started)
-                  entry.finished
-                      ? _UpNext(
-                          key: ValueKey(entry.item.key),
-                          finished: entry,
+                for (final (:entry, :next) in started)
+                  next != null
+                      ? _tile(
+                          key: ValueKey(next.key),
+                          title: next.shortTitle,
+                          imageUrl: next.poster,
+                          onTap: () => openPlayer(context, ref, next),
                           onMenu: () => _confirmHide(context, ref, entry),
                         )
                       : _tile(
@@ -204,33 +214,17 @@ Widget _tile({
   ),
 );
 
-/// Série dont l'épisode regardé en dernier est fini : l'épisode qui suit,
-/// à lancer depuis le début. Rien tant que la fiche de la série n'est pas
-/// chargée, ni à la fin de la série.
+/// Série dont l'épisode regardé en dernier ([finished]) est fini : l'épisode
+/// qui suit, à lancer depuis le début. `null` tant que la fiche de la série
+/// n'est pas chargée, et à la fin de la série.
 ///
 /// La fiche vient du cache du catalogue (un jour) : au plus une requête au
 /// serveur par série et par jour, pas une à chaque lancement.
-class _UpNext extends ConsumerWidget {
-  const _UpNext({super.key, required this.finished, required this.onMenu});
-
-  final Progress finished;
-  final VoidCallback onMenu;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final series = ref
-        .watch(cachedSeriesDetailsProvider(finished.item.seriesId!))
-        .value;
-    final next = series == null ? null : nextEpisode(series, finished.item);
-    if (next == null) return const SizedBox.shrink();
-    return _tile(
-      key: ValueKey(next.item.key),
-      title: next.item.shortTitle,
-      imageUrl: next.item.poster,
-      onTap: () => openPlayer(context, ref, next.item),
-      onMenu: onMenu,
-    );
-  }
+PlayItem? _upNext(WidgetRef ref, Progress finished) {
+  final series = ref
+      .watch(cachedSeriesDetailsProvider(finished.item.seriesId!))
+      .value;
+  return series == null ? null : nextEpisode(series, finished.item)?.item;
 }
 
 /// Défilement de côté au doigt et à la souris (glisser), en plus de Shift +

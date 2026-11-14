@@ -402,6 +402,38 @@ void main() {
     expect(inContinue('Les Veilleurs · S1E2'), findsNothing);
   });
 
+  testWidgets('série finie, rien à suivre : pas d\'en-tête « Continuer »', (
+    tester,
+  ) async {
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'progress': {
+            'episode:6923': {
+              'seriesId': '1',
+              'season': 2,
+              'episode': 3,
+              'name': 'Les Veilleurs',
+              'extension': 'mkv',
+              'position': 2700,
+              'duration': 2700,
+              'watched': true,
+              'updatedAt': '2026-01-03T00:00:00Z',
+            },
+          },
+        }),
+      );
+    await pumpApp(tester, openMovies: false);
+    for (var i = 0; i < 5; i++) {
+      await settle(tester);
+    }
+
+    expect(find.text('Ma liste'), findsOneWidget);
+    expect(find.text('Continuer à regarder'), findsNothing);
+  });
+
   testWidgets('pastilles : cœur et coche, même d\'une autre catégorie', (
     tester,
   ) async {
