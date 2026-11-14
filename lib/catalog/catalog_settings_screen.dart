@@ -46,40 +46,49 @@ class CatalogSettingsScreen extends ConsumerWidget {
       );
     } else if ((movies.value, series.value) case (final m?, final s?)) {
       final tags = detectTags([...m.value, ...s.value]);
-      body = ListView(
-        children: [
-          SwitchListTile(
-            autofocus: true,
-            title: const FocusRing(child: Text('Afficher le contenu adulte')),
-            value: filter.showAdult,
-            onChanged: notifier.setShowAdult,
-          ),
-          const Divider(),
-          ListTile(
-            title: const FocusRing(child: Text('Pays et langues affichés')),
-            subtitle: Text(
-              filter.tags.isEmpty
-                  ? 'Aucun coché : tout est affiché.'
-                  : 'Les catégories sans pays restent toujours affichées.',
-            ),
-          ),
-          for (final tag in tags)
-            CheckboxListTile(
-              title: FocusRing(child: Text(_tagNames[tag] ?? tag)),
-              subtitle: _tagNames.containsKey(tag) ? Text(tag) : null,
-              value: filter.tags.contains(tag),
-              onChanged: (shown) => notifier.setTag(tag, shown: shown ?? false),
-            ),
-          const Divider(),
-          ListTile(
-            title: const FocusRing(child: Text('Catégories une par une')),
-            subtitle: const Text('Pour afficher ou masquer une catégorie'),
-            trailing: filter.overrides.isEmpty
-                ? null
-                : TextButton(
-                    onPressed: notifier.resetCategories,
-                    child: const Text('Rétablir'),
-                  ),
+      // Slivers : les catégories, des centaines, ne sont construites qu'en
+      // défilant.
+      body = CustomScrollView(
+        slivers: [
+          SliverList.list(
+            children: [
+              SwitchListTile(
+                autofocus: true,
+                title: const FocusRing(
+                  child: Text('Afficher le contenu adulte'),
+                ),
+                value: filter.showAdult,
+                onChanged: notifier.setShowAdult,
+              ),
+              const Divider(),
+              ListTile(
+                title: const FocusRing(child: Text('Pays et langues affichés')),
+                subtitle: Text(
+                  filter.tags.isEmpty
+                      ? 'Aucun coché : tout est affiché.'
+                      : 'Les catégories sans pays restent toujours affichées.',
+                ),
+              ),
+              for (final tag in tags)
+                CheckboxListTile(
+                  title: FocusRing(child: Text(_tagNames[tag] ?? tag)),
+                  subtitle: _tagNames.containsKey(tag) ? Text(tag) : null,
+                  value: filter.tags.contains(tag),
+                  onChanged: (shown) =>
+                      notifier.setTag(tag, shown: shown ?? false),
+                ),
+              const Divider(),
+              ListTile(
+                title: const FocusRing(child: Text('Catégories une par une')),
+                subtitle: const Text('Pour afficher ou masquer une catégorie'),
+                trailing: filter.overrides.isEmpty
+                    ? null
+                    : TextButton(
+                        onPressed: notifier.resetCategories,
+                        child: const Text('Rétablir'),
+                      ),
+              ),
+            ],
           ),
           _CategoryChoices(
             title: 'Films',
@@ -106,7 +115,11 @@ class CatalogSettingsScreen extends ConsumerWidget {
   }
 }
 
-class _CategoryChoices extends ConsumerWidget {
+/// Un type de contenu, repliable, et ses catégories en dessous une fois
+/// déplié : en sliver paresseux plutôt que dans l'`ExpansionTile`, qui les
+/// construirait toutes d'un coup. Mêmes bordures qu'un `ExpansionTile`
+/// déplié : un trait au-dessus de l'en-tête, un sous la dernière catégorie.
+class _CategoryChoices extends ConsumerStatefulWidget {
   const _CategoryChoices({
     required this.title,
     required this.kind,
@@ -120,20 +133,53 @@ class _CategoryChoices extends ConsumerWidget {
   final CatalogFilter filter;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CategoryChoices> createState() => _CategoryChoicesState();
+}
+
+class _CategoryChoicesState extends ConsumerState<_CategoryChoices> {
+  var _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = widget.kind;
+    final categories = widget.categories;
+    final filter = widget.filter;
     final visible = filter.apply(kind, categories).length;
-    return ExpansionTile(
-      title: FocusRing(child: Text(title)),
-      subtitle: Text('$visible affichées sur ${categories.length}'),
-      children: [
-        for (final category in categories)
-          CheckboxListTile(
-            dense: true,
-            title: FocusRing(child: Text(category.name)),
-            value: filter.isVisible(kind, category),
-            onChanged: (shown) => ref
-                .read(catalogFilterProvider.notifier)
-                .setCategory(kind, category, shown: shown ?? false),
+    final divider = BorderSide(color: Theme.of(context).dividerColor);
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverToBoxAdapter(
+          child: ExpansionTile(
+            title: FocusRing(child: Text(widget.title)),
+            subtitle: Text('$visible affichées sur ${categories.length}'),
+            shape: Border(top: divider),
+            onExpansionChanged: (expanded) =>
+                setState(() => _expanded = expanded),
+          ),
+        ),
+        if (_expanded)
+          SliverList.builder(
+            itemCount: categories.length,
+            itemBuilder: (context, i) {
+              final category = categories[i];
+              final tile = CheckboxListTile(
+                dense: true,
+                title: FocusRing(child: Text(category.name)),
+                value: filter.isVisible(kind, category),
+                onChanged: (shown) => ref
+                    .read(catalogFilterProvider.notifier)
+                    .setCategory(kind, category, shown: shown ?? false),
+              );
+              return i < categories.length - 1
+                  ? tile
+                  : DecoratedBox(
+                      position: DecorationPosition.foreground,
+                      decoration: BoxDecoration(
+                        border: Border(bottom: divider),
+                      ),
+                      child: tile,
+                    );
+            },
           ),
       ],
     );
