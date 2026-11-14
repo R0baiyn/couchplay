@@ -163,11 +163,11 @@ final class Progress {
       ? (position.inMilliseconds / duration.inMilliseconds).clamp(0, 1)
       : 0;
 
-  Progress copyWith({bool? watched, bool? hidden}) => Progress(
+  Progress copyWith({bool? hidden}) => Progress(
     item: item,
     position: position,
     duration: duration,
-    watched: watched ?? this.watched,
+    watched: watched,
     hidden: hidden ?? this.hidden,
     updatedAt: updatedAt,
   );

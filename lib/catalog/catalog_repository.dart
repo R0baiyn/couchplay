@@ -26,16 +26,12 @@ final class Loaded<T> {
 /// demande (`refresh`), le serveur est interrogé ; s'il est injoignable, le
 /// cache sert quand même, marqué hors ligne.
 final class CatalogRepository {
-  CatalogRepository(
-    this._client,
-    this._cache, {
-    this.maxAge = const Duration(hours: 24),
-    this._now = DateTime.now,
-  });
+  CatalogRepository(this._client, this._cache, {this._now = DateTime.now});
+
+  static const maxAge = Duration(hours: 24);
 
   final ServerClient _client;
   final CatalogCache _cache;
-  final Duration maxAge;
   final DateTime Function() _now;
 
   Future<Loaded<List<Category>>> categories(
@@ -103,7 +99,8 @@ final class CatalogRepository {
     final path = _cache.path(name);
     final savedAt = path == null ? null : await _cache.savedAt(path);
     final fresh =
-        savedAt != null && _now().difference(savedAt) < (maxAge ?? this.maxAge);
+        savedAt != null &&
+        _now().difference(savedAt) < (maxAge ?? CatalogRepository.maxAge);
     if (path != null && fresh && !refresh) {
       if (await _readCached(path, parse) case final value?) {
         return Loaded(value, savedAt: savedAt);
