@@ -81,17 +81,9 @@ class _TvEntryState extends State<_TvEntry> {
   TextEntry get _field => widget.field;
 
   Future<void> _edit(FormFieldState<String> state) async {
-    final decoration = _field.decoration;
     final value = await showDialog<String>(
       context: context,
-      builder: (_) => _EntryDialog(
-        title: decoration.labelText ?? decoration.hintText ?? '',
-        initial: _field.controller.text,
-        obscureText: _field.obscureText,
-        keyboardType: _field.keyboardType,
-        autocorrect: _field.autocorrect,
-        enableSuggestions: _field.enableSuggestions,
-      ),
+      builder: (_) => _EntryDialog(field: _field),
     );
     if (value == null || !mounted) return;
     _field.controller.text = value;
@@ -145,29 +137,19 @@ class _TvEntryState extends State<_TvEntry> {
 /// Saisie d'une valeur : le clavier à l'écran s'ouvre ; « OK », ou la touche
 /// de validation du clavier, rend le texte, « Annuler » ou retour rend `null`.
 class _EntryDialog extends StatefulWidget {
-  const _EntryDialog({
-    required this.title,
-    required this.initial,
-    required this.obscureText,
-    required this.keyboardType,
-    required this.autocorrect,
-    required this.enableSuggestions,
-  });
+  const _EntryDialog({required this.field});
 
-  final String title;
-  final String initial;
-  final bool obscureText;
-  final TextInputType? keyboardType;
-  final bool autocorrect;
-  final bool enableSuggestions;
+  /// Le champ à remplir : son libellé, sa valeur de départ, ses réglages.
+  final TextEntry field;
 
   @override
   State<_EntryDialog> createState() => _EntryDialogState();
 }
 
 class _EntryDialogState extends State<_EntryDialog> {
-  late final _controller = TextEditingController(text: widget.initial);
-  late var _obscure = widget.obscureText;
+  TextEntry get _field => widget.field;
+  late final _controller = TextEditingController(text: _field.controller.text);
+  late var _obscure = _field.obscureText;
 
   @override
   void dispose() {
@@ -177,21 +159,22 @@ class _EntryDialogState extends State<_EntryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final decoration = _field.decoration;
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(decoration.labelText ?? decoration.hintText ?? ''),
       content: TextField(
         controller: _controller,
         autofocus: true,
         obscureText: _obscure,
-        keyboardType: widget.keyboardType,
-        autocorrect: widget.autocorrect,
-        enableSuggestions: widget.enableSuggestions,
+        keyboardType: _field.keyboardType,
+        autocorrect: _field.autocorrect,
+        enableSuggestions: _field.enableSuggestions,
         textInputAction: TextInputAction.done,
         onSubmitted: (value) => Navigator.pop(context, value),
       ),
       actions: [
         // Avec les autres boutons, pas dans le champ : les flèches y vont.
-        if (widget.obscureText)
+        if (_field.obscureText)
           TextButton(
             onPressed: () => setState(() => _obscure = !_obscure),
             child: Text(_obscure ? 'Afficher' : 'Masquer'),
