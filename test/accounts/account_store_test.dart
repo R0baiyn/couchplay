@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account.dart';
@@ -179,6 +180,115 @@ void main() {
     });
   });
 
+  group("stockage illisible à l'ouverture, puis un ajout", () {
+    late Directory root;
+
+    setUp(() => root = Directory.systemTemp.createTempSync('couchplay_q02_'));
+    tearDown(() => root.deleteSync(recursive: true));
+
+    Future<ProviderContainer> containerOn(AccountStore store) async {
+      final files = AccountFiles(Directory('${root.path}/accounts'));
+      return ProviderContainer.test(
+        overrides: [
+          accountStoreProvider.overrideWithValue(store),
+          accountFilesProvider.overrideWithValue(files),
+        ],
+      );
+    }
+
+    Future<void> seed(List<String> ids) async {
+      var state = const AccountsState();
+      for (final id in ids) {
+        state = state.withAccount(_account(id));
+      }
+      FlutterSecureStorage.setMockInitialValues({
+        'accounts': jsonEncode(state.toJson()),
+      });
+    }
+
+    test('échec passager : les anciens comptes sont gardés', () async {
+      await seed(['a', 'b']);
+      final store = await AccountStore.open(_FailingStorage(failedReads: 1));
+      expect(store.unreadable, isTrue);
+      final container = await containerOn(store);
+
+      await container.read(accountsProvider.notifier).save(_account('c'));
+
+      expect(container.read(accountsProvider).accounts.map((x) => x.id), [
+        'a',
+        'b',
+        'c',
+      ]);
+      expect(store.unreadable, isFalse);
+      final reopened = (await AccountStore.open()).current;
+      expect(reopened.accounts.map((x) => x.id), ['a', 'b', 'c']);
+    });
+
+    test("contenu corrompu : gardé de côté avant d'être remplacé", () async {
+      FlutterSecureStorage.setMockInitialValues({'accounts': '{pas du json'});
+      final store = await AccountStore.open();
+      final container = await containerOn(store);
+
+      await container.read(accountsProvider.notifier).save(_account('c'));
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'accounts.bak'), '{pas du json');
+      final reopened = (await AccountStore.open()).current;
+      expect(reopened.accounts.map((x) => x.id), ['c']);
+    });
+
+    test(
+      'profil Windows copié : le fichier effacé, on recrée un compte',
+      () async {
+        // Le plugin Windows efface le fichier qu'il ne déchiffre pas, puis
+        // relance l'erreur : la relecture ne trouve plus rien.
+        FlutterSecureStorage.setMockInitialValues({});
+        final store = await AccountStore.open(_FailingStorage(failedReads: 1));
+        final container = await containerOn(store);
+
+        await container.read(accountsProvider.notifier).save(_account('c'));
+
+        final reopened = (await AccountStore.open()).current;
+        expect(reopened.accounts.map((x) => x.id), ['c']);
+      },
+    );
+
+    test('illisible pour de bon : on peut recréer un compte', () async {
+      // Android, clé du Keystore perdue : lecture et écriture échouent
+      // jusqu'à ce que le stockage reparte de zéro.
+      await seed(['a']);
+      final store = await AccountStore.open(
+        _FailingStorage(writes: false),
+        const FlutterSecureStorage(),
+      );
+      final container = await containerOn(store);
+
+      await container.read(accountsProvider.notifier).save(_account('c'));
+
+      expect(container.read(accountsProvider).accounts.map((x) => x.id), ['c']);
+      final reopened = (await AccountStore.open()).current;
+      expect(reopened.accounts.map((x) => x.id), ['c']);
+    });
+
+    test(
+      'lisible : une écriture qui échoue remonte, rien n\'est effacé',
+      () async {
+        await seed(['a']);
+        final store = await AccountStore.open(
+          _FailingStorage(failedReads: 0, writes: false),
+          const FlutterSecureStorage(),
+        );
+
+        await expectLater(
+          store.save(const AccountsState()),
+          throwsA(isA<FileSystemException>()),
+        );
+        final reopened = (await AccountStore.open()).current;
+        expect(reopened.accounts.map((x) => x.id), ['a']);
+      },
+    );
+  });
+
   test(
     'sync crée les dossiers manquants et efface ceux des comptes disparus',
     () async {
@@ -224,8 +334,15 @@ void main() {
   });
 }
 
-/// Stockage dont la lecture échoue (déchiffrement, keystore passager).
+/// Stockage dont les [failedReads] premières lectures échouent
+/// (déchiffrement, Keystore passager), puis lisent le stockage de test ;
+/// ses écritures échouent toutes si [writes] est faux (clé Keystore perdue).
 final class _FailingStorage extends FlutterSecureStorage {
+  _FailingStorage({this.failedReads = 1 << 30, this.writes = true});
+
+  int failedReads;
+  final bool writes;
+
   @override
   Future<String?> read({
     required String key,
@@ -235,5 +352,24 @@ final class _FailingStorage extends FlutterSecureStorage {
     WebOptions? webOptions,
     AppleOptions? mOptions,
     WindowsOptions? wOptions,
-  }) => Future.error(const FileSystemException('déchiffrement'));
+  }) {
+    if (failedReads-- > 0) {
+      return Future.error(const FileSystemException('déchiffrement'));
+    }
+    return super.read(key: key);
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) => writes
+      ? super.write(key: key, value: value)
+      : Future.error(const FileSystemException('clé perdue'));
 }

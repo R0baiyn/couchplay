@@ -72,43 +72,108 @@ final class AccountsState {
 /// Un seul enregistrement contient tous les comptes et le compte actif : une
 /// écriture les change ensemble, sans état intermédiaire incohérent.
 final class AccountStore {
-  AccountStore._(this._storage, this._current, {this.unreadable = false});
+  AccountStore._(
+    this._storage,
+    this._resetting,
+    this._current, {
+    this._unreadable = false,
+  });
 
   static const _key = 'accounts';
 
+  /// Copie d'un enregistrement déchiffré mais corrompu, gardée avant qu'une
+  /// écriture le remplace. Elle reste dans le stockage chiffré.
+  static const _backupKey = 'accounts.bak';
+
+  /// Sur erreur de déchiffrement, le plugin Android effaçait lui-même tout
+  /// le stockage (`resetOnError` vaut `true` par défaut) : un échec passager
+  /// du Keystore perdait les comptes. Les autres options gardent leurs
+  /// valeurs par défaut : une 1.2.0 relit ses comptes.
+  static const _android = AndroidOptions(resetOnError: false);
+
   final FlutterSecureStorage _storage;
+
+  /// Le même stockage, qui repart de zéro s'il ne peut plus rien déchiffrer
+  /// (Android, clé du Keystore perdue) : sinon aucun compte ne pourrait plus
+  /// jamais être enregistré.
+  final FlutterSecureStorage _resetting;
 
   AccountsState _current;
 
   /// Dernier état enregistré (ou lu à l'ouverture, avant le premier rendu).
   AccountsState get current => _current;
 
+  bool _unreadable;
+
   /// Vrai si l'enregistrement existait mais n'a pas pu être lu : l'état sans
   /// compte ne dit alors rien des dossiers de données, qu'il faut garder.
-  final bool unreadable;
+  /// Faux dès qu'une relecture ou une écriture réussit.
+  bool get unreadable => _unreadable;
 
   static Future<AccountStore> open([
-    FlutterSecureStorage storage = const FlutterSecureStorage(),
+    FlutterSecureStorage storage = const FlutterSecureStorage(
+      aOptions: _android,
+    ),
+    FlutterSecureStorage resetting = const FlutterSecureStorage(),
   ]) async {
     try {
       final raw = await storage.read(key: _key);
       final state = raw == null
           ? const AccountsState()
           : AccountsState.fromJson(jsonDecode(raw));
-      return AccountStore._(storage, state);
+      return AccountStore._(storage, resetting, state);
     } on Exception catch (e) {
-      // JSON corrompu, ou déchiffrement impossible (profil copié sur une
-      // autre machine) : on repart sans compte plutôt que de planter. La
-      // prochaine écriture remplace l'enregistrement illisible.
+      // JSON corrompu, ou déchiffrement impossible (Keystore passager,
+      // profil copié sur une autre machine) : on repart sans compte plutôt
+      // que de planter, et la première écriture relit d'abord ([recover]).
       // Le contenu n'est jamais loggé : il porte les mots de passe.
       log('Comptes illisibles, ignorés', error: e.runtimeType);
-      return AccountStore._(storage, const AccountsState(), unreadable: true);
+      return AccountStore._(
+        storage,
+        resetting,
+        const AccountsState(),
+        unreadable: true,
+      );
+    }
+  }
+
+  /// Avant une écriture, si l'enregistrement était illisible à l'ouverture :
+  /// le relit, pour ne pas écraser des comptes qu'un échec passager cachait.
+  /// Rend les comptes retrouvés, sur lesquels appliquer le changement ;
+  /// `null` s'il n'y a rien à reprendre. Un enregistrement lu mais corrompu
+  /// est copié sous [_backupKey].
+  Future<AccountsState?> recover() async {
+    if (!_unreadable) return null;
+    final String? raw;
+    try {
+      raw = await _storage.read(key: _key);
+    } on Exception catch (e) {
+      log('Comptes toujours illisibles', error: e.runtimeType);
+      return null;
+    }
+    if (raw == null) return null;
+    try {
+      final state = AccountsState.fromJson(jsonDecode(raw));
+      _current = state;
+      _unreadable = false;
+      return state;
+    } on FormatException {
+      await _storage.write(key: _backupKey, value: raw);
+      return null;
     }
   }
 
   Future<void> save(AccountsState state) async {
-    await _storage.write(key: _key, value: jsonEncode(state.toJson()));
+    final value = jsonEncode(state.toJson());
+    try {
+      await _storage.write(key: _key, value: value);
+    } on Exception catch (e) {
+      if (!_unreadable) rethrow;
+      log('Comptes illisibles, stockage remis à zéro', error: e.runtimeType);
+      await _resetting.write(key: _key, value: value);
+    }
     _current = state;
+    _unreadable = false;
   }
 }
 
@@ -170,8 +235,10 @@ final class AccountsNotifier extends Notifier<AccountsState> {
   /// Écrit d'abord : en cas d'échec, l'écran garde l'état réellement enregistré.
   Future<void> _commit(AccountsState Function(AccountsState) change) {
     final run = _pending.then((_) async {
+      final store = ref.read(accountStoreProvider);
+      if (await store.recover() case final found?) state = found;
       final next = change(state);
-      await ref.read(accountStoreProvider).save(next);
+      await store.save(next);
       state = next;
     });
     // Un échec est remonté à l'appelant, sans bloquer les écritures suivantes.
