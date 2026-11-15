@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../logging.dart';
+import 'release_signature.dart';
 
 /// Une version publiée plus récente que celle de l'app, et le fichier à
 /// télécharger pour cette variante (installée, portable, APK d'une
@@ -118,6 +119,11 @@ abstract interface class Installer {
   /// [installNow] ne sont appelés. `null` quand l'app s'installe seule.
   Future<void> Function(Uri page)? get openPage;
 
+  /// Le fichier n'est confié à [prepared] que s'il figure, avec sa somme,
+  /// dans la liste signée de sa release (`SHA256SUMS`, voir
+  /// `release_signature.dart`).
+  bool get signed;
+
   /// Quand s'installe une mise à jour remise à plus tard : la fin de « elle
   /// s'installera … ».
   String get later;
@@ -142,6 +148,16 @@ abstract interface class Installer {
   Future<bool> installPending(String current);
 }
 
+/// Le fichier téléchargé n'est pas dans la liste signée de sa release, ou
+/// n'y a pas sa somme : il est effacé, rien ne s'installe.
+final class UnsignedUpdate implements Exception {
+  const UnsignedUpdate(this.name);
+  final String name;
+
+  @override
+  String toString() => 'UnsignedUpdate: $name';
+}
+
 /// Vérifie les GitHub Releases du dépôt public (sans jeton), télécharge le
 /// fichier de la variante de l'app, puis le confie à son [Installer].
 final class Updater {
@@ -149,7 +165,9 @@ final class Updater {
     required this.version,
     required this.installer,
     HttpClientAdapter? adapter,
-  }) : _dio = Dio(
+    List<int>? publicKey,
+  }) : _publicKey = publicKey ?? releaseKey,
+       _dio = Dio(
          BaseOptions(
            connectTimeout: const Duration(seconds: 10),
            receiveTimeout: const Duration(seconds: 30),
@@ -173,6 +191,9 @@ final class Updater {
   final Installer installer;
 
   final Dio _dio;
+
+  /// Clé de la signature des releases ; une autre seulement dans les tests.
+  final List<int> _publicKey;
 
   /// Avancement du téléchargement en cours, de 0 à 1.
   final progress = ValueNotifier<double>(0);
@@ -229,22 +250,73 @@ final class Updater {
     final workDir = installer.workDir;
     if (await workDir.exists()) await workDir.delete(recursive: true);
     await workDir.create(recursive: true);
-    final package = File(
-      '${workDir.path}${Platform.pathSeparator}${installer.packageName}',
-    );
-    await _download(update, package);
+    File file(String name) =>
+        File('${workDir.path}${Platform.pathSeparator}$name');
+    final package = file(installer.packageName);
+    if (!installer.signed) {
+      await _download(update.asset, package, update.size);
+    } else {
+      // La liste et sa signature d'abord, à côté du fichier dans la même
+      // release : une release qui n'en a pas échoue avant le gros
+      // téléchargement.
+      final sums = file(sumsName);
+      final signature = file(signatureName);
+      await _download(
+        update.asset.resolve(sumsName),
+        sums,
+        _maxSums,
+        exact: false,
+      );
+      await _download(
+        update.asset.resolve(signatureName),
+        signature,
+        _maxSignature,
+        exact: false,
+      );
+      await _download(update.asset, package, update.size);
+      // Le nom porte la version annoncée : une release ne peut pas
+      // resservir le fichier signé d'une version plus ancienne.
+      final name = update.asset.pathSegments.last;
+      final signed =
+          name.contains('-${update.version}-') &&
+          await isSignedFile(
+            sums: await sums.readAsBytes(),
+            // Octets quelconques acceptés : le base64 décide.
+            signature: String.fromCharCodes(await signature.readAsBytes()),
+            name: name,
+            file: package,
+            publicKey: _publicKey,
+          );
+      if (!signed) {
+        await workDir.delete(recursive: true);
+        log('Mise à jour ${update.version} refusée : signature');
+        throw UnsignedUpdate(name);
+      }
+    }
     await installer.prepared(update, package);
     log('Mise à jour ${update.version} prête');
   }
 
-  /// Suit les redirections à la main : chaque étape doit rester en HTTPS
-  /// chez GitHub. Un fichier plus gros qu'annoncé est coupé dès qu'il
-  /// dépasse, sans attendre la fin.
-  Future<void> _download(Update update, File file) async {
-    progress.value = 0;
+  /// Taille maximale de `SHA256SUMS` : quelques lignes de 100 octets.
+  static const _maxSums = 64 * 1024;
+
+  /// Taille maximale de `SHA256SUMS.sig` : 64 octets en base64.
+  static const _maxSignature = 1024;
+
+  /// Télécharge [url] dans [file], qui doit faire exactement [size] octets,
+  /// ou au plus [size] si [exact] est faux (la liste et sa signature, sans
+  /// avancement affiché). Suit les redirections à la main : chaque étape
+  /// doit rester en HTTPS chez GitHub. Un fichier plus gros est coupé dès
+  /// qu'il dépasse, sans attendre la fin.
+  Future<void> _download(
+    Uri url,
+    File file,
+    int size, {
+    bool exact = true,
+  }) async {
+    if (exact) progress.value = 0;
     final cancel = _cancel = CancelToken();
     var tooBig = false;
-    var url = update.asset;
     for (var hop = 0; ; hop++) {
       if (hop > 5 || !isAllowedDownload(url)) {
         throw HttpException('Téléchargement refusé : ${url.host}');
@@ -260,11 +332,11 @@ final class Updater {
             validateStatus: (status) => status != null && status < 400,
           ),
           onReceiveProgress: (received, _) {
-            if (received > update.size) {
+            if (received > size) {
               tooBig = true;
               cancel.cancel();
             }
-            progress.value = (received / update.size).clamp(0, 1);
+            if (exact) progress.value = (received / size).clamp(0, 1);
           },
         );
       } on DioException catch (e) {
@@ -276,7 +348,7 @@ final class Updater {
             await Future<void>.delayed(const Duration(milliseconds: 20));
           }
         }
-        if (tooBig) throw HttpException('Plus gros que ${update.size} octets');
+        if (tooBig) throw HttpException('Plus gros que $size octets');
         rethrow;
       }
       final location = response.headers.value(HttpHeaders.locationHeader);
@@ -288,10 +360,8 @@ final class Updater {
         continue;
       }
       final length = await file.length();
-      if (length != update.size) {
-        throw HttpException(
-          'Taille inattendue : $length au lieu de ${update.size}',
-        );
+      if (exact ? length != size : length > size) {
+        throw HttpException('Taille inattendue : $length au lieu de $size');
       }
       return;
     }

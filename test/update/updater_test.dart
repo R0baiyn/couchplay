@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:couchplay/update/android_installer.dart';
 import 'package:couchplay/update/linux_installer.dart';
+import 'package:couchplay/update/release_signature.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +19,12 @@ import '../support/fake_server.dart';
 
 /// Installation simulée : retient ce qui lui est confié.
 final class _FakeInstaller implements Installer {
-  _FakeInstaller(this.workDir, {this.pending = false, this.pendingError});
+  _FakeInstaller(
+    this.workDir, {
+    this.pending = false,
+    this.pendingError,
+    this.signed = false,
+  });
 
   @override
   final Directory workDir;
@@ -28,6 +37,9 @@ final class _FakeInstaller implements Installer {
 
   /// Contenu de chaque fichier préparé.
   final received = <String>[];
+
+  @override
+  final bool signed;
 
   @override
   String get assetSuffix => '-windows-portable.zip';
@@ -181,6 +193,31 @@ void main() {
         (asset as Map)['browser_download_url'] = 'https://example.com/x.exe';
       }
       expect(updateFrom(json, current: '0.1.0', suffix: setup), isNull);
+    });
+
+    test('la liste et sa signature ne passent jamais pour un fichier', () {
+      // Une 1.2.1, qui ne vérifie rien, doit continuer à trouver son fichier.
+      final json = release();
+      json['assets'] = [
+        for (final name in [sumsName, signatureName])
+          {
+            'name': name,
+            'browser_download_url':
+                'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/$name',
+            'size': 10,
+          },
+        ...json['assets'] as List,
+      ];
+      for (final suffix in [
+        setup,
+        '-windows-portable.zip',
+        '-android-arm64.apk',
+        '-android-armv7.apk',
+        '-linux-x64.tar.gz',
+      ]) {
+        final update = updateFrom(json, current: '0.1.0', suffix: suffix)!;
+        expect(update.asset.path, endsWith(suffix));
+      }
     });
 
     test('réponse inattendue : rien, sans exception', () {
@@ -359,6 +396,152 @@ void main() {
         await expectLater(subject.prepare(update), throwsA(anything));
       }
       expect(adapter.calls, 2);
+    });
+  });
+
+  group('prepare signé (Windows)', () {
+    late Directory work;
+    late Directory updateDir;
+    late List<int> seed;
+    late List<int> publicKey;
+    late _FakeInstaller installer;
+    setUp(() async {
+      work = Directory.systemTemp.createTempSync('couchplay-signed');
+      updateDir = Directory('${work.path}${Platform.pathSeparator}update');
+      // Clé de test tirée à chaque exécution, jamais écrite en dur.
+      final random = Random.secure();
+      seed = [for (var i = 0; i < keyLength; i++) random.nextInt(256)];
+      publicKey = await publicKeyOf(seed);
+    });
+    tearDown(() => work.deleteSync(recursive: true));
+
+    const name = 'couchplay-0.1.1-windows-portable.zip';
+    Update updateOf(String file) => Update(
+      version: '0.1.1',
+      notes: '',
+      asset: Uri.parse(
+        'https://github.com/R0baiyn/couchplay/releases/download/v0.1.1/$file',
+      ),
+      size: 3,
+    );
+    final update = updateOf(name);
+
+    /// Liste de la release, avec la somme de [content] pour [listed].
+    Future<(String, String)> signedList(
+      String content, {
+      String listed = name,
+      List<int>? key,
+    }) async {
+      final sums = formatSums({
+        listed: sha256.convert(utf8.encode(content)).toString(),
+        'couchplay-0.1.1-windows-setup.exe': '0' * 64,
+      });
+      return (sums, await signBytes(utf8.encode(sums), key ?? seed));
+    }
+
+    /// Répond comme la release : la liste, sa signature et le fichier.
+    FakeAdapter release({
+      String? sums,
+      String? signature,
+      String package = 'abc',
+    }) => FakeAdapter((options) async {
+      final body = switch (options.uri.pathSegments.last) {
+        sumsName => sums,
+        signatureName => signature,
+        _ => package,
+      };
+      return ResponseBody.fromString(body ?? '', body == null ? 404 : 200);
+    });
+
+    Updater updater(FakeAdapter adapter) => Updater(
+      version: '0.1.0',
+      installer: installer = _FakeInstaller(updateDir, signed: true),
+      adapter: adapter,
+      publicKey: publicKey,
+    );
+
+    Future<void> expectRefused(FakeAdapter adapter, {Update? of}) async {
+      await expectLater(
+        updater(adapter).prepare(of ?? update),
+        throwsA(isA<UnsignedUpdate>()),
+      );
+      expect(installer.received, isEmpty);
+      expect(updateDir.existsSync(), isFalse, reason: 'fichier effacé');
+    }
+
+    test('fichier dans la liste signée : confié à l\'installation', () async {
+      final (sums, signature) = await signedList('abc');
+      final adapter = release(sums: sums, signature: signature);
+      await updater(adapter).prepare(update);
+      expect(installer.received, ['abc']);
+      expect(adapter.calls, 3);
+    });
+
+    test('fichier remplacé (même taille) : refusé et effacé', () async {
+      final (sums, signature) = await signedList('abc');
+      await expectRefused(
+        release(sums: sums, signature: signature, package: 'abd'),
+      );
+    });
+
+    test('liste modifiée après signature : refusée', () async {
+      final (_, signature) = await signedList('abc');
+      final (forged, _) = await signedList('abd');
+      await expectRefused(
+        release(sums: forged, signature: signature, package: 'abd'),
+      );
+    });
+
+    test('signée par une autre clé : refusée', () async {
+      final (sums, signature) = await signedList(
+        'abc',
+        key: List.filled(keyLength, 7),
+      );
+      await expectRefused(release(sums: sums, signature: signature));
+    });
+
+    test('signature illisible : refusée', () async {
+      final (sums, _) = await signedList('abc');
+      await expectRefused(release(sums: sums, signature: 'ÿþ'));
+    });
+
+    test('fichier absent de la liste : refusé', () async {
+      final (sums, signature) = await signedList(
+        'abc',
+        listed: 'couchplay-0.1.1-windows-other.zip',
+      );
+      await expectRefused(release(sums: sums, signature: signature));
+    });
+
+    test('fichier signé d\'une autre version : refusé', () async {
+      // Une release 0.1.1 qui ressert le zip signé de la 0.1.0.
+      const old = 'couchplay-0.1.0-windows-portable.zip';
+      final (sums, signature) = await signedList('abc', listed: old);
+      await expectRefused(
+        release(sums: sums, signature: signature),
+        of: updateOf(old),
+      );
+    });
+
+    test('signature absente : échec avant le gros téléchargement', () async {
+      final (sums, _) = await signedList('abc');
+      final adapter = release(sums: sums);
+      await expectLater(
+        updater(adapter).prepare(update),
+        throwsA(isA<DioException>()),
+      );
+      expect(installer.received, isEmpty);
+      expect(adapter.calls, 2, reason: 'fichier jamais demandé');
+    });
+
+    test('liste démesurée : coupée', () async {
+      final (_, signature) = await signedList('abc');
+      await expectLater(
+        updater(release(sums: 'a' * (128 * 1024), signature: signature))
+            .prepare(update),
+        throwsA(isA<HttpException>()),
+      );
+      expect(installer.received, isEmpty);
     });
   });
 

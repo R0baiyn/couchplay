@@ -31,6 +31,9 @@ final class _FakeInstaller implements Installer {
   Future<void> Function(Uri page)? get openPage => null;
 
   @override
+  bool get signed => false;
+
+  @override
   String get later => 'au prochain démarrage de CouchPlay';
 
   @override

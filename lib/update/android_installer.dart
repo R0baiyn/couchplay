@@ -34,6 +34,10 @@ final class AndroidInstaller implements Installer {
   @override
   Future<void> Function(Uri page)? get openPage => null;
 
+  /// Android vérifie lui-même la signature de l'APK.
+  @override
+  bool get signed => false;
+
   /// `<cache>/update` : le dossier que voit `MainActivity.kt`.
   @override
   final Directory workDir;

@@ -48,6 +48,11 @@ final class WindowsInstaller implements Installer {
   @override
   Future<void> Function(Uri page)? get openPage => null;
 
+  /// Rien ne vérifie l'installateur ni le zip après nous : il est lancé en
+  /// silencieux.
+  @override
+  bool get signed => true;
+
   @override
   String get later => 'à la fermeture de CouchPlay';
 

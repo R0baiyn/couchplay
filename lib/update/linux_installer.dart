@@ -22,6 +22,9 @@ final class LinuxInstaller implements Installer {
   String get assetSuffix => '-linux-x64.tar.gz';
 
   @override
+  bool get signed => false;
+
+  @override
   String get later => 'jamais seule';
 
   @override
