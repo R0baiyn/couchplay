@@ -550,6 +550,24 @@ void main() {
       expect(adapter.calls, 2, reason: 'fichier jamais demandé');
     });
 
+    test('erreur en route : aucun fichier non vérifié ne reste', () async {
+      final (sums, signature) = await signedList('abc');
+      // Le fichier arrive tronqué après la liste et sa signature.
+      final adapter = FakeAdapter((options) async {
+        final body = switch (options.uri.pathSegments.last) {
+          sumsName => sums,
+          signatureName => signature,
+          _ => 'ab',
+        };
+        return ResponseBody.fromString(body, 200);
+      });
+      await expectLater(
+        updater(adapter).prepare(update),
+        throwsA(isA<HttpException>()),
+      );
+      expect(updateDir.existsSync(), isFalse);
+    });
+
     test('liste démesurée : coupée', () async {
       final (_, signature) = await signedList('abc');
       await expectLater(

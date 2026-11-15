@@ -256,41 +256,46 @@ final class Updater {
     if (!installer.signed) {
       await _download(update.asset, package, update.size);
     } else {
-      // La liste et sa signature d'abord, à côté du fichier dans la même
-      // release : une release qui n'en a pas échoue avant le gros
-      // téléchargement.
-      final sums = file(sumsName);
-      final signature = file(signatureName);
-      await _download(
-        update.asset.resolve(sumsName),
-        sums,
-        _maxSums,
-        exact: false,
-      );
-      await _download(
-        update.asset.resolve(signatureName),
-        signature,
-        _maxSignature,
-        exact: false,
-      );
-      await _download(update.asset, package, update.size);
-      // Le nom porte la version annoncée : une release ne peut pas
-      // resservir le fichier signé d'une version plus ancienne.
-      final name = update.asset.pathSegments.last;
-      final signed =
-          name.contains('-${update.version}-') &&
-          await isSignedFile(
-            sums: await sums.readAsBytes(),
-            // Octets quelconques acceptés : le base64 décide.
-            signature: String.fromCharCodes(await signature.readAsBytes()),
-            name: name,
-            file: package,
-            publicKey: _publicKey,
-          );
-      if (!signed) {
-        await workDir.delete(recursive: true);
-        log('Mise à jour ${update.version} refusée : signature');
-        throw UnsignedUpdate(name);
+      try {
+        // La liste et sa signature d'abord, à côté du fichier dans la même
+        // release : une release qui n'en a pas échoue avant le gros
+        // téléchargement.
+        final sums = file(sumsName);
+        final signature = file(signatureName);
+        await _download(
+          update.asset.resolve(sumsName),
+          sums,
+          _maxSums,
+          exact: false,
+        );
+        await _download(
+          update.asset.resolve(signatureName),
+          signature,
+          _maxSignature,
+          exact: false,
+        );
+        await _download(update.asset, package, update.size);
+        // Le nom porte la version annoncée : une release ne peut pas
+        // resservir le fichier signé d'une version plus ancienne.
+        final name = update.asset.pathSegments.last;
+        final signed =
+            name.contains('-${update.version}-') &&
+            await isSignedFile(
+              sums: await sums.readAsBytes(),
+              // Octets quelconques acceptés : le base64 décide.
+              signature: String.fromCharCodes(await signature.readAsBytes()),
+              name: name,
+              file: package,
+              publicKey: _publicKey,
+            );
+        if (!signed) {
+          log('Mise à jour ${update.version} refusée : signature');
+          throw UnsignedUpdate(name);
+        }
+      } on Object {
+        // Refus ou erreur en route : aucun fichier non vérifié ne reste.
+        if (await workDir.exists()) await workDir.delete(recursive: true);
+        rethrow;
       }
     }
     await installer.prepared(update, package);
