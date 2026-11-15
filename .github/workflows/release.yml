@@ -220,12 +220,13 @@ jobs:
           persist-credentials: false
 
       # Dart pour l'outil de signature : il lit le pubspec de l'app, qui
-      # dépend de Flutter.
+      # dépend de Flutter. Sans cache : un SDK restauré du cache tournerait
+      # avec la clé dans son environnement.
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.8
           channel: stable
-          cache: true
+          cache: false
 
       - run: flutter pub get --enforce-lockfile
 
