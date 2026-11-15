@@ -67,8 +67,14 @@ Future<void> showUpdateDialog(
                 ),
               ),
             ),
-            onError: (Object e) =>
-                log('Préparation de la mise à jour', error: e.runtimeType),
+            // Réseau, GitHub ou signature refusée : rien ne s'installera,
+            // l'utilisateur le sait (Q-29).
+            onError: (Object e) {
+              log('Préparation de la mise à jour', error: e.runtimeType);
+              messenger.showSnackBar(
+                const SnackBar(content: Text(_impossible)),
+              );
+            },
           ),
     );
     return;
@@ -112,16 +118,13 @@ Future<void> showUpdateDialog(
     navigator.pop();
     final cancelled = e is DioException && CancelToken.isCancel(e);
     messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          cancelled
-              ? 'Mise à jour annulée.'
-              : 'La mise à jour a échoué. Réessaie plus tard.',
-        ),
-      ),
+      SnackBar(content: Text(cancelled ? 'Mise à jour annulée.' : _impossible)),
     );
   }
 }
+
+/// Tout échec de la mise à jour, signature refusée comprise.
+const _impossible = "Mise à jour impossible pour l'instant.";
 
 Future<void> _showPageDialog(
   BuildContext context,

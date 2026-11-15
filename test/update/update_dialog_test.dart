@@ -13,7 +13,7 @@ import '../support/fake_server.dart';
 
 /// Installation simulée : compte les installations, échoue sur demande.
 final class _FakeInstaller implements Installer {
-  _FakeInstaller(this.workDir, {this.fails = false});
+  _FakeInstaller(this.workDir, {this.fails = false, this.signed = false});
 
   @override
   final Directory workDir;
@@ -31,7 +31,7 @@ final class _FakeInstaller implements Installer {
   Future<void> Function(Uri page)? get openPage => null;
 
   @override
-  bool get signed => false;
+  final bool signed;
 
   @override
   String get later => 'au prochain démarrage de CouchPlay';
@@ -51,6 +51,9 @@ final class _FakeInstaller implements Installer {
   @override
   Future<bool> installPending(String current) async => false;
 }
+
+/// Message de tout échec de la mise à jour (Q-29).
+const impossible = "Mise à jour impossible pour l'instant.";
 
 void main() {
   late Directory work;
@@ -74,11 +77,13 @@ void main() {
   Future<(Updater, _FakeInstaller)> open(
     WidgetTester tester, {
     bool fails = false,
+    bool signed = false,
     FakeAdapter? adapter,
   }) async {
     final installer = _FakeInstaller(
       Directory('${work.path}${Platform.pathSeparator}update'),
       fails: fails,
+      signed: signed,
     );
     final updater = Updater(
       version: '0.1.0',
@@ -137,10 +142,20 @@ void main() {
     await tester.tap(find.text('Mettre à jour'));
     await waitFor(tester, () => installer.installs > 0);
     expect(find.textContaining('Téléchargement'), findsNothing);
-    expect(
-      find.text('La mise à jour a échoué. Réessaie plus tard.'),
-      findsOneWidget,
-    );
+    expect(find.text(impossible), findsOneWidget);
+  });
+
+  testWidgets('« Mettre à jour » : signature refusée, rien installé, dit', (
+    tester,
+  ) async {
+    // La liste de la release n'est pas signée : refus net.
+    final (_, installer) = await open(tester, signed: true);
+    await tester.tap(find.text('Mettre à jour'));
+    await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
+    expect(find.textContaining('Téléchargement'), findsNothing);
+    expect(find.text(impossible), findsOneWidget);
+    expect(installer.prepares, 0);
+    expect(installer.installs, 0);
   });
 
   testWidgets('« Annuler » : la progression se ferme, rien d\'installé', (
@@ -178,6 +193,27 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('« Plus tard » puis échec du téléchargement : dit', (
+    tester,
+  ) async {
+    final (_, installer) = await open(
+      tester,
+      adapter: FakeAdapter.replying('', status: 404),
+    );
+    await tester.tap(find.text('Plus tard'));
+    await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
+    expect(find.text(impossible), findsOneWidget);
+    expect(installer.prepares, 0);
+  });
+
+  testWidgets('« Plus tard » puis signature refusée : dit', (tester) async {
+    final (_, installer) = await open(tester, signed: true);
+    await tester.tap(find.text('Plus tard'));
+    await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
+    expect(find.text(impossible), findsOneWidget);
+    expect(installer.prepares, 0);
   });
 
   group('Linux', () {
