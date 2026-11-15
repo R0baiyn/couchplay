@@ -75,4 +75,41 @@ void main() {
     expect(find.text('Les Veilleurs (2024)'), findsOneWidget);
     expect(find.text('FR - Les Veilleurs (2024) HD VF'), findsNothing);
   });
+
+  testWidgets(
+    "épisode demandé dans une saison absente : la fiche reste en haut",
+    (tester) async {
+      await pumpApp(tester, size: const Size(400, 400));
+      Navigator.of(tester.element(find.byType(Scaffold).first)).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const SeriesScreen(
+            item: CatalogItem(
+              kind: ContentKind.series,
+              id: '17',
+              name: 'Série',
+            ),
+            episode: PlayItem.episode(
+              id: 'absent',
+              extension: 'mkv',
+              name: 'Série',
+              seriesId: '17',
+              season: 7,
+              episode: 1,
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      // Assez d'images pour que l'ancien défilement (40 tentatives) soit fini.
+      for (var i = 0; i < 50; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      expect(scrollable.position.maxScrollExtent, greaterThan(0));
+      expect(scrollable.position.pixels, 0);
+    },
+  );
 }

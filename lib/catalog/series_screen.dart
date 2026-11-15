@@ -97,7 +97,12 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
         series.seasons.where((s) => s.number == _season).firstOrNull ??
         series.seasons.where((s) => s.number > 0).firstOrNull ??
         series.seasons.firstOrNull;
-    if (widget.episode != null && !_revealing) {
+    // Saison disparue : l'épisode n'y est pas, rien à chercher en défilant.
+    final target = widget.episode;
+    if (target != null &&
+        season != null &&
+        season.episodes.any((e) => e.id == target.id) &&
+        !_revealing) {
       _revealing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
     }
