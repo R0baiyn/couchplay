@@ -251,6 +251,22 @@ void main() {
     test('ni l\'un ni l\'autre (build local) : pas de mise à jour', () {
       expect(installer(), isNull);
     });
+
+    test(
+      'au démarrage, un fichier préparé sans vérification n\'est pas lancé',
+      () async {
+        // Comme après « Plus tard » dans une version qui ne vérifiait rien.
+        final work = Directory('${app.path}\\couchplay-update')..createSync();
+        File('${work.path}\\update.exe').writeAsStringSync('exe');
+        final windows = WindowsInstaller(
+          portable: false,
+          appDir: app,
+          workDir: work,
+        );
+        expect(await windows.installPending('0.1.0'), isFalse);
+        expect(work.listSync(), hasLength(1), reason: 'rien de lancé');
+      },
+    );
   });
 
   test('seul Linux ouvre la page de la release au lieu d\'installer', () {

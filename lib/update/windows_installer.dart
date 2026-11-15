@@ -93,7 +93,10 @@ final class WindowsInstaller implements Installer {
   }
 
   /// Rien à faire : le script d'une session précédente a déjà installé la
-  /// mise à jour à sa fermeture.
+  /// mise à jour à sa fermeture. Un fichier resté dans [workDir] (préparé
+  /// par une version qui ne vérifiait pas la signature, ou script
+  /// interrompu) n'est jamais lancé d'ici : la prochaine préparation vide le
+  /// dossier, puis télécharge et vérifie de nouveau.
   @override
   Future<bool> installPending(String current) async => false;
 }
