@@ -15,6 +15,15 @@ const sumsName = 'SHA256SUMS';
 /// Signature ed25519 de [sumsName], en base64 sur une ligne.
 const signatureName = 'SHA256SUMS.sig';
 
+/// Clé publique ed25519 des releases, en base64. Sa clé privée est le secret
+/// `RELEASE_SIGNING_KEY` de l'environnement `release` de la CI, qui signe
+/// chaque release : la changer ici rend les releases déjà signées
+/// invérifiables par cette version de l'app.
+const releasePublicKey = '7wL3Xm1OdsW1QHD3WZxNKgAQj3eXwziVi4+GLZ6mh2M=';
+
+/// [releasePublicKey] décodée.
+final releaseKey = decodeKey(releasePublicKey, keyLength)!;
+
 /// Les fichiers [sumsName] et [signatureName] ne sont pas dans la liste.
 bool isSignatureFile(String name) => name.startsWith(sumsName);
 
@@ -114,4 +123,18 @@ Future<Map<String, String>?> verifiedSums(
   } on FormatException {
     return null;
   }
+}
+
+/// [file], publié sous le nom [name], est dans la liste [sums] signée par
+/// [signature] et y a sa somme exacte. [publicKey] : [releaseKey] par défaut.
+Future<bool> isSignedFile({
+  required List<int> sums,
+  required String signature,
+  required String name,
+  required File file,
+  List<int>? publicKey,
+}) async {
+  final listed = await verifiedSums(sums, signature, publicKey ?? releaseKey);
+  final expected = listed?[name];
+  return expected != null && await sha256OfFile(file) == expected;
 }

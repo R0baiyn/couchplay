@@ -80,6 +80,8 @@ void main() {
       await cli(['verify', dist.path, '--public-key', base64.encode(other)]),
       1,
     );
+    // Sans --public-key : la clé de l'app, qui n'est pas celle du test.
+    expect(await cli(['verify', dist.path]), 1);
   });
 
   test('fichier ajouté ou retiré après la signature : refusé', () async {
@@ -133,7 +135,7 @@ void main() {
 
   test('arguments faux : code 64', () async {
     expect(await cli([]), 64);
-    expect(await cli(['verify', dist.path]), 64);
+    expect(await cli(['verify', dist.path, '--public-key']), 64);
     expect(await cli(['verify', dist.path, '--public-key', 'xx']), 64);
   });
 

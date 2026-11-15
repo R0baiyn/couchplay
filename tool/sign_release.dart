@@ -19,7 +19,7 @@ import 'package:couchplay/update/release_signature.dart';
 /// [keyVariable], jamais en argument, et écrit `SHA256SUMS` et
 /// `SHA256SUMS.sig` dans le dossier. `verify` relit les deux et sort en
 /// erreur si la signature ou une somme est fausse, ou si un fichier manque
-/// ou est en trop.
+/// ou est en trop ; sans `--public-key`, avec la clé embarquée dans l'app.
 Future<void> main(List<String> args) async {
   exitCode = await run(args, environment: Platform.environment);
 }
@@ -47,9 +47,10 @@ Future<int> run(
         return await _keygen(File(path), out);
       case ['sign', final dir]:
         return await _sign(Directory(dir), environment[keyVariable], out);
-      case ['verify', _]:
-        err.writeln('Clé publique manquante : --public-key <base64>');
-        return 64;
+      // Par défaut, la clé que l'app embarque : la CI vérifie ce que les
+      // apps vérifieront.
+      case ['verify', final dir]:
+        return await _verify(Directory(dir), releaseKey, out);
       case ['verify', final dir, '--public-key', final key]:
         final publicKey = decodeKey(key, keyLength);
         if (publicKey == null) {
