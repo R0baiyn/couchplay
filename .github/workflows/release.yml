@@ -1,7 +1,8 @@
 name: release
 
 # Un tag v* crée la release en brouillon : Windows (zip portable et
-# installateur) et Android (un APK par architecture). Elle n'est visible de
+# installateur) et Android (un APK par architecture), plus SHA256SUMS et sa
+# signature SHA256SUMS.sig (sans elles, pas de release). Elle n'est visible de
 # personne, mises à jour comprises, tant qu'elle n'est pas publiée à la main
 # sur GitHub (« Publish release »). Linux (archive tar.gz) est construit mais
 # pas publié. Lancé à la main, il construit tout sans rien publier ; les
@@ -209,12 +210,24 @@ jobs:
     needs: [windows, android]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
+    # La clé de signature des fichiers est dans cet environnement.
+    environment: release
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+
+      # Dart pour l'outil de signature : il lit le pubspec de l'app, qui
+      # dépend de Flutter.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.47.8
+          channel: stable
+          cache: true
+
+      - run: flutter pub get --enforce-lockfile
 
       # Le paquet Linux se construit mais n'est pas publié (D-022).
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -226,6 +239,19 @@ jobs:
         with:
           name: android
           path: dist
+
+      # SHA256SUMS et SHA256SUMS.sig, publiés avec les fichiers : l'app
+      # Windows n'installe que ce qui y figure. La clé n'arrive que par
+      # l'environnement de cette étape, jamais en argument ni affichée ; une
+      # clé absente ou fausse arrête le job ici, avant toute release.
+      # `verify` relit avec la clé publique embarquée dans l'app.
+      - name: Signature
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          dart run tool/sign_release.dart sign dist
+          dart run tool/sign_release.dart verify dist
 
       - name: Release
         env:
