@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:couchplay/catalog/catalog_providers.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/versions.dart';
+import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/server/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/catalog_app.dart';
+import '../support/fake_downloads.dart';
 import '../support/settle.dart';
 
 void main() {
@@ -63,5 +65,48 @@ void main() {
       ),
     );
     expect(play.onPressed, isNull);
+    // Sans fichier connu, rien à télécharger non plus.
+    final download = tester.widget<OutlinedButton>(
+      find.bySubtype<OutlinedButton>(),
+    );
+    expect(download.onPressed, isNull);
+  });
+
+  testWidgets('« Télécharger » met en file la version affichée', (
+    tester,
+  ) async {
+    final fake = FakeDownloads();
+    await pumpApp(
+      tester,
+      openMovies: false,
+      overrides: [downloadsProvider.overrideWith(() => fake)],
+    );
+    Navigator.of(tester.element(find.byType(Scaffold).first)).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const MovieScreen(
+          entry: CatalogEntry([
+            CatalogItem(
+              kind: ContentKind.movies,
+              id: '900',
+              name: 'Mirage (2020) 4K',
+              extension: 'mkv',
+            ),
+            CatalogItem(
+              kind: ContentKind.movies,
+              id: '902',
+              name: 'Mirage (2020) HD',
+              extension: 'mp4',
+            ),
+          ]),
+        ),
+      ),
+    );
+    await settle(tester);
+    await tester.tap(find.text('HD'));
+    await settle(tester);
+    await tester.tap(find.text('Télécharger'));
+    await tester.pump();
+
+    expect(fake.calls, ['add movie:902']);
   });
 }

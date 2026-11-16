@@ -3,6 +3,7 @@ import '../focus_scroll.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../downloads/download_button.dart';
 import '../focus_ring.dart';
 import '../library/favorite_button.dart';
 import '../library/library.dart';
@@ -103,7 +104,7 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
               spacing: 16,
               children: [
                 ?picker,
-                _PlayButton(
+                _Actions(
                   item: selected,
                   // Celle de la liste : la fiche affichée peut encore être
                   // celle d'une autre version.
@@ -168,8 +169,9 @@ class _VersionPicker extends StatelessWidget {
   }
 }
 
-class _PlayButton extends ConsumerWidget {
-  const _PlayButton({
+/// « Lecture » et « Télécharger » : la même version, celle affichée.
+class _Actions extends ConsumerWidget {
+  const _Actions({
     required this.item,
     required this.extension,
     required this.loading,
@@ -184,24 +186,31 @@ class _PlayButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final extension = this.extension;
-    return FilledButton.icon(
-      autofocus: true,
-      icon: const Icon(Icons.play_arrow),
-      label: Text(
-        extension == null && !loading ? 'Fichier introuvable' : 'Lecture',
-      ),
-      onPressed: extension == null
-          ? null
-          : () => openPlayer(
-              context,
-              ref,
-              PlayItem.movie(
-                id: item.id,
-                extension: extension,
-                name: item.name,
-                poster: poster,
-              ),
-            ),
+    final movie = extension == null
+        ? null
+        : PlayItem.movie(
+            id: item.id,
+            extension: extension,
+            name: item.name,
+            poster: poster,
+          );
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.start,
+      children: [
+        FilledButton.icon(
+          autofocus: true,
+          icon: const Icon(Icons.play_arrow),
+          label: Text(
+            extension == null && !loading ? 'Fichier introuvable' : 'Lecture',
+          ),
+          onPressed: movie == null
+              ? null
+              : () => openPlayer(context, ref, movie),
+        ),
+        DownloadButton(item: movie),
+      ],
     );
   }
 }
