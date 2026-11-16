@@ -10,6 +10,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/library/library.dart';
+import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/settings/app_settings.dart';
 import 'package:flutter/widgets.dart';
@@ -464,6 +465,70 @@ void main() {
       await h.until(() => h.status('1') == DownloadStatus.failed);
 
       expect(h.entries['movie:1']!.error, 'Espace disque insuffisant');
+    });
+  });
+
+  group('Effacer une fois vu (D-037)', () {
+    Future<_Harness> ready({bool setting = true}) async {
+      final h = await _Harness.start();
+      await h.container
+          .read(appSettingsProvider.notifier)
+          .setDeleteWatched(setting);
+      await h.notifier.add([_movie('1'), _movie('2')]);
+      await h.until(() => h.status('2') == DownloadStatus.ready);
+      return h;
+    }
+
+    LibraryNotifier library(_Harness h) =>
+        h.container.read(libraryProvider.notifier);
+
+    test('« Marquer comme vu » : vidéo effacée, les autres restent', () async {
+      final h = await ready();
+      await library(h).setWatched(_movie('1'), watched: true);
+      await h.until(() => h.status('1') == null);
+      await h.until(() => !h.video('a', 'movie-1.mkv').existsSync());
+      expect(h.status('2'), DownloadStatus.ready);
+    });
+
+    test('réglage désactivé : la vidéo reste', () async {
+      final h = await ready(setting: false);
+      await library(h).setWatched(_movie('1'), watched: true);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(h.status('1'), DownloadStatus.ready);
+    });
+
+    test('vu pendant la lecture : effacée à la sortie du lecteur', () async {
+      final h = await ready();
+      h.notifier.playerOpened();
+      await library(h).saveProgress(
+        _movie('1'),
+        position: const Duration(minutes: 95),
+        duration: const Duration(minutes: 100),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(h.status('1'), DownloadStatus.ready, reason: 'fichier ouvert');
+      expect(h.video('a', 'movie-1.mkv').existsSync(), isTrue);
+
+      h.notifier.playerClosed();
+      await h.until(() => h.status('1') == null);
+      await h.until(() => !h.video('a', 'movie-1.mkv').existsSync());
+    });
+
+    test('déjà vu avant le téléchargement : la vidéo reste', () async {
+      final h = await _Harness.start();
+      await h.container
+          .read(appSettingsProvider.notifier)
+          .setDeleteWatched(true);
+      await library(h).setWatched(_movie('1'), watched: true);
+      await h.notifier.add([_movie('1')]);
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+      await library(h).saveProgress(
+        _movie('1'),
+        position: const Duration(minutes: 99),
+        duration: const Duration(minutes: 100),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(h.status('1'), DownloadStatus.ready);
     });
   });
 

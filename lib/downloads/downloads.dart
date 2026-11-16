@@ -10,6 +10,7 @@ import '../accounts/account_files.dart';
 import '../accounts/account_store.dart';
 import '../accounts/server_session.dart';
 import '../library/library.dart';
+import '../library/library_store.dart';
 import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
@@ -278,6 +279,10 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
       session.current?.cancel.cancel();
       dio.close(force: true);
     });
+    _watched.clear();
+    ref.listen(libraryProvider, (previous, library) {
+      _onLibrary(id, previous, library);
+    });
     ref.listen(downloadHoldsProvider, (_, holds) {
       if (holds.reasons.isEmpty) {
         unawaited(_pump(session));
@@ -299,9 +304,46 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
   /// Lecteurs ouverts (deux un instant, pendant la fermeture du premier).
   var _players = 0;
 
+  /// Vidéos prêtes passées à « vu » avec « Effacer une fois vu » : effacées
+  /// une fois le lecteur fermé, jamais pendant (fichier ouvert).
+  final _watched = <String>{};
+
   void playerOpened() => _players++;
 
-  void playerClosed() => _players--;
+  /// À appeler une fois le lecteur arrêté (fichier fermé).
+  void playerClosed() {
+    _players--;
+    _deleteWatched();
+  }
+
+  /// D-037 : un contenu prêt qui passe à « vu » (fin de lecture ou « Marquer
+  /// comme vu ») perd sa vidéo. Un contenu déjà vu puis téléchargé la garde.
+  void _onLibrary(String accountId, Library? previous, Library library) {
+    // Bibliothèque d'un autre compte : changement de compte en cours.
+    if (previous == null || ref.read(activeAccountProvider)?.id != accountId) {
+      return;
+    }
+    if (!ref.read(appSettingsProvider).deleteWatched) return;
+    for (final MapEntry(:key, value: progress) in library.progress.entries) {
+      if (progress.watched &&
+          !(previous.progress[key]?.watched ?? false) &&
+          state.entries[key]?.status == DownloadStatus.ready) {
+        _watched.add(key);
+      }
+    }
+    _deleteWatched();
+  }
+
+  void _deleteWatched() {
+    final session = _session;
+    if (_players > 0 || session == null || session.disposed) return;
+    final keys = [..._watched];
+    _watched.clear();
+    for (final key in keys) {
+      log('Vidéo vue effacée');
+      unawaited(remove(key));
+    }
+  }
 
   /// Fichier d'un contenu prêt, ou `null` (pas téléchargé, pas fini) : pour
   /// le lecteur.
