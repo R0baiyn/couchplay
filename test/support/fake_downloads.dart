@@ -28,6 +28,12 @@ final class FakeDownloads extends DownloadsNotifier {
   @override
   File? fileOf(PlayItem item) => files[item.key];
 
+  /// Affiches enregistrées, par clé (`null` : pas sur le disque).
+  final posters = <String, File>{};
+
+  @override
+  File? posterOf(PlayItem item) => posters[item.key];
+
   @override
   DownloadsState build() => DownloadsState(entries: initial);
 
