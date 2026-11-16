@@ -4,12 +4,16 @@ import 'package:couchplay/accounts/account.dart';
 import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Conteneur d'un compte actif dans un dossier temporaire : de quoi lire et
 /// écrire sa bibliothèque, sans serveur.
-Future<ProviderContainer> libraryContainer(WidgetTester tester) async {
+Future<ProviderContainer> libraryContainer(
+  WidgetTester tester, {
+  List<Override> overrides = const [],
+}) async {
   final root = Directory.systemTemp.createTempSync('couchplay_library_');
   addTearDown(() {
     try {
@@ -41,6 +45,7 @@ Future<ProviderContainer> libraryContainer(WidgetTester tester) async {
     overrides: [
       accountStoreProvider.overrideWithValue(store),
       accountFilesProvider.overrideWithValue(files),
+      ...overrides,
     ],
   );
 }

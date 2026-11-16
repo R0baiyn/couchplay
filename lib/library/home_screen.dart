@@ -7,6 +7,7 @@ import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
 import '../catalog/versions.dart';
 import '../confirm.dart';
+import '../downloads/downloads.dart';
 import '../player/player_screen.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
@@ -158,6 +159,7 @@ class HomeScreen extends ConsumerWidget {
         final entry = shown[i];
         return _tile(
           key: ValueKey('seen:${entry.item.key}'),
+          downloadKey: entry.item.key,
           title: entry.item.shortTitle,
           imageUrl: entry.item.poster,
           progress: entry.finished ? null : entry.fraction,
@@ -195,22 +197,32 @@ const _tileWidth = 130.0;
 /// Affiches de la rangée « Vus » : elle reste courte.
 const _rowLength = 20;
 
+/// [key] est aussi la clé du contenu (`movie:`, `episode:`, `series:`) :
+/// pastille « téléchargé » si elle est prête.
 Widget _tile({
-  required Key key,
+  required ValueKey<String> key,
   required String title,
   required String? imageUrl,
   required VoidCallback onTap,
   double? progress,
   VoidCallback? onMenu,
+  String? downloadKey,
 }) => SizedBox(
   key: key,
   width: _tileWidth,
-  child: PosterTile(
-    title: title,
-    imageUrl: imageUrl,
-    onTap: onTap,
-    progress: progress,
-    onMenu: onMenu,
+  child: Consumer(
+    builder: (context, ref, _) => PosterTile(
+      title: title,
+      imageUrl: imageUrl,
+      onTap: onTap,
+      progress: progress,
+      onMenu: onMenu,
+      downloaded: ref.watch(
+        downloadedKeysProvider.select(
+          (keys) => keys.contains(downloadKey ?? key.value),
+        ),
+      ),
+    ),
   ),
 );
 

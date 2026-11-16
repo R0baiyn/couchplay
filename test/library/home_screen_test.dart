@@ -1,4 +1,6 @@
 import 'package:couchplay/catalog/poster_grid.dart';
+import 'package:couchplay/downloads/download.dart';
+import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/library/home_screen.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
@@ -7,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/fake_downloads.dart';
 import '../support/library_container.dart';
 
 void main() {
@@ -89,5 +92,50 @@ void main() {
     }
 
     expect(built.map(gapUnderTitle).reduce((a, b) => a < b ? a : b), 8);
+  });
+
+  testWidgets('accueil : pastille « téléchargé » sur un contenu prêt', (
+    tester,
+  ) async {
+    const ready = PlayItem.movie(id: '1', extension: 'mkv', name: 'Horizon');
+    const other = PlayItem.movie(id: '2', extension: 'mkv', name: 'Dune');
+    final container = await libraryContainer(
+      tester,
+      overrides: [
+        downloadsProvider.overrideWith(
+          () => FakeDownloads({
+            ready.key: download(ready, DownloadStatus.ready),
+            other.key: download(other, DownloadStatus.running),
+          }),
+        ),
+      ],
+    );
+    final library = container.read(libraryProvider.notifier);
+    await tester.runAsync(() async {
+      for (final item in [ready, other]) {
+        await library.saveProgress(
+          item,
+          position: const Duration(minutes: 10),
+          duration: const Duration(minutes: 90),
+        );
+      }
+    });
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: HomeScreen()),
+      ),
+    );
+    await tester.pump();
+
+    Finder badgeOf(String title) => find.descendant(
+      of: find.ancestor(
+        of: find.text(title),
+        matching: find.byType(PosterTile),
+      ),
+      matching: find.byIcon(Icons.download_done),
+    );
+    expect(badgeOf('Horizon'), findsOneWidget);
+    expect(badgeOf('Dune'), findsNothing);
   });
 }

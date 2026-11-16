@@ -15,6 +15,7 @@ import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
 import '../settings/app_settings.dart';
+import '../television.dart';
 import 'download.dart';
 import 'free_space.dart';
 import 'transfer.dart';
@@ -207,6 +208,24 @@ final class DownloadsState {
 final downloadsProvider = NotifierProvider<DownloadsNotifier, DownloadsState>(
   DownloadsNotifier.new,
 );
+
+/// Clés de ce qui se lit sans réseau, pour la pastille « téléchargé » des
+/// affiches : `movie:<id>` et `episode:<id>` d'une vidéo prête, et
+/// `series:<id>` d'une série dont au moins un épisode est prêt (clés de
+/// [PlayItem.key] et de `CatalogItem.libraryKey`). Recalculé une fois par
+/// nouvelle liste, jamais à l'avancement ; chaque affiche ne regarde que sa
+/// clé (`select`). Vide sur Android TV, sans téléchargements.
+final downloadedKeysProvider = Provider<Set<String>>((ref) {
+  if (ref.watch(televisionProvider)) return const {};
+  final entries = ref.watch(downloadsProvider.select((s) => s.entries));
+  return {
+    for (final d in entries.values)
+      if (d.status == DownloadStatus.ready) ...[
+        d.key,
+        if (d.item.seriesId case final series?) 'series:$series',
+      ],
+  };
+});
 
 /// Ce qui vaut pour une construction du provider (un compte, un client) :
 /// Riverpod peut garder la même instance du notifier d'une construction à

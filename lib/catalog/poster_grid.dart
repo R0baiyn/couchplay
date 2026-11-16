@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../downloads/downloads.dart';
 import '../focus_ring.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
@@ -111,11 +112,20 @@ class _EntryTile extends ConsumerWidget {
         ),
       ),
     );
+    // Une seule clé regardée : l'avancement d'un téléchargement ne
+    // reconstruit aucune affiche.
+    final downloaded = ref.watch(
+      downloadedKeysProvider.select(
+        (keys) =>
+            keys.isNotEmpty && versions.any((v) => keys.contains(v.libraryKey)),
+      ),
+    );
     return PosterTile(
       title: entry.title,
       imageUrl: entry.poster,
       favorite: favorite,
       watched: watched,
+      downloaded: downloaded,
       onTap: () => onOpen(entry),
     );
   }
@@ -133,6 +143,7 @@ class PosterTile extends StatelessWidget {
     this.onMenu,
     this.favorite = false,
     this.watched = false,
+    this.downloaded = false,
   });
 
   final String title;
@@ -146,9 +157,11 @@ class PosterTile extends StatelessWidget {
   /// secondaires.
   final VoidCallback? onMenu;
 
-  /// Pastilles en haut à droite : dans « Ma liste », déjà vu.
+  /// Pastilles en haut à droite : dans « Ma liste », déjà vu, téléchargé
+  /// (se lit sans réseau).
   final bool favorite;
   final bool watched;
+  final bool downloaded;
 
   /// Place de l'anneau autour de l'affiche, vide sans focus.
   static final _border = focusRing.width;
@@ -208,7 +221,8 @@ class PosterTile extends StatelessWidget {
                   padding: EdgeInsets.all(_border),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(5),
-                    child: progress == null && !favorite && !watched
+                    child:
+                        progress == null && !favorite && !watched && !downloaded
                         ? PosterImage(url: imageUrl, deferred: true)
                         : Stack(
                             fit: StackFit.expand,
@@ -233,6 +247,11 @@ class PosterTile extends StatelessWidget {
                                       const _Badge(
                                         Icons.favorite,
                                         'Dans ma liste',
+                                      ),
+                                    if (downloaded)
+                                      const _Badge(
+                                        Icons.download_done,
+                                        'Téléchargé',
                                       ),
                                   ],
                                 ),
