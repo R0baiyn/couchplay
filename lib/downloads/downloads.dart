@@ -231,7 +231,7 @@ final class _Session {
   final sinceProgress = Stopwatch();
 }
 
-final class DownloadsNotifier extends Notifier<DownloadsState> {
+class DownloadsNotifier extends Notifier<DownloadsState> {
   _Session? _session;
 
   /// Comptes en cours de suppression ([whileDownloadsReleased]) : rien ne
