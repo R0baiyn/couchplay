@@ -241,7 +241,8 @@ const posterLimit = 4 << 20;
 /// Lit l'affiche [url] en mémoire, [limit] octets au plus (comptés à la
 /// réception : la taille annoncée peut mentir). `null` si l'URL n'est pas
 /// en http(s), si le serveur refuse ou coupe, ou si l'image est trop
-/// grosse : la vidéo se télécharge sans elle. Aucune URL n'en sort : celle
+/// grosse ou n'est pas une image (page d'erreur, portail captif) : la
+/// vidéo se télécharge sans elle. Aucune URL n'en sort : celle
 /// d'un fournisseur peut porter des identifiants.
 Future<Uint8List?> fetchPoster(
   Dio dio,
@@ -262,11 +263,30 @@ Future<Uint8List?> fetchPoster(
       // Quitter la boucle ferme la connexion.
       if (bytes.length > limit) return null;
     }
-    return bytes.isEmpty ? null : bytes.takeBytes();
+    final image = bytes.takeBytes();
+    return _isImage(image) ? image : null;
   } on DioException {
     return null;
   } on Exception {
     // HttpException, SocketException : connexion coupée en route.
     return null;
   }
+}
+
+/// JPEG, PNG, GIF, WebP ou BMP, reconnus à leurs premiers octets.
+bool _isImage(Uint8List b) {
+  bool starts(List<int> magic, [int at = 0]) {
+    if (b.length < at + magic.length) return false;
+    for (var i = 0; i < magic.length; i++) {
+      if (b[at + i] != magic[i]) return false;
+    }
+    return true;
+  }
+
+  return starts(const [0xFF, 0xD8, 0xFF]) ||
+      starts(const [0x89, 0x50, 0x4E, 0x47]) ||
+      starts(const [0x47, 0x49, 0x46, 0x38]) ||
+      starts(const [0x42, 0x4D]) ||
+      (starts(const [0x52, 0x49, 0x46, 0x46]) &&
+          starts(const [0x57, 0x45, 0x42, 0x50], 8));
 }

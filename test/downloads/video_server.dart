@@ -44,7 +44,8 @@ final class VideoServer implements HttpClientAdapter {
   /// Chemin de chaque requête d'affiche (chemin qui commence par
   /// `/poster`), servie à part avec [poster].
   final posters = <String>[];
-  var poster = Uint8List.fromList(List.filled(50, 9));
+  // Début d'un JPEG.
+  var poster = Uint8List.fromList([0xFF, 0xD8, 0xFF, ...List.filled(50, 9)]);
 
   /// Ce code pour chaque affiche, sans corps.
   int? posterStatus;

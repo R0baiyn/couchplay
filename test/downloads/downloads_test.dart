@@ -375,6 +375,16 @@ void main() {
       });
     });
 
+    test("une réponse qui n'est pas une image n'est pas gardée", () async {
+      final h = await _Harness.start();
+      h.server.poster = Uint8List.fromList('<html>portail</html>'.codeUnits);
+      await h.notifier.add([film]);
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(h.server.posters, hasLength(1));
+      expect(files(h), {'movie-1.mkv'});
+    });
+
     test("elles partent avec la vidéo, celle d'une série avec son dernier "
         "épisode", () async {
       final h = await _Harness.start();
