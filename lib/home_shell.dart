@@ -45,11 +45,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     (Icons.movie_outlined, Icons.movie, 'Films'),
     (Icons.tv_outlined, Icons.tv, 'Séries'),
     (Icons.search_outlined, Icons.search, 'Recherche'),
-    (Icons.download_outlined, Icons.download, 'Téléchargements'),
+    (Icons.download_outlined, Icons.download, 'Hors ligne'),
   ];
   static const _searchTab = 3;
 
-  /// Pas d'onglet « Téléchargements » sur TV (D-034) : le dernier est retiré.
+  /// Pas d'onglet « Hors ligne » sur TV (D-034) : le dernier est retiré.
   List<(IconData, IconData, String)> get _shown =>
       ref.read(televisionProvider) ? _tabs.sublist(0, _tabs.length - 1) : _tabs;
 

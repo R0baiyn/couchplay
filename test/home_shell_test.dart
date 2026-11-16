@@ -7,10 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/catalog_app.dart';
 import 'support/fake_downloads.dart';
+import 'support/real_font.dart';
 import 'support/settle.dart';
 
 void main() {
   setUpCatalogApp();
+  // Vraies largeurs de lettres : les libellés des onglets doivent tenir.
+  setUpAll(loadRoboto);
 
   testWidgets('rail peu haut : Réglages ne recouvre aucun onglet', (
     tester,
@@ -29,7 +32,7 @@ void main() {
     ('rail', const Size(1280, 800)),
     ('barre du bas', const Size(360, 740)),
   ]) {
-    testWidgets('$name : onglet Téléchargements ouvert, rien ne déborde', (
+    testWidgets('$name : onglet Hors ligne ouvert, rien ne déborde', (
       tester,
     ) async {
       await pumpApp(
@@ -38,15 +41,49 @@ void main() {
         openMovies: false,
         overrides: [downloadsProvider.overrideWith(FakeDownloads.new)],
       );
-      await tester.tap(find.text('Téléchargements'));
+      // Le libellé tient sur une ligne : aussi haut que celui de « Films ».
+      expect(
+        tester.getSize(find.text('Hors ligne')).height,
+        tester.getSize(find.text('Films')).height,
+      );
+      await tester.tap(find.text('Hors ligne'));
       await settle(tester);
       expect(find.byType(DownloadsScreen), findsOneWidget);
+      // Le titre de l'écran garde son nom complet.
+      expect(
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('Téléchargements'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Aucun téléchargement'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('Android TV : pas d onglet Téléchargements', (tester) async {
+  testWidgets('le rail a la même largeur avec ou sans l\'onglet Hors ligne', (
+    tester,
+  ) async {
+    Future<double> railWidth({required bool tv}) async {
+      await pumpApp(
+        tester,
+        size: const Size(1280, 800),
+        openMovies: false,
+        overrides: [
+          televisionProvider.overrideWithValue(tv),
+          downloadsProvider.overrideWith(FakeDownloads.new),
+        ],
+      );
+      return tester.getSize(find.byType(NavigationRail)).width;
+    }
+
+    final five = await railWidth(tv: false);
+    final four = await railWidth(tv: true);
+    expect(five, four);
+  });
+
+  testWidgets('Android TV : pas d onglet Hors ligne', (tester) async {
     await pumpApp(
       tester,
       openMovies: false,
@@ -56,7 +93,7 @@ void main() {
       ],
     );
     expect(find.text('Recherche'), findsOneWidget);
-    expect(find.text('Téléchargements'), findsNothing);
+    expect(find.text('Hors ligne'), findsNothing);
     expect(find.byIcon(Icons.download_outlined), findsNothing);
   });
 }

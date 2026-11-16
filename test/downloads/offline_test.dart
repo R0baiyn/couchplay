@@ -36,7 +36,7 @@ void main() {
           ),
         ],
       );
-      await tester.tap(find.text('Téléchargements'));
+      await tester.tap(find.text('Hors ligne'));
       await settle(tester);
 
       expect(find.byType(DownloadsScreen), findsOneWidget);
