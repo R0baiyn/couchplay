@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +11,7 @@ import '../settings/settings_screen.dart';
 import 'download.dart';
 import 'download_button.dart';
 import 'downloads.dart';
+import 'export.dart';
 
 /// Onglet « Téléchargements » : ce qui est en cours ou en attente, puis les
 /// vidéos prêtes (une vidéo prête se lit sans réseau).
@@ -65,6 +68,13 @@ class DownloadsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Téléchargements'),
         actions: [
+          // PC seulement : la vidéo est un fichier que l'on peut aller voir.
+          if (ref.watch(desktopFilesProvider))
+            IconButton(
+              tooltip: 'Ouvrir le dossier des vidéos',
+              icon: const Icon(Icons.folder_open_outlined),
+              onPressed: () => _openFolder(context, ref),
+            ),
           if (entries.isNotEmpty)
             TextButton(
               onPressed: () => _confirmRemoveAll(context, ref, entries.length),
@@ -133,6 +143,19 @@ class DownloadsScreen extends ConsumerWidget {
       ),
       for (final d in episodes) _ReadyRow(key: ValueKey(d.key), download: d),
     ];
+  }
+
+  static Future<void> _openFolder(BuildContext context, WidgetRef ref) async {
+    final folder = ref.read(downloadsProvider.notifier).folder;
+    if (folder == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(openFolderProvider)(folder);
+    } on IOException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text("Impossible d'ouvrir le dossier.")),
+      );
+    }
   }
 
   static Future<void> _confirmRemoveAll(
@@ -297,14 +320,51 @@ class _ActiveRow extends ConsumerWidget {
   }
 }
 
-/// Une vidéo prête : appui = lecture, ✕ = suppression.
-class _ReadyRow extends ConsumerWidget {
+/// Une vidéo prête : appui = lecture, ⤓ = export (PC), poubelle =
+/// suppression.
+class _ReadyRow extends ConsumerStatefulWidget {
   const _ReadyRow({super.key, required this.download});
 
   final Download download;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ReadyRow> createState() => _ReadyRowState();
+}
+
+class _ReadyRowState extends ConsumerState<_ReadyRow> {
+  /// Copie en cours : l'action est désactivée.
+  var _exporting = false;
+
+  /// Copie la vidéo dans un dossier choisi, sous son vrai titre. Une vidéo
+  /// effacée entre-temps (« Effacer une fois vu », suppression) est dite,
+  /// pas avalée.
+  Future<void> _export() async {
+    final messenger = ScaffoldMessenger.of(context);
+    void say(String text) => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+    final item = widget.download.item;
+    final path = await ref.read(pickFolderProvider)();
+    if (path == null || !mounted) return;
+    final source = ref.read(downloadsProvider.notifier).fileOf(item);
+    if (source == null) {
+      say("La vidéo n'existe plus.");
+      return;
+    }
+    setState(() => _exporting = true);
+    try {
+      await exportVideo(source, Directory(path), exportFileName(item));
+      say('Exporté dans $path');
+    } on ExportException catch (e) {
+      say(e.message);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final download = widget.download;
     final item = download.item;
     final episode = item.isEpisode;
     return Row(
@@ -319,10 +379,20 @@ class _ReadyRow extends ConsumerWidget {
                     : item.name,
               ),
             ),
-            subtitle: Text(formatSize(download.size)),
+            subtitle: Text(
+              _exporting
+                  ? 'Export en cours · ${formatSize(download.size)}'
+                  : formatSize(download.size),
+            ),
             onTap: () => openPlayer(context, ref, item),
           ),
         ),
+        if (ref.watch(desktopFilesProvider))
+          IconButton(
+            tooltip: 'Exporter la vidéo',
+            icon: const Icon(Icons.save_alt),
+            onPressed: _exporting ? null : _export,
+          ),
         IconButton(
           tooltip: 'Supprimer la vidéo',
           icon: const Icon(Icons.delete_outline),

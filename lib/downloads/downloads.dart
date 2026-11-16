@@ -345,6 +345,10 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     }
   }
 
+  /// Dossier des vidéos du compte actif, `null` sans compte : pour l'ouvrir
+  /// dans l'explorateur de fichiers (PC).
+  Directory? get folder => _session?.store.videos;
+
   /// Fichier d'un contenu prêt, ou `null` (pas téléchargé, pas fini) : pour
   /// le lecteur.
   File? fileOf(PlayItem item) {

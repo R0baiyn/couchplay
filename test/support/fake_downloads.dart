@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/library/library.dart';
@@ -13,6 +15,18 @@ final class FakeDownloads extends DownloadsNotifier {
   /// Clés qui « se lisent en local ».
   final Set<String> local;
   final calls = <String>[];
+
+  /// Dossier des vidéos du compte (`null` : pas de compte).
+  Directory? videos;
+
+  @override
+  Directory? get folder => videos;
+
+  /// Fichiers des contenus prêts, par clé (`null` : fichier absent).
+  final files = <String, File>{};
+
+  @override
+  File? fileOf(PlayItem item) => files[item.key];
 
   @override
   DownloadsState build() => DownloadsState(entries: initial);

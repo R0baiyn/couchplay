@@ -1,12 +1,17 @@
+import 'dart:io';
+
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/downloads/downloads_screen.dart';
+import 'package:couchplay/downloads/export.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_downloads.dart';
+import '../support/settle.dart';
 
 PlayItem _episode(String id, int season, int number) => PlayItem.episode(
   id: id,
@@ -23,15 +28,21 @@ Future<FakeDownloads> pumpScreen(
   List<Download> downloads, {
   bool mobileOnly = false,
   Size size = const Size(800, 1000),
+  bool desktop = false,
+  List<Override> overrides = const [],
+  FakeDownloads? downloadsFake,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final fake = FakeDownloads({for (final d in downloads) d.key: d});
+  final fake =
+      downloadsFake ?? FakeDownloads({for (final d in downloads) d.key: d});
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         downloadsProvider.overrideWith(() => fake),
+        desktopFilesProvider.overrideWithValue(desktop),
+        ...overrides,
         mobileOnlyNetworkProvider.overrideWith(
           (ref) => Stream.value(mobileOnly),
         ),
@@ -218,5 +229,173 @@ void main() {
       download(_episode('22', 1, 2), DownloadStatus.ready, size: 5000),
     ], size: const Size(320, 640));
     expect(tester.takeException(), isNull);
+  });
+
+  group('ouvrir le dossier', () {
+    testWidgets('PC : le bouton ouvre le dossier des vidéos du compte', (
+      tester,
+    ) async {
+      final opened = <String>[];
+      final fake = FakeDownloads()..videos = Directory('/vidéos/compte');
+      await pumpScreen(
+        tester,
+        [],
+        desktop: true,
+        downloadsFake: fake,
+        overrides: [
+          openFolderProvider.overrideWithValue((d) async => opened.add(d.path)),
+        ],
+      );
+      await tester.tap(find.byTooltip('Ouvrir le dossier des vidéos'));
+      await tester.pump();
+      expect(opened, [Directory('/vidéos/compte').path]);
+    });
+
+    testWidgets("l'explorateur introuvable : un message, pas de plantage", (
+      tester,
+    ) async {
+      final fake = FakeDownloads()..videos = Directory('/vidéos/compte');
+      await pumpScreen(
+        tester,
+        [],
+        desktop: true,
+        downloadsFake: fake,
+        overrides: [
+          openFolderProvider.overrideWithValue(
+            (_) async => throw const ProcessException('xdg-open', []),
+          ),
+        ],
+      );
+      await tester.tap(find.byTooltip('Ouvrir le dossier des vidéos'));
+      await tester.pump();
+      expect(find.text("Impossible d'ouvrir le dossier."), findsOneWidget);
+    });
+
+    testWidgets('Android et Android TV : pas de bouton', (tester) async {
+      await pumpScreen(tester, [download(movie, DownloadStatus.ready)]);
+      expect(find.byTooltip('Ouvrir le dossier des vidéos'), findsNothing);
+    });
+  });
+
+  group('exporter', () {
+    late Directory root;
+    late Directory target;
+    late FakeDownloads fake;
+
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('export_screen');
+      target = Directory('${root.path}/choisi')..createSync();
+      fake = FakeDownloads({
+        movie.key: download(movie, DownloadStatus.ready, size: 5),
+      });
+      fake.files[movie.key] = File('${root.path}/movie-1.mkv')
+        ..writeAsBytesSync([1, 2, 3, 4, 5]);
+    });
+    tearDown(() => root.deleteSync(recursive: true));
+
+    Future<void> pump(
+      WidgetTester tester, {
+      String? picked,
+      bool desktop = true,
+    }) => pumpScreen(
+      tester,
+      [],
+      desktop: desktop,
+      downloadsFake: fake,
+      overrides: [pickFolderProvider.overrideWithValue(() async => picked)],
+    );
+
+    testWidgets('copie sous le vrai titre, puis le dit', (tester) async {
+      await pump(tester, picked: target.path);
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await settle(tester);
+      expect(File('${target.path}/Mirage.mkv').readAsBytesSync(), [
+        1,
+        2,
+        3,
+        4,
+        5,
+      ]);
+      expect(find.text('Exporté dans ${target.path}'), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_alt))
+            .onPressed,
+        isNotNull,
+      );
+      expect(find.textContaining('Export en cours'), findsNothing);
+    });
+
+    testWidgets('pendant la copie : la ligne le montre, l\'action est grisée', (
+      tester,
+    ) async {
+      await pump(tester, picked: target.path);
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.pump();
+      expect(find.textContaining('Export en cours'), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_alt))
+            .onPressed,
+        isNull,
+      );
+      await settle(tester);
+      expect(find.textContaining('Export en cours'), findsNothing);
+    });
+
+    testWidgets('choix du dossier annulé : rien n\'est copié ni dit', (
+      tester,
+    ) async {
+      await pump(tester);
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await settle(tester);
+      expect(target.listSync(), isEmpty);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('fichier déjà là : jamais écrasé', (tester) async {
+      File('${target.path}/Mirage.mkv').writeAsStringSync('à moi');
+      await pump(tester, picked: target.path);
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await settle(tester);
+      expect(File('${target.path}/Mirage.mkv').readAsStringSync(), 'à moi');
+      expect(File('${target.path}/Mirage (2).mkv').readAsBytesSync(), [
+        1,
+        2,
+        3,
+        4,
+        5,
+      ]);
+    });
+
+    testWidgets('vidéo effacée entre-temps : l\'erreur est dite', (
+      tester,
+    ) async {
+      await pump(tester, picked: target.path);
+      fake.files.clear();
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await settle(tester);
+      expect(find.text('La vidéo n\'existe plus.'), findsOneWidget);
+      expect(target.listSync(), isEmpty);
+    });
+
+    testWidgets('erreur de copie : message clair, aucun fichier', (
+      tester,
+    ) async {
+      fake.files[movie.key]!.deleteSync();
+      await pump(tester, picked: target.path);
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await settle(tester);
+      expect(find.text('La vidéo n\'existe plus.'), findsOneWidget);
+      expect(target.listSync(), isEmpty);
+    });
+
+    testWidgets('Android et Android TV : pas d\'action d\'export', (
+      tester,
+    ) async {
+      await pump(tester, desktop: false);
+      expect(find.byTooltip('Exporter la vidéo'), findsNothing);
+      expect(find.byTooltip('Supprimer la vidéo'), findsOneWidget);
+    });
   });
 }
