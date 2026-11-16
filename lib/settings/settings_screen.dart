@@ -5,6 +5,7 @@ import '../accounts/account_status_screen.dart';
 import '../accounts/accounts_screen.dart';
 import '../catalog/catalog_settings_screen.dart';
 import '../focus_ring.dart';
+import '../television.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
 import 'app_settings.dart';
@@ -75,11 +76,13 @@ class SettingsButton extends StatelessWidget {
 }
 
 /// Réglages de l'app.
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Pas de téléchargements sur TV (D-034) : pas de réglages non plus.
+    final tv = ref.watch(televisionProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
       body: ListView(
@@ -119,11 +122,44 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (!tv) ...const [_WifiOnlyTile(), _DeleteWatchedTile()],
           const _DebugTile(),
           const Divider(),
           const _VersionTile(),
         ],
       ),
+    );
+  }
+}
+
+/// D-037 : sur réseau mobile, la file des téléchargements attend le Wi-Fi.
+class _WifiOnlyTile extends ConsumerWidget {
+  const _WifiOnlyTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.wifi),
+      title: const FocusRing(child: Text('Télécharger en Wi-Fi seulement')),
+      subtitle: const Text('Sur réseau mobile, les téléchargements attendent'),
+      value: ref.watch(appSettingsProvider.select((s) => s.wifiOnly)),
+      onChanged: ref.read(appSettingsProvider.notifier).setWifiOnly,
+    );
+  }
+}
+
+/// D-037 : la vidéo d'un contenu vu est supprimée à la sortie du lecteur.
+class _DeleteWatchedTile extends ConsumerWidget {
+  const _DeleteWatchedTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.auto_delete_outlined),
+      title: const FocusRing(child: Text('Effacer une fois vu')),
+      subtitle: const Text('Supprime la vidéo téléchargée après la lecture'),
+      value: ref.watch(appSettingsProvider.select((s) => s.deleteWatched)),
+      onChanged: ref.read(appSettingsProvider.notifier).setDeleteWatched,
     );
   }
 }
