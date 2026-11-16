@@ -121,6 +121,62 @@ Future<T> withRetries<T>(
   }
 }
 
+/// D'où vient ce qu'on regarde.
+enum PlaySource { local, stream }
+
+/// Ouvre un contenu par [open] : son fichier téléchargé [file] s'il existe
+/// (requête [local], sans rien demander au serveur), sinon le flux
+/// ([stream] ; `null` sans compte : rien n'est ouvert, `null` renvoyé).
+///
+/// - Fichier absent : [dropFile], puis le flux.
+/// - Fichier qui ne s'ouvre pas : le flux ; [dropFile] seulement si le flux
+///   démarre (le fichier était abîmé). Si le flux échoue aussi (hors ligne,
+///   format non pris en charge), le fichier reste.
+/// - D-036 : [streaming] passe à `true` avant d'ouvrir un flux, à `false`
+///   après une ouverture locale (une lecture locale ne met rien en pause).
+///   Un flux refusé par le serveur alors que [downloading] : [pauseDownloads]
+///   puis une seule nouvelle ouverture.
+Future<PlaySource?> openContent({
+  required File? file,
+  required PlayRequest Function(File) local,
+  required Future<PlayRequest?> Function() stream,
+  required Future<void> Function(PlayRequest) open,
+  required Future<void> Function() dropFile,
+  required void Function(bool) streaming,
+  required bool Function() downloading,
+  required void Function() pauseDownloads,
+}) async {
+  var broken = false;
+  if (file != null) {
+    if (await file.exists()) {
+      try {
+        await open(local(file));
+        streaming(false);
+        return PlaySource.local;
+      } on PlaybackFailed {
+        log('Vidéo téléchargée illisible : lecture par le flux');
+        broken = true;
+      }
+    } else {
+      log('Vidéo téléchargée absente : lecture par le flux');
+      await dropFile();
+    }
+  }
+  final request = await stream();
+  if (request == null) return null;
+  streaming(true);
+  try {
+    await open(request);
+  } on PlaybackFailed catch (e) {
+    if (e.unreadable || e.network || !downloading()) rethrow;
+    log('Flux refusé pendant un téléchargement : téléchargement en pause');
+    pauseDownloads();
+    await open(request);
+  }
+  if (broken) await dropFile();
+  return PlaySource.stream;
+}
+
 /// Propriétés mpv des pistes pour [request], dans l'ordre où les poser :
 /// langue audio demandée, sinon le français ; sous-titres de la langue
 /// demandée, sinon aucun.

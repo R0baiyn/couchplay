@@ -11,6 +11,7 @@ import '../accounts/account_store.dart';
 import '../accounts/server_session.dart';
 import '../catalog/catalog_providers.dart';
 import '../catalog/status_views.dart';
+import '../downloads/downloads.dart';
 import '../format.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
@@ -97,11 +98,33 @@ Future<PlayRequest?> _requestFor(
   );
 }
 
+/// Fichier téléchargé d'un contenu : ni serveur, ni nom à résoudre, ni
+/// identifiants (D-034).
+PlayRequest localRequest(
+  PlayItem item,
+  File file, {
+  String? audioLanguage,
+  String? subtitleLanguage,
+  Duration? start,
+}) => PlayRequest(
+  title: item.title,
+  url: Uri.file(file.path),
+  userAgent: '',
+  audioLanguage: audioLanguage,
+  subtitleLanguage: subtitleLanguage,
+  start: start,
+);
+
 /// Fin du fichier bien avant la fin annoncée (plus de 30 s) : le serveur a
 /// coupé. Sans durée connue, on ne peut rien dire.
 bool endedEarly(Duration position, Duration duration) =>
     duration > Duration.zero &&
     position < duration - const Duration(seconds: 30);
+
+/// Cloudflare ne connaît pas le nom du serveur.
+final class _NameNotResolved implements Exception {
+  const _NameNotResolved();
+}
 
 /// Lecture plein cadre. La position est enregistrée toutes les 10 s, à la
 /// pause et à la sortie. Quitter l'écran arrête le flux.
@@ -123,6 +146,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Lu dans initState, pas à la première sauvegarde : `ref` n'est plus
   /// utilisable dans dispose, et une erreur là y sauterait l'arrêt du flux.
   late final LibraryNotifier _library;
+  late final DownloadsNotifier _downloads;
+  late final DownloadHoldsNotifier _holds;
   late final AppLifecycleListener _lifecycle;
   StreamSubscription<bool>? _completed;
   StreamSubscription<bool>? _playing;
@@ -166,6 +191,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     _library = ref.read(libraryProvider.notifier);
+    _downloads = ref.read(downloadsProvider.notifier);
+    _holds = ref.read(downloadHoldsProvider.notifier);
+    _downloads.playerOpened();
     if (_mobile) _setFullscreen(true);
     _lifecycle = AppLifecycleListener(onHide: _onHide);
     _completed = _playback.player.stream.completed.listen(_onCompleted);
@@ -311,46 +339,76 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _opening = true;
       _error = null;
     });
-    final PlayRequest? request;
-    try {
-      request = await _requestFor(
-        ref,
-        _item,
-        audioLanguage: _audioLanguage,
-        subtitleLanguage: _subtitleLanguage,
-        start: _resumeAt,
-      );
-    } on Exception {
-      // Seule la résolution du nom par Cloudflare peut échouer ici.
-      if (mounted) {
-        setState(() {
-          _opening = false;
-          _error = 'Serveur introuvable : Cloudflare ne connaît pas son nom.';
-        });
-      }
-      return;
-    }
-    // Écran fermé pendant la résolution : rien à ouvrir.
-    if (!mounted) return;
-    if (request == null) {
-      _exit();
-      return;
-    }
-    final opening = _playback.open(request);
-    final ticket = _ticket = _playback.ticket;
+    final item = _item;
+    final audioLanguage = _audioLanguage;
+    final subtitleLanguage = _subtitleLanguage;
+    final start = _resumeAt;
+    int? ticket;
     // Une ouverture remplacée (écran fermé, épisode suivant lancé) ne touche
     // plus à l'écran ni au flux : ils ne sont plus les siens.
     bool current() => mounted && ticket == _ticket;
     try {
-      await opening;
+      final source = await openContent(
+        file: _downloads.fileOf(item),
+        local: (file) => localRequest(
+          item,
+          file,
+          audioLanguage: audioLanguage,
+          subtitleLanguage: subtitleLanguage,
+          start: start,
+        ),
+        stream: () async {
+          final PlayRequest? request;
+          try {
+            request = await _requestFor(
+              ref,
+              item,
+              audioLanguage: audioLanguage,
+              subtitleLanguage: subtitleLanguage,
+              start: start,
+            );
+          } on Exception {
+            // Seule la résolution du nom par Cloudflare peut échouer ici.
+            throw const _NameNotResolved();
+          }
+          // Écran fermé pendant la résolution : rien à ouvrir.
+          if (!mounted) throw const PlaybackAbandoned();
+          return request;
+        },
+        open: (request) {
+          final opening = _playback.open(request);
+          ticket = _ticket = _playback.ticket;
+          return opening;
+        },
+        dropFile: () => _downloads.remove(item.key),
+        // Avant l'ouverture d'un flux, le ticket n'est pas encore connu.
+        streaming: (open) {
+          if (open ? mounted : current()) _holds.streaming = open;
+        },
+        downloading: () => _downloads.downloading,
+        pauseDownloads: () => _holds.pauseAll(DownloadHold.playback),
+      );
+      if (source == null) {
+        if (mounted) _exit();
+        return;
+      }
       _resumeAt = null;
       if (current()) _matchTracksByTitle();
     } on PlaybackAbandoned {
       return;
+    } on _NameNotResolved {
+      if (mounted && (ticket == null || current())) {
+        setState(
+          () => _error =
+              'Serveur introuvable : Cloudflare ne connaît pas son nom.',
+        );
+      }
     } on PlaybackFailed catch (e) {
       if (current()) setState(() => _error = e.message);
     } finally {
-      if (current()) setState(() => _opening = false);
+      if (mounted && (ticket == null || current())) {
+        setState(() => _opening = false);
+      }
     }
   }
 
@@ -402,7 +460,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     unawaited(_playing?.cancel());
     unawaited(_track?.cancel());
     _save();
-    if (_ticket case final ticket?) unawaited(_playback.stop(ticket));
+    final downloads = _downloads;
+    final holds = _holds;
+    if (_ticket case final ticket?) {
+      final stopping = _playback.stop(ticket);
+      // Lu juste après l'arrêt : une ouverture plus récente le change.
+      final after = _playback.ticket;
+      unawaited(
+        stopping.whenComplete(() {
+          // Flux fermé : le téléchargement peut repartir (D-036), sauf si un
+          // autre lecteur a ouvert un flux entre-temps.
+          if (_playback.ticket == after) holds.streaming = false;
+          downloads.playerClosed();
+        }),
+      );
+    } else {
+      scheduleMicrotask(downloads.playerClosed);
+    }
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
     super.dispose();
   }

@@ -291,6 +291,18 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
     return DownloadsState(entries: entries);
   }
 
+  /// Un téléchargement tourne : pour le lecteur, qui le met en pause si le
+  /// serveur refuse la lecture (D-036).
+  bool get downloading =>
+      state.entries.values.any((d) => d.status == DownloadStatus.running);
+
+  /// Lecteurs ouverts (deux un instant, pendant la fermeture du premier).
+  var _players = 0;
+
+  void playerOpened() => _players++;
+
+  void playerClosed() => _players--;
+
   /// Fichier d'un contenu prêt, ou `null` (pas téléchargé, pas fini) : pour
   /// le lecteur.
   File? fileOf(PlayItem item) {

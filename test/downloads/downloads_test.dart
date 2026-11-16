@@ -10,6 +10,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/library/library.dart';
+import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/settings/app_settings.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -364,6 +365,94 @@ void main() {
       server.status = null;
       holds.streaming = false;
       await h.until(() => h.status('1') == DownloadStatus.ready);
+    });
+
+    test(
+      'refus pendant une lecture : la suite de la file attend aussi',
+      () async {
+        final server = VideoServer(_source, status: 403);
+        final h = await _Harness.start(server: server);
+        h.container.read(downloadHoldsProvider.notifier).streaming = true;
+
+        await h.notifier.add([_movie('1'), _movie('2')]);
+        await h.until(
+          () => h.container
+              .read(downloadHoldsProvider)
+              .reasons
+              .contains(DownloadHold.playback),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(h.status('1'), DownloadStatus.queued);
+        expect(h.status('2'), DownloadStatus.queued);
+        expect(server.ranges, hasLength(1), reason: 'rien ne repart');
+      },
+    );
+
+    test('lecteur refusé pendant un téléchargement : pause, lecture, reprise '
+        'à la sortie (D-036)', () async {
+      final server = VideoServer(_source, cutAt: 500, hangAtCut: true);
+      final h = await _Harness.start(server: server);
+      final holds = h.container.read(downloadHoldsProvider.notifier);
+      await h.notifier.add([_movie('1')]);
+      await server.reachedCut;
+      expect(h.notifier.downloading, isTrue);
+
+      var refused = true;
+      final source = await openContent(
+        file: null,
+        local: (_) => fail('pas de fichier'),
+        stream: () async => PlayRequest(
+          title: 'Autre',
+          url: Uri.parse('http://serveur.test/x/9.mkv'),
+          userAgent: 'ua',
+        ),
+        open: (_) async {
+          // Le faux serveur refuse un 2e flux tant que le téléchargement
+          // tient la connexion.
+          if (refused && h.notifier.downloading) throw const PlaybackFailed();
+          refused = false;
+        },
+        dropFile: () => fail('rien à retirer'),
+        streaming: (open) => holds.streaming = open,
+        downloading: () => h.notifier.downloading,
+        pauseDownloads: () => holds.pauseAll(DownloadHold.playback),
+      );
+      expect(source, PlaySource.stream);
+      await h.until(() => h.status('1') == DownloadStatus.queued);
+      expect(h.notifier.downloading, isFalse);
+
+      // Sortie du lecteur.
+      server.cutAt = null;
+      holds.streaming = false;
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+    });
+
+    test('lecture locale pendant un téléchargement : rien en pause', () async {
+      final server = VideoServer(_source, cutAt: 500, hangAtCut: true);
+      final h = await _Harness.start(server: server);
+      final holds = h.container.read(downloadHoldsProvider.notifier);
+      await h.notifier.add([_movie('1')]);
+      await server.reachedCut;
+      final file = File('${h.root.path}${Platform.pathSeparator}local.mkv')
+        ..writeAsStringSync('vidéo');
+
+      final source = await openContent(
+        file: file,
+        local: (file) => PlayRequest(
+          title: 'Local',
+          url: Uri.file(file.path),
+          userAgent: '',
+        ),
+        stream: () => fail('le serveur ne doit pas être appelé'),
+        open: (_) async {},
+        dropFile: () => fail('rien à retirer'),
+        streaming: (open) => holds.streaming = open,
+        downloading: () => h.notifier.downloading,
+        pauseDownloads: () => fail('rien à mettre en pause'),
+      );
+      expect(source, PlaySource.local);
+      expect(h.container.read(downloadHoldsProvider).reasons, isEmpty);
+      expect(h.status('1'), DownloadStatus.running);
     });
 
     test('place insuffisante : échec avec la raison', () async {
