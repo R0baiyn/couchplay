@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:couchplay/app.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/downloads/downloads_screen.dart';
 import 'package:couchplay/downloads/export.dart';
+import 'package:couchplay/focus_ring.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -396,6 +399,124 @@ void main() {
       await pump(tester, desktop: false);
       expect(find.byTooltip('Exporter la vidéo'), findsNothing);
       expect(find.byTooltip('Supprimer la vidéo'), findsOneWidget);
+    });
+  });
+
+  group('clavier et largeur minimale', () {
+    late Directory root;
+    late FakeDownloads fake;
+    final opened = <String>[];
+
+    setUp(() {
+      opened.clear();
+      root = Directory.systemTemp.createTempSync('export_keys');
+      fake = FakeDownloads({
+        movie.key: download(movie, DownloadStatus.ready, size: 5),
+      })..videos = Directory('${root.path}/vidéos');
+      fake.files[movie.key] = File('${root.path}/movie-1.mkv')
+        ..writeAsBytesSync([1, 2, 3, 4, 5]);
+    });
+    tearDown(() => root.deleteSync(recursive: true));
+
+    Future<void> pumpKeyboardApp(WidgetTester tester, {Size? size}) async {
+      tester.view.physicalSize = size ?? const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            downloadsProvider.overrideWith(() => fake),
+            mobileOnlyNetworkProvider.overrideWith(
+              (ref) => Stream.value(false),
+            ),
+            desktopFilesProvider.overrideWithValue(true),
+            openFolderProvider.overrideWithValue(
+              (d) async => opened.add(d.path),
+            ),
+            pickFolderProvider.overrideWithValue(
+              () async => '${root.path}/choisi',
+            ),
+          ],
+          child: const CouchPlayApp(home: DownloadsScreen()),
+        ),
+      );
+      await tester.pump();
+    }
+
+    /// Le contour que le bouton dessine.
+    BorderSide sideOf(WidgetTester tester, Finder button) {
+      final material = tester.widget<Material>(
+        find.descendant(of: button, matching: find.byType(Material)).first,
+      );
+      return (material.shape! as OutlinedBorder).side;
+    }
+
+    /// Tab jusqu'à ce que [button] ait le focus.
+    Future<void> tabTo(WidgetTester tester, Finder button) async {
+      for (var i = 0; i < 12; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final focused = FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<IconButton>();
+        if (focused != null && focused == tester.widget(button)) return;
+      }
+      fail('le focus n\'atteint jamais le bouton');
+    }
+
+    testWidgets('ouvrir le dossier : anneau de focus, Entrée agit', (
+      tester,
+    ) async {
+      await pumpKeyboardApp(tester);
+      final button = find.widgetWithIcon(
+        IconButton,
+        Icons.folder_open_outlined,
+      );
+      expect(sideOf(tester, button), BorderSide.none);
+      await tabTo(tester, button);
+      await tester.pumpAndSettle();
+      expect(sideOf(tester, button), focusRing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(opened, [fake.videos!.path]);
+    });
+
+    testWidgets('exporter : anneau de focus, Entrée agit', (tester) async {
+      await pumpKeyboardApp(tester);
+      final button = find.widgetWithIcon(IconButton, Icons.save_alt);
+      expect(sideOf(tester, button), BorderSide.none);
+      await tabTo(tester, button);
+      await tester.pumpAndSettle();
+      expect(sideOf(tester, button), focusRing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      // L'export est parti : l'action se grise, la ligne le dit.
+      expect(find.textContaining('Export en cours'), findsOneWidget);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pump();
+    });
+
+    testWidgets('320 dp : ligne « Prêts » avec export, rien ne déborde', (
+      tester,
+    ) async {
+      const long = PlayItem.movie(
+        id: '9',
+        extension: 'mkv',
+        name: 'Un titre de film vraiment très très long qui doit passer à la ligne',
+      );
+      fake = FakeDownloads({
+        movie.key: download(movie, DownloadStatus.ready, size: 5),
+        long.key: download(long, DownloadStatus.ready, size: 5000000000),
+        _episode('22', 1, 2).key: download(
+          _episode('22', 1, 2),
+          DownloadStatus.ready,
+        ),
+      })..videos = Directory('${root.path}/vidéos');
+      await pumpKeyboardApp(tester, size: const Size(320, 640));
+      expect(find.byTooltip('Exporter la vidéo'), findsNWidgets(3));
+      expect(find.byTooltip('Ouvrir le dossier des vidéos'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }
