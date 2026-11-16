@@ -514,6 +514,32 @@ void main() {
       await h.until(() => !h.video('a', 'movie-1.mkv').existsSync());
     });
 
+    test('changement de compte : la vidéo vue sur b reste', () async {
+      final h = await _Harness.start();
+      final accounts = h.container.read(accountsProvider.notifier);
+      // Film prêt sur les deux comptes, vu sur b seulement, réglage
+      // désactivé pendant la préparation.
+      await accounts.activate('b');
+      await h.notifier.add([_movie('1')]);
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+      await library(h).setWatched(_movie('1'), watched: true);
+      await accounts.activate('a');
+      await h.until(() => h.status('1') == null);
+      await h.notifier.add([_movie('1')]);
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+      await h.container
+          .read(appSettingsProvider.notifier)
+          .setDeleteWatched(true);
+
+      // Non vu sur a, vu sur b : ce n'est pas un passage à « vu ».
+      await accounts.activate('b');
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(h.status('1'), DownloadStatus.ready);
+      expect(h.video('b', 'movie-1.mkv').existsSync(), isTrue);
+      expect(h.video('a', 'movie-1.mkv').existsSync(), isTrue);
+    });
+
     test('déjà vu avant le téléchargement : la vidéo reste', () async {
       final h = await _Harness.start();
       await h.container
