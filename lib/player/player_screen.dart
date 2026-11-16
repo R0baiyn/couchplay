@@ -222,6 +222,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _open();
   }
 
+  /// Arrête notre flux, s'il l'est encore (pas déjà arrêté, pas remplacé
+  /// par un autre lecteur). Une fois fermé, le téléchargement peut repartir
+  /// (D-036), sauf si un autre lecteur a ouvert un flux entre-temps.
+  Future<void> _stopStream(int ticket) {
+    if (ticket != _playback.ticket) return Future.value();
+    final holds = _holds;
+    final stopping = _playback.stop(ticket);
+    // Lu juste après l'arrêt : une ouverture plus récente le change.
+    final after = _playback.ticket;
+    return stopping.whenComplete(() {
+      if (_playback.ticket == after) holds.streaming = false;
+    });
+  }
+
   /// Enregistre où on en est, seulement sur un flux bien démarré : quitter
   /// pendant le chargement ou après un échec (position à 0) ne doit pas
   /// effacer la position enregistrée. À appeler avant tout arrêt du flux.
@@ -251,7 +265,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!_mobile || !mounted) return;
     _save();
     // Sans ticket, rien n'a été ouvert ici : le flux en cours n'est pas le nôtre.
-    if (_ticket case final ticket?) unawaited(_playback.stop(ticket));
+    if (_ticket case final ticket?) unawaited(_stopStream(ticket));
     final route = ModalRoute.of(context);
     final navigator = Navigator.of(context);
     if (route != null && route.isActive) {
@@ -461,22 +475,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     unawaited(_track?.cancel());
     _save();
     final downloads = _downloads;
-    final holds = _holds;
-    if (_ticket case final ticket?) {
-      final stopping = _playback.stop(ticket);
-      // Lu juste après l'arrêt : une ouverture plus récente le change.
-      final after = _playback.ticket;
-      unawaited(
-        stopping.whenComplete(() {
-          // Flux fermé : le téléchargement peut repartir (D-036), sauf si un
-          // autre lecteur a ouvert un flux entre-temps.
-          if (_playback.ticket == after) holds.streaming = false;
-          downloads.playerClosed();
-        }),
-      );
-    } else {
-      scheduleMicrotask(downloads.playerClosed);
-    }
+    final stopped = switch (_ticket) {
+      final ticket? => _stopStream(ticket),
+      null => Future<void>.value(),
+    };
+    // Fichier fermé : une vidéo vue peut être effacée.
+    unawaited(stopped.whenComplete(downloads.playerClosed));
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
     super.dispose();
   }
