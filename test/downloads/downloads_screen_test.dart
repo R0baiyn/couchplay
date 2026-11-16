@@ -952,6 +952,21 @@ void main() {
       }
     });
 
+    testWidgets("en pause avant d'avoir commencé : pas de barre", (
+      tester,
+    ) async {
+      await pumpScreen(tester, [
+        download(film, DownloadStatus.paused, size: 0),
+        download(movie, DownloadStatus.paused, size: 1000, received: 500),
+      ]);
+      expect(find.text('En pause'), findsOneWidget);
+      expect(find.text('En pause · 50 % · 500 o / 1 Ko'), findsOneWidget);
+      final bars = tester.widgetList<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bars.map((b) => b.value), [0.5]);
+    });
+
     testWidgets('état vide : comment télécharger', (tester) async {
       await pumpScreen(tester, []);
       expect(find.byIcon(Icons.download_outlined), findsOneWidget);

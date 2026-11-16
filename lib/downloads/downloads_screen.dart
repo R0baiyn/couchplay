@@ -388,7 +388,10 @@ class _ActiveRow extends ConsumerWidget {
               const SizedBox(width: 4),
             ],
           ),
-          if (!failed && d.status != DownloadStatus.queued)
+          // En pause avant d'avoir reçu quoi que ce soit : pas de barre
+          // (indéterminée, elle s'animerait comme un transfert).
+          if (d.status == DownloadStatus.running ||
+              (d.status == DownloadStatus.paused && d.fraction != null))
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: _ActiveBar(d),
