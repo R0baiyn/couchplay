@@ -58,6 +58,54 @@ final class PlayItem {
   /// Titre affiché dans le lecteur : avec celui de l'épisode, s'il en a un.
   String get title =>
       episodeTitle == null ? shortTitle : '$shortTitle · $episodeTitle';
+
+  /// Lit les champs d'une entrée de `library.json` ou `downloads.json` de
+  /// clé [key] ; `null` si l'entrée est illisible.
+  static PlayItem? fromJson(String key, Map<String, Object?> map) {
+    final id = key.startsWith('movie:') || key.startsWith('episode:')
+        ? key.substring(key.indexOf(':') + 1)
+        : null;
+    final name = asString(map['name']);
+    final extension = asString(map['extension']);
+    if (id == null || id.isEmpty || name == null || extension == null) {
+      return null;
+    }
+    if (!key.startsWith('episode:')) {
+      return PlayItem.movie(
+        id: id,
+        extension: extension,
+        name: name,
+        poster: asString(map['poster']),
+      );
+    }
+    final seriesId = asId(map['seriesId']);
+    final season = asInt(map['season']);
+    final episode = asInt(map['episode']);
+    if (seriesId == null || season == null || episode == null) return null;
+    return PlayItem.episode(
+      id: id,
+      extension: extension,
+      name: name,
+      seriesId: seriesId,
+      season: season,
+      episode: episode,
+      episodeTitle: asString(map['title']),
+      poster: asString(map['poster']),
+    );
+  }
+
+  /// Champs de l'entrée, sans la clé ([key]).
+  Map<String, Object?> toJson() => {
+    if (isEpisode) ...{
+      'seriesId': seriesId,
+      'season': season,
+      'episode': episode,
+      'title': ?episodeTitle,
+    },
+    'name': name,
+    'poster': ?poster,
+    'extension': extension,
+  };
 }
 
 /// Clé d'un film ou d'une série du catalogue dans `library.json` : celle de
@@ -174,38 +222,8 @@ final class Progress {
 
   static Progress? fromJson(String key, Object? json) {
     final map = asMap(json);
-    final id = key.startsWith('movie:') || key.startsWith('episode:')
-        ? key.substring(key.indexOf(':') + 1)
-        : null;
-    final name = asString(map['name']);
-    final extension = asString(map['extension']);
-    if (id == null || id.isEmpty || name == null || extension == null) {
-      return null;
-    }
-    final PlayItem item;
-    if (key.startsWith('episode:')) {
-      final seriesId = asId(map['seriesId']);
-      final season = asInt(map['season']);
-      final episode = asInt(map['episode']);
-      if (seriesId == null || season == null || episode == null) return null;
-      item = PlayItem.episode(
-        id: id,
-        extension: extension,
-        name: name,
-        seriesId: seriesId,
-        season: season,
-        episode: episode,
-        episodeTitle: asString(map['title']),
-        poster: asString(map['poster']),
-      );
-    } else {
-      item = PlayItem.movie(
-        id: id,
-        extension: extension,
-        name: name,
-        poster: asString(map['poster']),
-      );
-    }
+    final item = PlayItem.fromJson(key, map);
+    if (item == null) return null;
     return Progress(
       item: item,
       position: Duration(seconds: asInt(map['position']) ?? 0),
@@ -217,15 +235,7 @@ final class Progress {
   }
 
   Map<String, Object?> toJson() => {
-    if (item.isEpisode) ...{
-      'seriesId': item.seriesId,
-      'season': item.season,
-      'episode': item.episode,
-      'title': ?item.episodeTitle,
-    },
-    'name': item.name,
-    'poster': ?item.poster,
-    'extension': item.extension,
+    ...item.toJson(),
     'position': position.inSeconds,
     'duration': duration.inSeconds,
     'watched': watched,
