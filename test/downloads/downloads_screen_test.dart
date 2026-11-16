@@ -8,12 +8,14 @@ import 'package:couchplay/downloads/export.dart';
 import 'package:couchplay/focus_ring.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_downloads.dart';
+import '../support/real_font.dart';
 import '../support/settle.dart';
 
 PlayItem _episode(String id, int season, int number) => PlayItem.episode(
@@ -497,6 +499,23 @@ void main() {
       await tester.pump();
     });
 
+    testWidgets('« Tout supprimer » en icône : anneau de focus, Entrée agit', (
+      tester,
+    ) async {
+      await pumpKeyboardApp(tester, size: const Size(360, 740));
+      final button = find.widgetWithIcon(
+        IconButton,
+        Icons.delete_sweep_outlined,
+      );
+      expect(sideOf(tester, button), BorderSide.none);
+      await tabTo(tester, button);
+      await tester.pumpAndSettle();
+      expect(sideOf(tester, button), focusRing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text('Tout supprimer ?'), findsOneWidget);
+    });
+
     testWidgets('320 dp : ligne « Prêts » avec export, rien ne déborde', (
       tester,
     ) async {
@@ -517,6 +536,50 @@ void main() {
       expect(find.byTooltip('Exporter la vidéo'), findsNWidgets(3));
       expect(find.byTooltip('Ouvrir le dossier des vidéos'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('écran étroit : titre entier', () {
+    // Vraies largeurs de lettres : sous Ahem le titre ne tient jamais.
+    setUpAll(loadRoboto);
+
+    for (final desktop in [false, true]) {
+      testWidgets('360 dp${desktop ? ' (fenêtre PC étroite)' : ''} : '
+          '« Téléchargements » n\'est pas tronqué', (tester) async {
+        await pumpScreen(
+          tester,
+          [download(movie, DownloadStatus.ready, size: 5000)],
+          size: const Size(360, 740),
+          desktop: desktop,
+        );
+        final title = tester.renderObject<RenderParagraph>(
+          find.text('Téléchargements'),
+        );
+        expect(title.didExceedMaxLines, isFalse);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('« Tout supprimer » en icône : infobulle, confirmation', (
+      tester,
+    ) async {
+      final fake = await pumpScreen(tester, [
+        download(movie, DownloadStatus.ready),
+      ], size: const Size(360, 740));
+      expect(find.text('Tout supprimer'), findsNothing);
+      await tester.tap(find.byTooltip('Tout supprimer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tout supprimer ?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Tout supprimer'));
+      await tester.pumpAndSettle();
+      expect(fake.calls, ['removeAll']);
+    });
+
+    testWidgets('grand écran : « Tout supprimer » reste un bouton texte', (
+      tester,
+    ) async {
+      await pumpScreen(tester, [download(movie, DownloadStatus.ready)]);
+      expect(find.widgetWithText(TextButton, 'Tout supprimer'), findsOneWidget);
     });
   });
 }

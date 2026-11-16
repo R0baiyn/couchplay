@@ -76,10 +76,20 @@ class DownloadsScreen extends ConsumerWidget {
               onPressed: () => _openFolder(context, ref),
             ),
           if (entries.isNotEmpty)
-            TextButton(
-              onPressed: () => _confirmRemoveAll(context, ref, entries.length),
-              child: const Text('Tout supprimer'),
-            ),
+            // Étroit : une icône, pour que le titre tienne en entier.
+            if (MediaQuery.sizeOf(context).width < railMinWidth)
+              IconButton(
+                tooltip: 'Tout supprimer',
+                icon: const Icon(Icons.delete_sweep_outlined),
+                onPressed: () =>
+                    _confirmRemoveAll(context, ref, entries.length),
+              )
+            else
+              TextButton(
+                onPressed: () =>
+                    _confirmRemoveAll(context, ref, entries.length),
+                child: const Text('Tout supprimer'),
+              ),
           const SettingsButton(),
         ],
       ),
