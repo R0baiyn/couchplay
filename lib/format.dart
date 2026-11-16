@@ -26,3 +26,13 @@ String formatDate(DateTime date) {
   final local = date.toLocal();
   return '${twoDigits(local.day)}/${twoDigits(local.month)}/${local.year}';
 }
+
+/// Taille d'un fichier : `350 Mo`, `1,4 Go` (unités de 1000, à la française).
+String formatSize(int bytes) {
+  String unit(double value, String name) =>
+      '${value >= 10 || value == value.roundToDouble() ? value.round() : value.toStringAsFixed(1).replaceFirst('.', ',')} $name';
+  if (bytes >= 1000000000) return unit(bytes / 1e9, 'Go');
+  if (bytes >= 1000000) return unit(bytes / 1e6, 'Mo');
+  if (bytes >= 1000) return unit(bytes / 1e3, 'Ko');
+  return '$bytes o';
+}

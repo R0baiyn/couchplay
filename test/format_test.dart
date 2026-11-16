@@ -20,4 +20,14 @@ void main() {
   test('formatDate, en heure locale', () {
     expect(formatDate(DateTime(2026, 3, 7, 12)), '07/03/2026');
   });
+
+  test('formatSize', () {
+    expect(formatSize(0), '0 o');
+    expect(formatSize(999), '999 o');
+    expect(formatSize(1500), '1,5 Ko');
+    expect(formatSize(350000000), '350 Mo');
+    expect(formatSize(1400000000), '1,4 Go');
+    expect(formatSize(12000000000), '12 Go');
+    expect(formatSize(2000000000), '2 Go');
+  });
 }
