@@ -74,6 +74,23 @@ void main() {
     expect(request.start, _start);
   });
 
+  test('dossier avec espace et accents : le fichier est retrouvé', () async {
+    // Un profil Windows peut en contenir : `Uri.file` encode, `toFilePath`
+    // décode, et c'est l'URL encodée que mpv reçoit.
+    final accented = await Directory(
+      '${dir.path}${Platform.pathSeparator}Éloïse à côté',
+    ).create();
+    final file = File('${accented.path}${Platform.pathSeparator}movie-12.mkv');
+    await file.writeAsString('vidéo');
+
+    final request = localRequest(_movie, file);
+
+    expect(request.url.toFilePath(), file.path);
+    expect(request.url.toString(), startsWith('file:///'));
+    expect(request.url.toString(), contains('%20'));
+    expect(File.fromUri(request.url).existsSync(), isTrue);
+  });
+
   test('lecture locale : mêmes pistes et même reprise que le flux', () {
     final local = localRequest(
       _movie,
