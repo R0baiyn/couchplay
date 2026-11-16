@@ -447,11 +447,15 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
   void _interrupt(_Session session) {
     final current = session.current;
     if (current == null) return;
+    // Seulement s'il tourne encore : un téléchargement qui vient de finir
+    // (prêt, la file pas encore passée au suivant) serait repris de zéro.
     unawaited(
       _set(
         session,
         current.key,
-        (d) => d.copyWith(status: DownloadStatus.queued),
+        (d) => d.status == DownloadStatus.running
+            ? d.copyWith(status: DownloadStatus.queued)
+            : d,
       ),
     );
     current.cancel.cancel();

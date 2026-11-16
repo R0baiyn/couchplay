@@ -602,6 +602,33 @@ void main() {
       expect(server.ranges.last, 'bytes=$kept-');
     });
 
+    test('pause juste à la fin d\'un téléchargement : il reste prêt', () async {
+      final h = await _Harness.start();
+      final holds = h.container.read(downloadHoldsProvider.notifier);
+      // La pause arrive dès que l'entrée est prête, avant que la file ne
+      // passe au suivant.
+      h.container.listen(downloadsProvider, (_, next) {
+        if (next.entries['movie:1']?.status == DownloadStatus.ready) {
+          holds.pauseAll(DownloadHold.background);
+        }
+      });
+
+      await h.notifier.add([_movie('1')]);
+      await h.until(
+        () => h.container
+            .read(downloadHoldsProvider)
+            .reasons
+            .contains(DownloadHold.background),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(h.status('1'), DownloadStatus.ready);
+
+      holds.resumeAll(DownloadHold.background);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(h.status('1'), DownloadStatus.ready);
+      expect(h.server.ranges, [null], reason: 'pas téléchargé deux fois');
+    });
+
     test('Android : app quittée, pause ; retour, reprise', () async {
       final binding = TestWidgetsFlutterBinding.instance;
       binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
