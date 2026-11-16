@@ -585,8 +585,10 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
     String key,
     Download Function(Download) change,
   ) {
+    // Avant de lire `state` : illisible une fois le provider détruit.
+    if (session.disposed) return Future.value();
     final download = state.entries[key];
-    if (download == null || session.disposed) return Future.value();
+    if (download == null) return Future.value();
     return _save(session, {...state.entries, key: change(download)});
   }
 
