@@ -25,6 +25,10 @@ final class VideoServer implements HttpClientAdapter {
   int? cutAt;
   final bool hangAtCut;
 
+  /// [cutAt] compté depuis le début de chaque réponse : chaque reprise
+  /// reçoit un peu, puis est coupée.
+  var cutAfterEachRequest = false;
+
   /// Répond 200 avec tout le fichier, même à une demande de plage.
   final bool ignoreRange;
 
@@ -87,7 +91,8 @@ final class VideoServer implements HttpClientAdapter {
     );
     for (var i = start; i < source.length && !cancelled; i += 100) {
       await Future<void>.delayed(Duration.zero);
-      if (cutAt case final cut? when i >= cut) {
+      if (cutAt case final cut?
+          when i >= (cutAfterEachRequest ? start + cut : cut)) {
         if (!_reachedCut.isCompleted) _reachedCut.complete();
         if (hangAtCut) return;
         controller.addError(const SocketException('Connexion coupée'));

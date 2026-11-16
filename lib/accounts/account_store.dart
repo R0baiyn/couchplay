@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../downloads/downloads.dart';
 import '../logging.dart';
 import '../server/json_read.dart';
 import 'account.dart';
@@ -222,23 +223,26 @@ final class AccountsNotifier extends Notifier<AccountsState> {
 
   /// Efface les identifiants du compte, puis ses dossiers de données et de
   /// vidéos.
-  Future<void> remove(String id) async {
-    await _commit((s) => s.without(id));
-    await ref.read(accountStoreProvider).forgetBackup();
-    for (final files in [
-      ref.read(accountFilesProvider),
-      ?ref.read(downloadFilesProvider),
-    ]) {
-      try {
-        await files.delete(id);
-      } on FileSystemException catch (e) {
-        // Fichier verrouillé par Windows : il restera des données locales,
-        // mais le compte est bien supprimé. Le rangement du prochain
-        // démarrage les effacera.
-        log('Dossier du compte non effacé', error: e.osError?.errorCode);
-      }
-    }
-  }
+  Future<void> remove(String id) =>
+      // Son téléchargement en cours d'abord, fichier fermé : sinon Windows
+      // n'efface pas le dossier des vidéos.
+      whileDownloadsReleased(id, () async {
+        await _commit((s) => s.without(id));
+        await ref.read(accountStoreProvider).forgetBackup();
+        for (final files in [
+          ref.read(accountFilesProvider),
+          ?ref.read(downloadFilesProvider),
+        ]) {
+          try {
+            await files.delete(id);
+          } on FileSystemException catch (e) {
+            // Fichier verrouillé par Windows : il restera des données
+            // locales, mais le compte est bien supprimé. Le rangement du
+            // prochain démarrage les effacera.
+            log('Dossier du compte non effacé', error: e.osError?.errorCode);
+          }
+        }
+      });
 
   Future<void> activate(String id) => _commit((s) => s.withActive(id));
 

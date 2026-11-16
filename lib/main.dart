@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
 import 'app.dart';
+import 'downloads/downloads.dart';
 import 'downloads/downloads_folder.dart';
 import 'server/cloudflare_dns.dart';
 import 'settings/app_settings.dart';
@@ -37,22 +38,28 @@ Future<void> main() async {
   final videos = AccountFiles(await downloadsRoot(support));
   // En tâche de fond : ne retarde pas le premier rendu.
   unawaited(syncAccountFolders(accounts, files, videos));
-  runApp(
-    ProviderScope(
-      overrides: [
-        accountStoreProvider.overrideWithValue(accounts),
-        accountFilesProvider.overrideWithValue(files),
-        downloadFilesProvider.overrideWithValue(videos),
-        appSettingsFileProvider.overrideWithValue(
-          File('${support.path}${Platform.pathSeparator}settings.json'),
+  final container = ProviderContainer(
+    overrides: [
+      accountStoreProvider.overrideWithValue(accounts),
+      accountFilesProvider.overrideWithValue(files),
+      downloadFilesProvider.overrideWithValue(videos),
+      appSettingsFileProvider.overrideWithValue(
+        File('${support.path}${Platform.pathSeparator}settings.json'),
+      ),
+      appVersionProvider.overrideWithValue(package.version),
+      televisionProvider.overrideWithValue(television),
+      if (installer != null)
+        updaterProvider.overrideWithValue(
+          Updater(version: package.version, installer: installer),
         ),
-        appVersionProvider.overrideWithValue(package.version),
-        televisionProvider.overrideWithValue(television),
-        if (installer != null)
-          updaterProvider.overrideWithValue(
-            Updater(version: package.version, installer: installer),
-          ),
-      ],
+    ],
+  );
+  // Écoutée dès le démarrage : un téléchargement interrompu reprend, et la
+  // file suit le compte actif sans attendre son écran.
+  container.listen(downloadsProvider, (_, _) {});
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
       child: const CouchPlayApp(home: HomeGate()),
     ),
   );
