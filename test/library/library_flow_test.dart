@@ -120,6 +120,9 @@ void main() {
 
     Focus.of(tester.element(firstEpisode)).requestFocus();
     await tester.pump();
+    // Le bouton « Télécharger » est entre l'épisode et son menu.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await settle(tester);
     expect(

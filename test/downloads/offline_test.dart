@@ -1,10 +1,8 @@
 import 'dart:io';
 
 import 'package:couchplay/accounts/account_files.dart';
-import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/downloads/downloads_screen.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/catalog_app.dart';
