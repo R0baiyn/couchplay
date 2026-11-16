@@ -93,31 +93,53 @@ Future<File> exportVideo(File source, Directory folder, String name) async {
   if (!await source.exists()) {
     throw const ExportException('La vidéo n\'existe plus.');
   }
-  final part = File('${folder.path}${Platform.pathSeparator}$name.part');
+  File? part;
+  File? reserved;
   try {
+    // Créé ici, exclusivement : jamais le `.part` d'un autre (un
+    // téléchargement du navigateur, un autre export du même titre).
+    part = await _createNew(
+      (n) => '${folder.path}${Platform.pathSeparator}$name.$pid-$n.part',
+    );
     await source.copy(part.path);
     // Choisi à la fin : un fichier apparu pendant la copie n'est pas écrasé.
-    return await part.rename(await _freePath(folder, name));
+    final dot = name.lastIndexOf('.');
+    final stem = name.substring(0, dot);
+    final extension = name.substring(dot);
+    reserved = await _createNew(
+      (n) =>
+          '${folder.path}${Platform.pathSeparator}'
+          '$stem${n == 1 ? '' : ' ($n)'}$extension',
+    );
+    return await part.rename(reserved.path);
   } on FileSystemException catch (e) {
-    try {
-      if (await part.exists()) await part.delete();
-    } on FileSystemException {
-      // Rien de plus à faire : le fichier partiel reste, mais l'erreur
-      // d'origine est celle que l'on dit.
+    // Seulement les fichiers créés par cet export.
+    for (final file in [?part, ?reserved]) {
+      try {
+        if (await file.exists()) await file.delete();
+      } on FileSystemException {
+        // Rien de plus à faire : le fichier reste, mais l'erreur d'origine
+        // est celle que l'on dit.
+      }
     }
     throw ExportException(_message(e.osError?.errorCode));
   }
 }
 
-Future<String> _freePath(Directory folder, String name) async {
-  final dot = name.lastIndexOf('.');
-  final stem = name.substring(0, dot);
-  final extension = name.substring(dot);
+/// Crée, vide et de façon exclusive, le premier chemin libre parmi
+/// `path(1)`, `path(2)`… : un autre export qui fait de même au même moment
+/// prend le suivant, et un fichier existant n'est jamais repris.
+Future<File> _createNew(String Function(int n) path) async {
   for (var n = 1; ; n++) {
-    final candidate =
-        '${folder.path}${Platform.pathSeparator}'
-        '$stem${n == 1 ? '' : ' ($n)'}$extension';
-    if (!await File(candidate).exists()) return candidate;
+    final candidate = File(path(n));
+    if (await candidate.exists()) continue;
+    try {
+      return await candidate.create(exclusive: true);
+    } on FileSystemException {
+      // Pris entre-temps : le suivant. Une autre erreur (dossier disparu)
+      // est rendue telle quelle.
+      if (!await candidate.exists()) rethrow;
+    }
   }
 }
 

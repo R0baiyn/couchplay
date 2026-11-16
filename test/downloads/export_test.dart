@@ -116,6 +116,26 @@ void main() {
       );
     });
 
+    test('un fichier .part de l\'utilisateur reste intact', () async {
+      final mine = File('${target.path}/Mirage.mkv.part')
+        ..writeAsStringSync('téléchargement du navigateur');
+      await exportVideo(source, target, 'Mirage.mkv');
+      expect(mine.readAsStringSync(), 'téléchargement du navigateur');
+      expect(names(), ['Mirage.mkv', 'Mirage.mkv.part']);
+    });
+
+    test('deux exports en même temps : deux fichiers complets', () async {
+      // Deux films de même titre, exportés pendant la même copie.
+      final files = await Future.wait([
+        exportVideo(source, target, 'Mirage.mkv'),
+        exportVideo(source, target, 'Mirage.mkv'),
+      ]);
+      expect(names(), ['Mirage (2).mkv', 'Mirage.mkv']);
+      for (final file in files) {
+        expect(file.readAsBytesSync(), source.readAsBytesSync());
+      }
+    });
+
     test(
       'nom déjà pris : le premier est intact, le second a un suffixe',
       () async {
@@ -157,14 +177,19 @@ void main() {
       expect(target.existsSync(), isFalse);
     });
 
-    test('erreur en cours de copie : pas de fichier partiel', () async {
-      // Un dossier à la place du fichier `.part` : la copie échoue.
-      Directory('${target.path}/Mirage.mkv.part').createSync();
+    test('erreur après la copie : pas de fichier partiel', () async {
+      // Un dossier à la place du nom final : la copie réussit, le nom ne
+      // peut pas être pris.
+      Directory('${target.path}/Mirage.mkv').createSync();
       await expectLater(
         exportVideo(source, target, 'Mirage.mkv'),
         throwsA(isA<ExportException>()),
       );
-      expect(File('${target.path}/Mirage.mkv').existsSync(), isFalse);
+      expect(names(), ['Mirage.mkv']);
+      expect(
+        FileSystemEntity.isDirectorySync(target.listSync().single.path),
+        isTrue,
+      );
     });
   });
 }
