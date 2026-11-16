@@ -10,15 +10,25 @@ import '../server/json_read.dart';
 /// à la racine du dossier de support : ils survivent à la suppression d'un
 /// compte. Les prochains réglages globaux s'ajoutent ici.
 final class AppSettings {
-  const AppSettings({this.debug = false});
+  const AppSettings({this.debug = false, this.wifiOnly = true});
 
   /// Mode debug : le lecteur affiche les infos techniques du flux.
   final bool debug;
 
-  factory AppSettings.fromJson(Object? json) =>
-      AppSettings(debug: asBool(asMap(json)['debug']) ?? false);
+  /// Télécharger en Wi-Fi seulement (D-037) : sur réseau mobile, la file des
+  /// téléchargements attend. Activé par défaut, pour ne pas vider un forfait
+  /// par surprise.
+  final bool wifiOnly;
 
-  Map<String, Object?> toJson() => {'debug': debug};
+  factory AppSettings.fromJson(Object? json) {
+    final map = asMap(json);
+    return AppSettings(
+      debug: asBool(map['debug']) ?? false,
+      wifiOnly: asBool(map['wifiOnly']) ?? true,
+    );
+  }
+
+  Map<String, Object?> toJson() => {'debug': debug, 'wifiOnly': wifiOnly};
 }
 
 /// Le fichier des réglages, injecté par `main()`. `null` (tests) : réglages
@@ -46,8 +56,14 @@ final class AppSettingsNotifier extends Notifier<AppSettings> {
     }
   }
 
-  Future<void> setDebug(bool debug) {
-    state = AppSettings(debug: debug);
+  Future<void> setDebug(bool debug) =>
+      _set(AppSettings(debug: debug, wifiOnly: state.wifiOnly));
+
+  Future<void> setWifiOnly(bool wifiOnly) =>
+      _set(AppSettings(debug: state.debug, wifiOnly: wifiOnly));
+
+  Future<void> _set(AppSettings settings) {
+    state = settings;
     final file = ref.read(appSettingsFileProvider);
     if (file == null) return Future.value();
     return _writer.write(file, jsonEncode(state.toJson()));

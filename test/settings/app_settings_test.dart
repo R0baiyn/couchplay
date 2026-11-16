@@ -31,6 +31,15 @@ void main() {
     expect(container().read(appSettingsProvider).debug, isTrue);
   });
 
+  test('Wi-Fi seulement : activé par défaut, gardé avec debug', () async {
+    expect(container().read(appSettingsProvider).wifiOnly, isTrue);
+    final c = container();
+    await c.read(appSettingsProvider.notifier).setWifiOnly(false);
+    await c.read(appSettingsProvider.notifier).setDebug(true);
+    final read = container().read(appSettingsProvider);
+    expect((read.wifiOnly, read.debug), (false, true));
+  });
+
   test('fichier illisible : debug désactivé', () {
     file.writeAsStringSync('{pas du json');
     expect(container().read(appSettingsProvider).debug, isFalse);
