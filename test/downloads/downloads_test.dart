@@ -48,6 +48,7 @@ final class _Harness {
     Override? freeSpace,
     bool background = false,
     bool mobileOnly = false,
+    Stream<bool> Function()? network,
     void Function(Directory root)? before,
   }) async {
     final root = Directory.systemTemp.createTempSync('couchplay_queue_');
@@ -87,7 +88,7 @@ final class _Harness {
           freeSpaceProvider.overrideWithValue((_) async => null),
         pauseInBackgroundProvider.overrideWithValue(background),
         mobileOnlyNetworkProvider.overrideWith(
-          (ref) => Stream.value(mobileOnly),
+          (ref) => network?.call() ?? Stream.value(mobileOnly),
         ),
         ?freeSpace,
       ],
@@ -132,8 +133,56 @@ void main() {
       expect(h.notifier.fileOf(_movie('3')), isNull);
       expect(h.entries['movie:1']!.size, 1000);
       expect(h.server.ranges, [null, null]);
+      // Ni l'hôte ni les identifiants du compte dans le manifeste écrit.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final manifest = File('${h.root.path}/accounts/a/downloads.json')
+          .readAsStringSync();
+      expect(manifest, contains('movie:2'));
+      for (final secret in ['"moi"', 'mdpa', 'example.com', 'http']) {
+        expect(manifest, isNot(contains(secret)), reason: secret);
+      }
     },
   );
+
+  test('tout supprimer pendant un téléchargement : rien ne repart', () async {
+    final server = VideoServer(_source, cutAt: 500, hangAtCut: true);
+    final h = await _Harness.start(server: server);
+    await h.notifier.add([_movie('1'), _movie('2')]);
+    await server.reachedCut;
+
+    await h.notifier.removeAll();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(h.entries, isEmpty);
+    expect(server.ranges, hasLength(1));
+    expect(Directory('${h.root.path}/downloads/a').listSync(), isEmpty);
+  });
+
+  test('compte modifié pendant un téléchargement : fichier intact', () async {
+    final server = VideoServer(_source, cutAt: 500, hangAtCut: true);
+    final h = await _Harness.start(server: server);
+    await h.notifier.add([_movie('1')]);
+    await server.reachedCut;
+
+    server.cutAt = null;
+    final edited = _account('a');
+    await h.container
+        .read(accountsProvider.notifier)
+        .save(
+          Account(
+            id: edited.id,
+            name: edited.name,
+            host: edited.host,
+            username: edited.username,
+            password: edited.password,
+            userAgent: 'Autre/1.0',
+          ),
+        );
+    await h.until(() => h.status('1') == DownloadStatus.ready);
+
+    expect(h.video('a', 'movie-1.mkv').readAsBytesSync(), _source);
+    expect(server.ranges.last, startsWith('bytes='));
+  });
 
   test('ajouter ce qui y est déjà ne change rien', () async {
     final h = await _Harness.start();
@@ -370,6 +419,40 @@ void main() {
       binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await h.until(() => h.status('1') == DownloadStatus.ready);
     });
+
+    test(
+      'Wi-Fi seulement : rien ne part avant de connaître le réseau',
+      () async {
+        final network = StreamController<bool>();
+        addTearDown(network.close);
+        final h = await _Harness.start(
+          network: () => network.stream,
+          before: (root) => File('${root.path}/accounts/a/downloads.json')
+              .writeAsStringSync(
+                jsonEncode({
+                  'downloads': {
+                    'movie:1': {
+                      'name': 'Film 1',
+                      'extension': 'mkv',
+                      'status': 'queued',
+                    },
+                  },
+                }),
+              ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(h.server.ranges, isEmpty);
+
+        network.add(true);
+        await h.until(
+          () => h.container.read(downloadHoldsProvider).waitingForWifi,
+        );
+        expect(h.server.ranges, isEmpty);
+
+        network.add(false);
+        await h.until(() => h.status('1') == DownloadStatus.ready);
+      },
+    );
 
     test('Wi-Fi seulement : la file attend sur réseau mobile', () async {
       final h = await _Harness.start(mobileOnly: true);

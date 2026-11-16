@@ -75,9 +75,15 @@ final class DownloadHoldsNotifier extends Notifier<DownloadHolds> {
     );
   }
 
+  /// Tant que le type de réseau n'est pas connu, la file attend : un
+  /// téléchargement repris au démarrage ne part pas sur le forfait mobile.
   bool get _onMobileOnly =>
       ref.read(appSettingsProvider).wifiOnly &&
-      (ref.read(mobileOnlyNetworkProvider).value ?? false);
+      switch (ref.read(mobileOnlyNetworkProvider)) {
+        AsyncData(:final value) => value,
+        AsyncError() => false,
+        _ => true,
+      };
 
   void _network() => _onMobileOnly
       ? pauseAll(DownloadHold.mobileNetwork)
@@ -201,33 +207,44 @@ final downloadsProvider = NotifierProvider<DownloadsNotifier, DownloadsState>(
   DownloadsNotifier.new,
 );
 
+/// Ce qui vaut pour une construction du provider (un compte, un client) :
+/// Riverpod peut garder la même instance du notifier d'une construction à
+/// l'autre, et un transfert de la précédente ne doit rien toucher ensuite.
+final class _Session {
+  _Session(this.store, this.client, this.accountId, this.dio);
+
+  final DownloadsStore store;
+  final ServerClient client;
+  final String accountId;
+  final Dio dio;
+  var disposed = false;
+
+  /// Rangement du dossier fait : rien ne démarre avant.
+  Future<void> tidied = Future.value();
+
+  /// Le téléchargement en cours.
+  ({String key, CancelToken cancel, Future<void> done})? current;
+
+  /// Octets présents dans le fichier partiel en cours.
+  var received = 0;
+  final sinceProgress = Stopwatch();
+}
+
 final class DownloadsNotifier extends Notifier<DownloadsState> {
-  DownloadsStore? _store;
-  ServerClient? _client;
-  String? _accountId;
-  late Dio _dio;
-  var _disposed = false;
+  _Session? _session;
 
   /// Comptes en cours de suppression ([whileDownloadsReleased]) : rien ne
   /// repart.
   static final _released = <String>{};
 
-  /// Téléchargement en cours de chaque compte, pour [whileDownloadsReleased] :
-  /// lu hors du provider, qui dépend du compte actif.
+  /// Téléchargement en cours de chaque compte, pour [whileDownloadsReleased]
+  /// et pour la construction suivante du même compte : lu hors du provider,
+  /// qui dépend du compte actif.
   static final _running = <String, Future<void> Function()>{};
-
-  /// Rangement du dossier fait : rien ne démarre avant.
-  Future<void> _tidied = Future.value();
-
-  /// Le téléchargement en cours.
-  ({String key, CancelToken cancel, Future<void> done})? _current;
-
-  /// Octets présents dans le fichier partiel en cours.
-  var _received = 0;
-  final _sinceProgress = Stopwatch();
 
   @override
   DownloadsState build() {
+    _session = null;
     final account = ref.watch(
       activeAccountProvider.select(
         (a) => a == null ? null : (a.id, a.userAgent),
@@ -239,15 +256,13 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
       return const DownloadsState();
     }
     final (id, userAgent) = account;
-    final store = _store = DownloadsStore(
+    final store = DownloadsStore(
       File(ref.watch(accountFilesProvider).path(id, 'downloads.json')),
       videos.of(id),
     );
-    _client = client;
-    _accountId = id;
     // Même chemin réseau que le lecteur : DoH par `HttpOverrides`, en-tête
     // Host et certificat au nom du serveur, User-Agent du compte.
-    _dio = Dio(
+    final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
@@ -255,23 +270,24 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
       ),
     );
     if (ref.read(downloadAdapterProvider) case final adapter?) {
-      _dio.httpClientAdapter = adapter;
+      dio.httpClientAdapter = adapter;
     }
+    final session = _session = _Session(store, client, id, dio);
     ref.onDispose(() {
-      _disposed = true;
-      _current?.cancel.cancel();
-      _dio.close(force: true);
+      session.disposed = true;
+      session.current?.cancel.cancel();
+      dio.close(force: true);
     });
     ref.listen(downloadHoldsProvider, (_, holds) {
       if (holds.reasons.isEmpty) {
-        unawaited(_pump());
+        unawaited(_pump(session));
       } else {
-        _interrupt();
+        _interrupt(session);
       }
     });
     final entries = store.load();
-    _tidied = store.tidy(entries.values);
-    Future.microtask(_pump);
+    session.tidied = store.tidy(entries.values);
+    Future.microtask(() => _pump(session));
     return DownloadsState(entries: entries);
   }
 
@@ -279,14 +295,17 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
   /// le lecteur.
   File? fileOf(PlayItem item) {
     final download = state.entries[item.key];
-    if (download?.status != DownloadStatus.ready) return null;
-    return _store?.fileOf(download!);
+    if (download == null || download.status != DownloadStatus.ready) {
+      return null;
+    }
+    return _session?.store.fileOf(download);
   }
 
   /// Ajoute à la file : un film, un épisode, ou une saison entière. Ce qui
   /// y est déjà est laissé tel quel ; ce qui avait échoué repart.
   Future<void> add(Iterable<PlayItem> items) async {
-    if (_store == null) return;
+    final session = _session;
+    if (session == null) return;
     final entries = {...state.entries};
     for (final item in items) {
       if (!isDownloadable(item)) {
@@ -303,61 +322,67 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
         entries[item.key] = existing.copyWith(status: DownloadStatus.queued);
       }
     }
-    await _save(entries);
-    unawaited(_pump());
+    await _save(session, entries);
+    unawaited(_pump(session));
   }
 
   /// Met en pause : la file passe au suivant.
   Future<void> pause(String key) async {
-    final download = state.entries[key];
-    if (download == null ||
-        (download.status != DownloadStatus.queued &&
-            download.status != DownloadStatus.running)) {
+    final session = _session;
+    final status = state.entries[key]?.status;
+    if (session == null ||
+        (status != DownloadStatus.queued && status != DownloadStatus.running)) {
       return;
     }
-    await _stop(key);
-    await _set(key, (d) => d.copyWith(status: DownloadStatus.paused));
-    unawaited(_pump());
+    await _stop(session, key);
+    await _set(session, key, (d) => d.copyWith(status: DownloadStatus.paused));
+    unawaited(_pump(session));
   }
 
   /// Reprend un téléchargement en pause, ou relance un échec.
   Future<void> resume(String key) async {
+    final session = _session;
     final status = state.entries[key]?.status;
-    if (status != DownloadStatus.paused && status != DownloadStatus.failed) {
+    if (session == null ||
+        (status != DownloadStatus.paused && status != DownloadStatus.failed)) {
       return;
     }
-    await _set(key, (d) => d.copyWith(status: DownloadStatus.queued));
-    unawaited(_pump());
+    await _set(session, key, (d) => d.copyWith(status: DownloadStatus.queued));
+    unawaited(_pump(session));
   }
 
   /// Annule un téléchargement ou supprime un fichier prêt : l'entrée et ses
   /// fichiers disparaissent.
   Future<void> remove(String key) async {
+    final session = _session;
     final download = state.entries[key];
-    if (download == null) return;
-    await _stop(key);
-    if (_disposed) return;
-    await _save({...state.entries}..remove(key));
-    await _store?.deleteFiles(download);
-    unawaited(_pump());
+    if (session == null || download == null) return;
+    await _stop(session, key);
+    if (session.disposed) return;
+    await _save(session, {...state.entries}..remove(key));
+    await session.store.deleteFiles(download);
+    unawaited(_pump(session));
   }
 
   /// Supprime tout : téléchargements en cours, en attente et fichiers prêts.
   Future<void> removeAll() async {
+    final session = _session;
+    if (session == null) return;
     final all = state.entries.values.toList();
-    final current = _current;
-    if (current != null) await _stop(current.key);
-    if (_disposed) return;
-    await _save(const {});
+    // Vidée d'abord : rien ne repart pendant l'arrêt du transfert en cours.
+    await _save(session, const {});
+    if (session.current case final current?) {
+      await _stop(session, current.key);
+    }
     for (final download in all) {
-      await _store?.deleteFiles(download);
+      await session.store.deleteFiles(download);
     }
   }
 
   /// Arrête le téléchargement de [key] s'il est en cours, fichier fermé au
   /// retour.
-  Future<void> _stop(String key) async {
-    final current = _current;
+  Future<void> _stop(_Session session, String key) async {
+    final current = session.current;
     if (current == null || current.key != key) return;
     current.cancel.cancel();
     await current.done;
@@ -365,34 +390,44 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
 
   /// Une pause de toute la file : le téléchargement en cours repasse en
   /// attente, et reprendra à la levée de la pause.
-  void _interrupt() {
-    final current = _current;
+  void _interrupt(_Session session) {
+    final current = session.current;
     if (current == null) return;
     unawaited(
-      _set(current.key, (d) => d.copyWith(status: DownloadStatus.queued)),
+      _set(
+        session,
+        current.key,
+        (d) => d.copyWith(status: DownloadStatus.queued),
+      ),
     );
     current.cancel.cancel();
   }
 
-  bool get _blocked =>
-      _disposed ||
-      _released.contains(_accountId) ||
+  bool _blocked(_Session session) =>
+      session.disposed ||
+      _released.contains(session.accountId) ||
       ref.read(downloadHoldsProvider).reasons.isNotEmpty;
 
   /// Lance le premier téléchargement en attente, s'il n'y en a aucun en
   /// cours et que rien ne bloque la file.
-  Future<void> _pump() async {
-    if (_current != null || _blocked) return;
-    await _tidied;
-    if (_current != null || _blocked) return;
+  Future<void> _pump(_Session session) async {
+    if (session.current != null || _blocked(session)) return;
+    await session.tidied;
+    if (session.current != null || _blocked(session)) return;
+    final account = session.accountId;
+    // Le même compte rechargé (User-Agent modifié) : le transfert de la
+    // construction précédente ferme d'abord son fichier partiel.
+    if (_running[account] case final previous?) {
+      await previous();
+      if (session.current != null || _blocked(session)) return;
+    }
     final next = state.entries.values
         .where((d) => d.status == DownloadStatus.queued)
         .firstOrNull;
     if (next == null) return;
     final cancel = CancelToken();
-    final done = _run(next, cancel);
-    _current = (key: next.key, cancel: cancel, done: done);
-    final account = _accountId!;
+    final done = _run(session, next, cancel);
+    session.current = (key: next.key, cancel: cancel, done: done);
     Future<void> stop() {
       cancel.cancel();
       return done;
@@ -401,17 +436,21 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
     _running[account] = stop;
     await done;
     if (identical(_running[account], stop)) _running.remove(account);
-    _current = null;
-    if (_disposed) return;
+    session.current = null;
+    if (session.disposed) return;
     ref.read(downloadProgressProvider.notifier).publish(null);
-    unawaited(_pump());
+    unawaited(_pump(session));
   }
 
-  Future<void> _run(Download download, CancelToken cancel) async {
-    final store = _store!;
+  Future<void> _run(
+    _Session session,
+    Download download,
+    CancelToken cancel,
+  ) async {
+    final store = session.store;
     final key = download.key;
     final item = download.item;
-    final url = _client!.streamUri(
+    final url = session.client.streamUri(
       item.isEpisode ? ContentKind.series : ContentKind.movies,
       item.id,
       item.extension,
@@ -419,40 +458,42 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
     final part = store.partOf(download);
     final delays = ref.read(downloadRetryDelaysProvider);
     final progress = ref.read(downloadProgressProvider.notifier);
+    final holds = ref.read(downloadHoldsProvider.notifier);
     final space = ref.read(freeSpaceProvider);
     var size = download.size;
-    await _set(key, (d) => d.copyWith(status: DownloadStatus.running));
+    await _set(session, key, (d) => d.copyWith(status: DownloadStatus.running));
     try {
       // Créé ici, pas avant : un compte sans téléchargement n'a pas de
       // dossier. La suppression du compte arrête ce téléchargement
-      // d'abord ([release]) : il ne fait pas revenir le dossier effacé.
+      // d'abord ([whileDownloadsReleased]) : il ne fait pas revenir le
+      // dossier effacé.
       await part.parent.create(recursive: true);
     } on FileSystemException catch (e) {
       log('Dossier des vidéos non créé', error: e.osError?.errorCode);
-      return _fail(key, const WriteFailed());
+      return _fail(session, key, const WriteFailed());
     }
     for (var attempt = 0; ; attempt++) {
       try {
-        _received = await part.exists() ? await part.length() : 0;
+        session.received = await part.exists() ? await part.length() : 0;
         size = await transfer(
-          dio: _dio,
+          dio: session.dio,
           url: url,
           part: part,
           cancel: cancel,
           size: size,
           freeSpace: space,
           onProgress: (received, total) {
-            _received = received;
+            session.received = received;
             if (total != size) {
               size = total;
-              unawaited(_set(key, (d) => d.copyWith(size: total)));
+              unawaited(_set(session, key, (d) => d.copyWith(size: total)));
             }
-            if (!_sinceProgress.isRunning ||
-                _sinceProgress.elapsedMilliseconds >= 250) {
-              _sinceProgress
+            final clock = session.sinceProgress;
+            if (!clock.isRunning || clock.elapsedMilliseconds >= 250) {
+              clock
                 ..reset()
                 ..start();
-              if (!_disposed) {
+              if (!session.disposed) {
                 progress.publish(DownloadProgress(key, received, total));
               }
             }
@@ -460,6 +501,7 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
         );
         await part.rename(store.fileOf(download).path);
         await _set(
+          session,
           key,
           (d) => d.copyWith(
             status: DownloadStatus.ready,
@@ -472,32 +514,42 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
         // Arrêté par une pause, une annulation ou le changement de compte :
         // l'état est réglé par celui qui l'a demandé.
         if (CancelToken.isCancel(e)) {
-          // La taille sur le disque : les derniers octets écrits n'ont pas
-          // forcément été comptés.
-          if (await part.exists()) _received = await part.length();
-          await _set(key, (d) => d.copyWith(received: _received));
+          // La taille sur le disque : les derniers octets reçus n'ont pas
+          // forcément été écrits.
+          if (await part.exists()) session.received = await part.length();
+          await _set(
+            session,
+            key,
+            (d) => d.copyWith(received: session.received),
+          );
           return;
         }
         log('Téléchargement', error: e.type);
-        await _fail(key, const WriteFailed());
-        return;
+        return _fail(session, key, const WriteFailed());
       } on TransferException catch (e) {
         final retry = e is TransferInterrupted || e is TransferRefused;
-        if (retry && ref.read(downloadHoldsProvider).streaming) {
+        if (retry &&
+            !session.disposed &&
+            ref.read(downloadHoldsProvider).streaming) {
           // D-036 : le serveur refuse sans doute deux flux à la fois ; on
           // attend la sortie du lecteur.
           await _set(
+            session,
             key,
-            (d) =>
-                d.copyWith(status: DownloadStatus.queued, received: _received),
+            (d) => d.copyWith(
+              status: DownloadStatus.queued,
+              received: session.received,
+            ),
           );
-          ref
-              .read(downloadHoldsProvider.notifier)
-              .pauseAll(DownloadHold.playback);
+          holds.pauseAll(DownloadHold.playback);
           return;
         }
         if (e is TransferInterrupted && attempt < delays.length) {
-          await _set(key, (d) => d.copyWith(received: _received));
+          await _set(
+            session,
+            key,
+            (d) => d.copyWith(received: session.received),
+          );
           await Future.any([
             Future<void>.delayed(delays[attempt]),
             cancel.whenCancel,
@@ -505,40 +557,43 @@ final class DownloadsNotifier extends Notifier<DownloadsState> {
           if (cancel.isCancelled) return;
           continue;
         }
-        await _fail(key, e);
-        return;
+        return _fail(session, key, e);
       } on FileSystemException catch (e) {
         // Renommage impossible (fichier verrouillé, disque retiré).
         log('Téléchargement non renommé', error: e.osError?.errorCode);
-        await _fail(key, const WriteFailed());
-        return;
+        return _fail(session, key, const WriteFailed());
       }
     }
   }
 
-  Future<void> _fail(String key, TransferException error) {
+  Future<void> _fail(_Session session, String key, TransferException error) {
     log('Téléchargement en échec : ${error.message}');
     return _set(
+      session,
       key,
       (d) => d.copyWith(
         status: DownloadStatus.failed,
         error: error.message,
-        received: _received,
+        received: session.received,
       ),
     );
   }
 
   /// Change l'entrée [key], si elle existe encore.
-  Future<void> _set(String key, Download Function(Download) change) {
+  Future<void> _set(
+    _Session session,
+    String key,
+    Download Function(Download) change,
+  ) {
     final download = state.entries[key];
-    if (download == null || _disposed) return Future.value();
-    return _save({...state.entries, key: change(download)});
+    if (download == null || session.disposed) return Future.value();
+    return _save(session, {...state.entries, key: change(download)});
   }
 
-  Future<void> _save(Map<String, Download> entries) {
-    if (_disposed) return Future.value();
+  Future<void> _save(_Session session, Map<String, Download> entries) {
+    if (session.disposed) return Future.value();
     state = DownloadsState(entries: entries);
-    return _store?.save(entries) ?? Future.value();
+    return session.store.save(entries);
   }
 }
 
