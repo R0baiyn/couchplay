@@ -109,6 +109,21 @@ void main() {
     expect(store.load(), isEmpty);
   });
 
+  test('manifeste corrompu : mis de côté, vidéos gardées', () async {
+    store.manifest.writeAsStringSync('{pas du json');
+    final video = File('${store.videos.path}/movie-12.mkv')
+      ..writeAsStringSync('vidéo');
+
+    expect(store.load(), isEmpty);
+    await store.tidy(const []);
+
+    expect(video.existsSync(), isTrue);
+    expect(
+      File('${store.manifest.path}.bak').readAsStringSync(),
+      '{pas du json',
+    );
+  });
+
   test('entrée prête dont le fichier a disparu : retirée', () async {
     final ready = Download(
       item: _movie,

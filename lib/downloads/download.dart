@@ -139,19 +139,47 @@ final class DownloadsStore {
   File partOf(Download download) =>
       File('${videos.path}${Platform.pathSeparator}${download.partName}');
 
+  /// Le manifeste n'a pas pu être lu : ni rangement ([tidy]), qui
+  /// effacerait des vidéos encore listées, ni écriture, qui l'écraserait
+  /// (verrou passager, accès refusé), jusqu'au prochain chargement.
+  var unreadable = false;
+
   /// Lit le manifeste, dans l'ordre d'ajout. Une entrée illisible est
-  /// ignorée seule ; un fichier illisible donne une liste vide. Une entrée
-  /// prête dont le fichier a disparu est retirée.
+  /// ignorée seule ; un fichier illisible donne une liste vide (voir
+  /// [unreadable]) ; un fichier corrompu est mis de côté en
+  /// `downloads.json.bak`. Une entrée prête dont le fichier a disparu est
+  /// retirée ; une entrée en cours repasse en attente.
   Map<String, Download> load() {
-    if (_unwritten[manifest.path] case final pending?) return pending;
+    if (_unwritten[manifest.path] case final pending?) {
+      return {
+        for (final MapEntry(:key, :value) in pending.entries)
+          key: value.status == DownloadStatus.running
+              ? value.copyWith(status: DownloadStatus.queued)
+              : value,
+      };
+    }
     Object? json;
     try {
       // Lecture synchrone : quelques Ko, lus au changement de compte.
       json = jsonDecode(manifest.readAsStringSync());
     } on PathNotFoundException {
       return const {};
-    } on Exception catch (e) {
-      log('Téléchargements illisibles, liste vide', error: e.runtimeType);
+    } on FileSystemException catch (e) {
+      unreadable = true;
+      log('Téléchargements non lus, liste vide', error: e.osError?.errorCode);
+      return const {};
+    } on FormatException {
+      unreadable = true;
+      log('Téléchargements illisibles, mis de côté en downloads.json.bak');
+      try {
+        manifest.renameSync('${manifest.path}.bak');
+        // Mis de côté : on peut écrire de nouveau, sans ranger les vidéos,
+        // que la copie liste peut-être.
+        unreadable = false;
+        _noTidy = true;
+      } on FileSystemException catch (e) {
+        log('Téléchargements non mis de côté', error: e.osError?.errorCode);
+      }
       return const {};
     }
     final entries = <String, Download>{};
@@ -177,7 +205,11 @@ final class DownloadsStore {
   /// Dernière liste confiée à la file et pas encore écrite : [load] la rend.
   static final _unwritten = <String, Map<String, Download>>{};
 
+  /// Manifeste mis de côté : les vidéos restent pour cette session.
+  var _noTidy = false;
+
   Future<void> save(Map<String, Download> entries) {
+    if (unreadable) return Future.value();
     final path = manifest.path;
     _unwritten[path] = entries;
     final writer = _writers.putIfAbsent(
@@ -212,6 +244,7 @@ final class DownloadsStore {
   /// Efface les fichiers du dossier des vidéos qu'aucune entrée ne
   /// réclame : restes d'une annulation interrompue, d'un manifeste perdu.
   Future<void> tidy(Iterable<Download> entries) async {
+    if (unreadable || _noTidy) return;
     final kept = {
       for (final d in entries) ...[d.fileName, d.partName],
     };
