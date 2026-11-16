@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'catalog/catalog_index.dart';
 import 'catalog/catalog_screen.dart';
+import 'downloads/downloads_screen.dart';
 import 'focus_ring.dart';
 import 'library/home_screen.dart';
 import 'search/search_screen.dart';
@@ -44,8 +45,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     (Icons.movie_outlined, Icons.movie, 'Films'),
     (Icons.tv_outlined, Icons.tv, 'Séries'),
     (Icons.search_outlined, Icons.search, 'Recherche'),
+    (Icons.download_outlined, Icons.download, 'Téléchargements'),
   ];
   static const _searchTab = 3;
+
+  /// Pas d'onglet « Téléchargements » sur TV (D-034) : le dernier est retiré.
+  List<(IconData, IconData, String)> get _shown =>
+      ref.read(televisionProvider) ? _tabs.sublist(0, _tabs.length - 1) : _tabs;
 
   var _index = 0;
 
@@ -260,7 +266,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     0 => const HomeScreen(),
     1 => const CatalogScreen(kind: ContentKind.movies),
     2 => const CatalogScreen(kind: ContentKind.series),
-    _ => SearchScreen(focusNode: _searchField),
+    3 => SearchScreen(focusNode: _searchField),
+    _ => const DownloadsScreen(),
   };
 
   @override
@@ -293,10 +300,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   Widget _shell(BuildContext context) {
+    final tabs = _shown;
     final body = IndexedStack(
       index: _index,
       children: [
-        for (var i = 0; i < _tabs.length; i++)
+        for (var i = 0; i < tabs.length; i++)
           _visited.contains(i)
               ? _built.putIfAbsent(i, () => _tab(i))
               : const SizedBox.shrink(),
@@ -343,7 +351,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                           child: SettingsButton(inRail: true),
                         ),
                         destinations: [
-                          for (final (icon, selected, label) in _tabs)
+                          for (final (icon, selected, label) in tabs)
                             NavigationRailDestination(
                               icon: _tabIcon(icon, 56),
                               selectedIcon: _tabIcon(selected, 56),
@@ -368,7 +376,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: _select,
         destinations: [
-          for (final (icon, selected, label) in _tabs)
+          for (final (icon, selected, label) in tabs)
             NavigationDestination(
               icon: _tabIcon(icon, 64),
               selectedIcon: _tabIcon(selected, 64),
