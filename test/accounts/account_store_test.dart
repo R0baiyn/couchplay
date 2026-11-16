@@ -131,6 +131,9 @@ void main() {
           accountFilesProvider.overrideWithValue(
             AccountFiles(Directory('${root.path}/accounts')),
           ),
+          downloadFilesProvider.overrideWithValue(
+            AccountFiles(Directory('${root.path}/downloads')),
+          ),
           serverClientFactoryProvider.overrideWithValue(
             (a) => ServerClient(
               host: a.host,
@@ -142,6 +145,24 @@ void main() {
         ],
       );
     }
+
+    test('supprimer un compte efface ses données et ses vidéos', () async {
+      final container = await containerWith([_account('a'), _account('b')]);
+      final videos = container.read(downloadFilesProvider)!;
+      File(videos.path('a', '1.mkv'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('vidéo');
+      videos.of('b').createSync(recursive: true);
+
+      await container.read(accountsProvider.notifier).remove('a');
+
+      expect(videos.of('a').existsSync(), isFalse);
+      expect(videos.of('b').existsSync(), isTrue);
+      expect(
+        container.read(accountFilesProvider).of('a').existsSync(),
+        isFalse,
+      );
+    });
 
     test(
       'un clic pendant une suppression ne fait pas revenir le compte',
@@ -328,14 +349,19 @@ void main() {
     final root = Directory.systemTemp.createTempSync('couchplay_tidy_');
     addTearDown(() => root.deleteSync(recursive: true));
     final files = AccountFiles(Directory('${root.path}/accounts'));
+    final videos = AccountFiles(Directory('${root.path}/downloads'));
     files.of('orphelin').createSync(recursive: true);
+    File(videos.path('orphelin', '1.mkv')).createSync(recursive: true);
+    videos.of('garde').createSync(recursive: true);
     final store = await AccountStore.open();
     await store.save(const AccountsState().withAccount(_account('garde')));
 
-    await syncAccountFolders(store, files);
+    await syncAccountFolders(store, files, videos);
 
     expect(files.of('garde').existsSync(), isTrue);
     expect(files.of('orphelin').existsSync(), isFalse);
+    expect(videos.of('garde').existsSync(), isTrue);
+    expect(videos.of('orphelin').existsSync(), isFalse);
   });
 }
 

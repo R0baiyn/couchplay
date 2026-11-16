@@ -187,13 +187,17 @@ final class AccountStore {
 /// revenir vide sans erreur (Android efface sa clé, Windows son fichier au
 /// lancement suivant), et ses dossiers doivent rester. La suppression du
 /// dernier compte efface déjà son dossier elle-même ([AccountsNotifier.remove]).
+///
+/// [videos] : les dossiers des vidéos téléchargées, rangés de même.
 Future<void> syncAccountFolders(
   AccountStore accounts,
-  AccountFiles files,
-) async {
+  AccountFiles files, [
+  AccountFiles? videos,
+]) async {
   final ids = {for (final a in accounts.current.accounts) a.id};
   if (accounts.unreadable || ids.isEmpty) return;
   await files.sync(ids);
+  await videos?.sync(ids);
 }
 
 /// Ouvert dans `main()` avant le premier rendu, puis injecté via un override.
@@ -216,16 +220,23 @@ final class AccountsNotifier extends Notifier<AccountsState> {
     await _commit((s) => s.withAccount(account, activate: activate));
   }
 
-  /// Efface les identifiants du compte, puis son dossier de données.
+  /// Efface les identifiants du compte, puis ses dossiers de données et de
+  /// vidéos.
   Future<void> remove(String id) async {
     await _commit((s) => s.without(id));
     await ref.read(accountStoreProvider).forgetBackup();
-    try {
-      await ref.read(accountFilesProvider).delete(id);
-    } on FileSystemException catch (e) {
-      // Fichier verrouillé par Windows : il restera des données locales,
-      // mais le compte est bien supprimé.
-      log('Dossier du compte non effacé', error: e.osError?.errorCode);
+    for (final files in [
+      ref.read(accountFilesProvider),
+      ?ref.read(downloadFilesProvider),
+    ]) {
+      try {
+        await files.delete(id);
+      } on FileSystemException catch (e) {
+        // Fichier verrouillé par Windows : il restera des données locales,
+        // mais le compte est bien supprimé. Le rangement du prochain
+        // démarrage les effacera.
+        log('Dossier du compte non effacé', error: e.osError?.errorCode);
+      }
     }
   }
 

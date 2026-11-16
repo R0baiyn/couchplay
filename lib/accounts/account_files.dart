@@ -130,3 +130,8 @@ Future<FileSystemException?> _writeInIsolate(String path, String text) =>
 final accountFilesProvider = Provider<AccountFiles>(
   (ref) => throw UnimplementedError('accountFilesProvider doit être surchargé'),
 );
+
+/// Dossiers des vidéos téléchargées de chaque compte :
+/// `<dossier local de l'app>/downloads/<id>/`, créé dans `main()` (voir
+/// `downloadsRoot`). `null` (tests) : pas de téléchargement.
+final downloadFilesProvider = Provider<AccountFiles?>((ref) => null);
