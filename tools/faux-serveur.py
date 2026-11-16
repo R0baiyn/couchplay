@@ -2,6 +2,7 @@
 
 Lancement : python -I tools/faux-serveur.py [--port 8080] [--donnees DIR]
             [--video FICHIER] [--video-hd FICHIER] [--max-par-categorie N]
+            [--debit KIO_PAR_S]
 
 Dans l'app : hôte http://localhost:8080 (PC) ou http://<IP du PC>:8080
 (téléphone), mot de passe quelconque. Le nom d'utilisateur choisit le
@@ -12,6 +13,8 @@ comportement :
   muet     chaque réponse attend 40 s, plus que le délai de l'app
   html     page HTML à la place du JSON (pare-feu, page d'erreur)
   plein    max_connections 1 appliqué : un 2e flux simultané reçoit un 403
+  coupe    un flux demandé sans Range est coupé au milieu du fichier ; une
+           requête avec Range (reprise) aboutit
   403, 429, 500…  ce code HTTP à chaque requête
   autre    fonctionnement normal
 
@@ -20,7 +23,8 @@ défaut, de test/fixtures/. Les listes respectent category_id, comme le vrai
 serveur. Les films dont le nom porte SD ou HD jouent la vidéo --video-hd
 (probe/mire-720p.mkv par défaut), les autres films et tous les épisodes la
 vidéo --video : la résolution affichée par le lecteur montre quelle version
-est lue.
+est lue. --debit bride l'envoi des vidéos (Kio/s), pour voir avancer un
+téléchargement.
 """
 
 import argparse
@@ -87,6 +91,8 @@ class Requete(BaseHTTPRequestHandler):
     donnees: Path
     video: Path | None
     video_hd: Path | None
+    # Kio/s des vidéos, None : sans bride.
+    debit: int | None = None
     # Listes chargées une fois : action -> entrées, et nom de chaque film.
     listes: dict[str, list] = {}
     noms_films: dict[str, str] = {}
@@ -159,14 +165,14 @@ class Requete(BaseHTTPRequestHandler):
         if refuse:
             return self.repondre(403, b'')
         try:
-            self.envoyer_plage(video)
+            self.envoyer_plage(video, coupe=utilisateur == 'coupe')
         except ConnectionError:
             pass  # Le lecteur a fermé ou sauté ailleurs dans la vidéo.
         finally:
             with verrou:
                 flux_ouverts[utilisateur] -= 1
 
-    def envoyer_plage(self, video: Path):
+    def envoyer_plage(self, video: Path, coupe=False):
         taille = video.stat().st_size
         debut, fin = 0, taille - 1
         plage = PLAGE.match(self.headers.get('Range', ''))
@@ -190,15 +196,22 @@ class Requete(BaseHTTPRequestHandler):
         if plage:
             self.send_header('Content-Range', f'bytes {debut}-{fin}/{taille}')
         self.end_headers()
+        # Coupé au milieu : l'en-tête annonce tout, la connexion se ferme
+        # avant la fin.
+        limite = taille // 2 if coupe and not plage else fin + 1
         with video.open('rb') as f:
             f.seek(debut)
-            reste = fin - debut + 1
+            reste = min(fin + 1, limite) - debut
             while reste > 0:
                 bloc = f.read(min(reste, 1 << 16))
                 if not bloc:
                     break
                 self.wfile.write(bloc)
                 reste -= len(bloc)
+                if self.debit:
+                    time.sleep(len(bloc) / (self.debit * 1024))
+        if limite <= fin:
+            self.close_connection = True
 
     def repondre(self, code: int, corps: bytes, type_mime='application/json'):
         self.send_response(code)
@@ -252,10 +265,17 @@ def principal():
         metavar='N',
         help='ne garder que les N premiers titres de chaque catégorie',
     )
+    arguments.add_argument(
+        '--debit',
+        type=int,
+        metavar='KIO_PAR_S',
+        help="bride l'envoi des vidéos à ce débit",
+    )
     a = arguments.parse_args()
     Requete.donnees = a.donnees
     Requete.video = a.video
     Requete.video_hd = a.video_hd
+    Requete.debit = a.debit
     for action in ('get_vod_streams', 'get_series'):
         fichier = a.donnees / FICHIERS[action]
         entrees = json.loads(fichier.read_text(encoding='utf-8'))
@@ -279,6 +299,8 @@ def principal():
     print(f'Catalogue : {a.donnees}')
     print(f'Vidéo : {a.video or "aucune, les flux répondent 404"}')
     print(f'Vidéo des films SD et HD : {a.video_hd or "la même"}')
+    if a.debit:
+        print(f'Débit des vidéos : {a.debit} Kio/s')
     print(f'Écoute sur http://localhost:{a.port} (Ctrl+C pour arrêter)')
     try:
         serveur.serve_forever()

@@ -5,6 +5,7 @@ import importlib.util
 import json
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 ICI = Path(__file__).resolve().parent
@@ -71,6 +72,31 @@ def principal():
         assert r.status == 206 and r.read() == bytes(range(10, 20))
         assert r.getheader('Content-Range') == f'bytes 10-19/{video.stat().st_size}'
         c.close()
+
+        taille = video.stat().st_size
+        r, c = get(port, '/movie/coupe/x/1.mkv')  # pre-push:allow : fictif
+        assert r.status == 200 and r.getheader('Content-Length') == str(taille)
+        try:
+            r.read()
+            raise AssertionError('le flux sans Range doit être coupé')
+        except http.client.IncompleteRead as e:
+            recu = e.partial
+        c.close()
+        assert recu == video.read_bytes()[: taille // 2], len(recu)
+        r, c = get(port, '/movie/coupe/x/1.mkv',  # pre-push:allow : fictif
+                   {'Range': f'bytes={len(recu)}-'})
+        assert r.status == 206
+        assert recu + r.read() == video.read_bytes(), 'la reprise aboutit'
+        c.close()
+
+        faux.Requete.debit = 50
+        debut = time.monotonic()
+        r, c = get(port, '/movie/demo/x/1.mkv',  # pre-push:allow : fictif
+                   {'Range': 'bytes=0-25599'})
+        assert len(r.read()) == 25600
+        assert time.monotonic() - debut >= 0.45, '25 Kio à 50 Kio/s'
+        c.close()
+        faux.Requete.debit = None
 
         premier, c1 = get(port, '/series/plein/x/1.mkv')  # pre-push:allow : fictif
         assert premier.status == 200
