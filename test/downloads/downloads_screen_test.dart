@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:couchplay/app.dart';
@@ -346,6 +347,58 @@ void main() {
       );
       await settle(tester);
       expect(find.textContaining('Export en cours'), findsNothing);
+    });
+
+    testWidgets('pendant le choix du dossier : l\'action est grisée', (
+      tester,
+    ) async {
+      // Sous Linux, le choix du dossier ne bloque pas la fenêtre : un
+      // second appui ouvrirait un second export.
+      final choice = Completer<String?>();
+      await pumpScreen(
+        tester,
+        [],
+        desktop: true,
+        downloadsFake: fake,
+        overrides: [pickFolderProvider.overrideWithValue(() => choice.future)],
+      );
+      IconButton export() => tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.save_alt),
+      );
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.pump();
+      expect(export().onPressed, isNull);
+
+      choice.complete(null);
+      await settle(tester);
+      expect(export().onPressed, isNotNull);
+      expect(target.listSync(), isEmpty);
+    });
+
+    testWidgets('choix du dossier impossible : c\'est dit', (tester) async {
+      await pumpScreen(
+        tester,
+        [],
+        desktop: true,
+        downloadsFake: fake,
+        overrides: [
+          pickFolderProvider.overrideWithValue(
+            () async => throw Exception('pas de portail'),
+          ),
+        ],
+      );
+      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await settle(tester);
+      expect(
+        find.text('Impossible d\'ouvrir le choix du dossier.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_alt))
+            .onPressed,
+        isNotNull,
+      );
     });
 
     testWidgets('choix du dossier annulé : rien n\'est copié ni dit', (

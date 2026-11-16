@@ -354,15 +354,23 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(text)));
     final item = widget.download.item;
-    final path = await ref.read(pickFolderProvider)();
-    if (path == null || !mounted) return;
-    final source = ref.read(downloadsProvider.notifier).fileOf(item);
-    if (source == null) {
-      say("La vidéo n'existe plus.");
-      return;
-    }
+    // Grisé dès le choix du dossier : sous Linux, il ne bloque pas la
+    // fenêtre, et un second appui lancerait un second export.
     setState(() => _exporting = true);
     try {
+      final String? path;
+      try {
+        path = await ref.read(pickFolderProvider)();
+      } on Exception {
+        say("Impossible d'ouvrir le choix du dossier.");
+        return;
+      }
+      if (path == null || !mounted) return;
+      final source = ref.read(downloadsProvider.notifier).fileOf(item);
+      if (source == null) {
+        say("La vidéo n'existe plus.");
+        return;
+      }
       await exportVideo(source, Directory(path), exportFileName(item));
       say('Exporté dans $path');
     } on ExportException catch (e) {
