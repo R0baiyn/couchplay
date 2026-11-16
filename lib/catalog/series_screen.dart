@@ -3,7 +3,11 @@ import '../focus_scroll.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../downloads/download.dart';
+import '../downloads/download_button.dart';
+import '../downloads/downloads.dart';
 import '../focus_ring.dart';
+import '../television.dart';
 import '../library/favorite_button.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
@@ -91,6 +95,24 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
     );
   }
 
+  /// L'épisode [episode] de [season] : `null` sans fichier connu, ni lecture
+  /// ni suivi possibles.
+  PlayItem? _item(Episode episode, Season season) {
+    final extension = episode.extension;
+    return extension == null
+        ? null
+        : PlayItem.episode(
+            id: episode.id,
+            extension: extension,
+            name: widget.item.name,
+            seriesId: widget.item.id,
+            season: season.number,
+            episode: episode.number,
+            episodeTitle: episode.title,
+            poster: widget.item.poster,
+          );
+  }
+
   Widget _content(SeriesDetails series) {
     // Première saison numérotée par défaut, les épisodes spéciaux après.
     final season =
@@ -137,26 +159,27 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
               ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _SeasonDownloadButton(
+                  items: [
+                    for (final episode in season.episodes)
+                      ?_item(episode, season),
+                  ],
+                ),
+              ),
+            ),
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             sliver: SliverList.builder(
               itemCount: season.episodes.length,
               itemBuilder: (context, index) {
                 final episode = season.episodes[index];
-                final extension = episode.extension;
-                // Sans fichier connu, ni lecture ni suivi possibles.
-                final item = extension == null
-                    ? null
-                    : PlayItem.episode(
-                        id: episode.id,
-                        extension: extension,
-                        name: widget.item.name,
-                        seriesId: widget.item.id,
-                        season: season.number,
-                        episode: episode.number,
-                        episodeTitle: episode.title,
-                        poster: widget.item.poster,
-                      );
+                final item = _item(episode, season);
                 return _EpisodeTile(
                   focusNode: episode.id == widget.episode?.id ? _target : null,
                   episode: episode,
@@ -175,6 +198,54 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// « Télécharger la saison » : met en file, dans l'ordre, les épisodes de la
+/// saison affichée qui ne sont ni téléchargés ni déjà en file (ceux en échec
+/// repartent).
+class _SeasonDownloadButton extends ConsumerWidget {
+  const _SeasonDownloadButton({required this.items});
+
+  final List<PlayItem> items;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (items.isEmpty || ref.watch(televisionProvider)) {
+      return const SizedBox.shrink();
+    }
+    // Deux chiffres seulement : l'avancement ne reconstruit pas le bouton.
+    final (missing, ready) = ref.watch(
+      downloadsProvider.select((s) {
+        var missing = 0;
+        var ready = 0;
+        for (final item in items) {
+          final status = s.entries[item.key]?.status;
+          if (status == null || status == DownloadStatus.failed) missing++;
+          if (status == DownloadStatus.ready) ready++;
+        }
+        return (missing, ready);
+      }),
+    );
+    return OutlinedButton.icon(
+      icon: Icon(
+        missing > 0
+            ? Icons.download_outlined
+            : ready == items.length
+            ? Icons.download_done
+            : Icons.schedule,
+      ),
+      label: Text(
+        missing > 0
+            ? 'Télécharger la saison'
+            : ready == items.length
+            ? 'Saison téléchargée'
+            : 'Saison en file',
+      ),
+      onPressed: missing > 0
+          ? () => ref.read(downloadsProvider.notifier).add(items)
+          : null,
     );
   }
 }
@@ -300,6 +371,7 @@ class _EpisodeTile extends ConsumerWidget {
               ),
             ),
           ),
+          DownloadButton(item: item, compact: true),
           // Menu plutôt qu'appui long : il marche aussi au clavier et à la
           // télécommande.
           if (onWatched != null)

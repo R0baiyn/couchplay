@@ -1,4 +1,6 @@
 import 'package:couchplay/catalog/series_screen.dart';
+import 'package:couchplay/downloads/download.dart';
+import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/server/models.dart';
@@ -7,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/catalog_app.dart';
+import '../support/fake_downloads.dart';
 import '../support/settle.dart';
 
 void main() {
@@ -112,4 +115,64 @@ void main() {
       expect(scrollable.position.pixels, 0);
     },
   );
+
+  testWidgets('« Télécharger la saison » met en file ceux de la saison '
+      'affichée, dans cet ordre ; chaque épisode a son bouton', (tester) async {
+    final fake = FakeDownloads();
+    await pumpApp(
+      tester,
+      openMovies: false,
+      overrides: [downloadsProvider.overrideWith(() => fake)],
+    );
+    await tester.tap(find.text('Séries'));
+    await settle(tester);
+    await tester.tap(find.text('Les Veilleurs'));
+    await settle(tester);
+
+    // Un bouton par épisode de la saison 1.
+    expect(find.byTooltip('Télécharger'), findsNWidgets(3));
+    await tester.tap(find.byTooltip('Télécharger').at(1));
+    await tester.pump();
+    expect(fake.calls, ['add episode:6913']);
+
+    fake.calls.clear();
+    await tester.tap(find.text('Télécharger la saison'));
+    await tester.pump();
+    expect(fake.calls, ['add episode:6912 episode:6913 episode:6914']);
+  });
+
+  testWidgets('saison entièrement téléchargée : bouton de saison grisé', (
+    tester,
+  ) async {
+    PlayItem episode(String id, int number) => PlayItem.episode(
+      id: id,
+      extension: 'mkv',
+      name: 'Les Veilleurs',
+      seriesId: '17',
+      season: 1,
+      episode: number,
+    );
+    final items = [episode('6912', 1), episode('6913', 2), episode('6914', 3)];
+    final fake = FakeDownloads({
+      for (final item in items)
+        item.key: download(item, DownloadStatus.ready, received: 1000),
+    });
+    await pumpApp(
+      tester,
+      openMovies: false,
+      overrides: [downloadsProvider.overrideWith(() => fake)],
+    );
+    await tester.tap(find.text('Séries'));
+    await settle(tester);
+    await tester.tap(find.text('Les Veilleurs'));
+    await settle(tester);
+
+    final button = tester.widget<OutlinedButton>(
+      find.ancestor(
+        of: find.text('Saison téléchargée'),
+        matching: find.bySubtype<OutlinedButton>(),
+      ),
+    );
+    expect(button.onPressed, isNull);
+  });
 }
