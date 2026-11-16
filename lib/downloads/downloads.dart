@@ -297,7 +297,14 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     });
     final entries = store.load();
     session.tidied = store.tidy(entries.values);
-    Future.microtask(() => _pump(session));
+    Future.microtask(() {
+      unawaited(_pump(session));
+      // Rattrapage : une affiche manquée (réseau coupé, app fermée trop
+      // tôt) est redemandée à chaque lancement.
+      for (final download in entries.values) {
+        unawaited(_fetchPoster(session, download));
+      }
+    });
     return DownloadsState(entries: entries);
   }
 
@@ -425,6 +432,9 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
       // vidéo déjà retirée.
       if (!_claimed(session, name)) return;
       await store.writePoster(download, bytes);
+      // Compte quitté pendant l'écriture : l'affiche reste, le manifeste
+      // la réclame peut-être encore (sinon le rangement l'effacera).
+      if (session.disposed) return;
       // Retirée pendant l'écriture : l'affiche part avec elle.
       if (!_claimed(session, name)) {
         await store.deletePoster(download);

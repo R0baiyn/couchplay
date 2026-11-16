@@ -375,6 +375,33 @@ void main() {
       });
     });
 
+    test('affiche manquante au démarrage : rattrapée', () async {
+      final h = await _Harness.start(
+        before: (root) {
+          File('${root.path}/accounts/a/downloads.json').writeAsStringSync(
+            jsonEncode({
+              'version': 1,
+              'downloads': {
+                'movie:1': {
+                  'name': 'Mirage',
+                  'extension': 'mkv',
+                  'poster': 'http://$host/poster/film.jpg',
+                  'size': 1000,
+                  'received': 1000,
+                  'status': 'ready',
+                },
+              },
+            }),
+          );
+          File('${root.path}/downloads/a/movie-1.mkv')
+            ..createSync(recursive: true)
+            ..writeAsBytesSync(_source);
+        },
+      );
+      await h.until(() => h.video('a', 'poster-movie-1').existsSync());
+      expect(h.server.posters, ['/poster/film.jpg']);
+    });
+
     test("une réponse qui n'est pas une image n'est pas gardée", () async {
       final h = await _Harness.start();
       h.server.poster = Uint8List.fromList('<html>portail</html>'.codeUnits);
