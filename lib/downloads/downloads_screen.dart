@@ -249,13 +249,10 @@ class _Empty extends StatelessWidget {
 /// la vidéo (la page s'ouvre hors ligne), sinon celle du serveur, sinon
 /// l'icône. Pour un épisode, l'affiche de sa série.
 class _Poster extends ConsumerWidget {
-  const _Poster(this.item, {this.width = 48, this.watched});
+  const _Poster(this.item, {this.width = 48});
 
   final PlayItem item;
   final double width;
-
-  /// Part regardée, en barre au bas de l'affiche, comme dans la grille.
-  final double? watched;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -275,25 +272,10 @@ class _Poster extends ConsumerWidget {
             // Fichier abîmé : le serveur, puis l'icône.
             errorBuilder: (_, _, _) => network,
           );
-    final watched = this.watched;
     return SizedBox(
       width: width,
       height: width * 3 / 2,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: watched == null
-            ? image
-            : Stack(
-                fit: StackFit.expand,
-                children: [
-                  image,
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: LinearProgressIndicator(value: watched),
-                  ),
-                ],
-              ),
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(4), child: image),
     );
   }
 }
@@ -591,10 +573,8 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
     final progress = ref.watch(
       libraryProvider.select((l) => l.progress[item.key]),
     );
+    // Où on en est, en texte et en coche seulement (D-046).
     final watched = progress?.watched ?? false;
-    final fraction = progress?.fraction ?? 0;
-    // Mêmes repères que la grille et la fiche série.
-    final bar = !watched && fraction > 0 ? fraction : null;
     final resume = progress?.resumeAt;
     final subtitle = _exporting
         ? 'Export en cours · ${formatSize(download.size)}'
@@ -613,7 +593,7 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
                 child: Row(
                   spacing: 12,
                   children: [
-                    if (!episode) _Poster(item, watched: bar),
+                    if (!episode) _Poster(item),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -645,8 +625,6 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
                             ],
                           ),
                           Text(subtitle, style: theme.textTheme.bodySmall),
-                          if (episode && bar != null)
-                            LinearProgressIndicator(value: bar),
                         ],
                       ),
                     ),

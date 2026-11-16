@@ -860,7 +860,7 @@ void main() {
       );
     });
 
-    testWidgets('où j\'en suis : barre, « Reprendre à », coche « vu »', (
+    testWidgets('où j\'en suis : « Reprendre à », coche « vu », sans barre', (
       tester,
     ) async {
       final seen = _episode('21', 1, 1);
@@ -891,14 +891,9 @@ void main() {
 
       expect(find.text('46 Mo · Reprendre à 10:00'), findsOneWidget);
       expect(find.text('1 Mo · Reprendre à 50:00'), findsOneWidget);
-      Finder bar(double value) => find.byWidgetPredicate(
-        (w) => w is LinearProgressIndicator && w.value == value,
-      );
-      expect(bar(0.1), findsOneWidget);
-      expect(bar(0.5), findsOneWidget);
-      // Vu : la coche, ni barre ni reprise.
+      // Vu : la coche, sans reprise. Aucune barre de visionnage (D-046).
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNWidgets(2));
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
     testWidgets('en cours : vignette, pourcentage, octets, barre pleine '
