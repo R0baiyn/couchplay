@@ -38,8 +38,16 @@ final class VideoServer implements HttpClientAdapter {
   /// Ce code à chaque requête, sans corps.
   int? status;
 
-  /// En-tête Range de chaque requête (`null` : sans plage).
+  /// En-tête Range de chaque requête de vidéo (`null` : sans plage).
   final ranges = <String?>[];
+
+  /// Chemin de chaque requête d'affiche (chemin qui commence par
+  /// `/poster`), servie à part avec [poster].
+  final posters = <String>[];
+  var poster = Uint8List.fromList(List.filled(50, 9));
+
+  /// Ce code pour chaque affiche, sans corps.
+  int? posterStatus;
   final dio = Dio();
 
   final _reachedCut = Completer<void>();
@@ -51,6 +59,13 @@ final class VideoServer implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (options.uri.path.startsWith('/poster')) {
+      posters.add(options.uri.path);
+      if (posterStatus case final code?) {
+        return ResponseBody.fromString('', code);
+      }
+      return ResponseBody.fromBytes(poster, 200);
+    }
     final range = options.headers[HttpHeaders.rangeHeader] as String?;
     ranges.add(range);
     if (status case final code?) {

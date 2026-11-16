@@ -9,6 +9,7 @@ import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
+import 'package:couchplay/downloads/transfer.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/player/playback.dart';
@@ -311,6 +312,168 @@ void main() {
 
     expect(Directory('${h.root.path}/downloads/a').existsSync(), isFalse);
     expect(Directory('${h.root.path}/accounts/a').existsSync(), isFalse);
+  });
+
+  group('affiches', () {
+    const host = 'example.com';
+    const film = PlayItem.movie(
+      id: '1',
+      extension: 'mkv',
+      name: 'Mirage',
+      poster: 'http://$host/poster/film.jpg',
+    );
+    PlayItem episode(String id, int number) => PlayItem.episode(
+      id: id,
+      extension: 'mp4',
+      name: 'Ma série',
+      seriesId: '7',
+      season: 1,
+      episode: number,
+      poster: 'http://$host/poster/serie.jpg',
+    );
+    Set<String> files(_Harness h) => {
+      for (final f in Directory('${h.root.path}/downloads/a').listSync())
+        f.uri.pathSegments.last,
+    };
+
+    test('une par film, une par série, gardées au rangement', () async {
+      final h = await _Harness.start();
+      await h.notifier.add([film, episode('11', 1), episode('12', 2)]);
+      await h.until(
+        () =>
+            h.entries['episode:12']?.status == DownloadStatus.ready &&
+            h.video('a', 'poster-series-7').existsSync(),
+      );
+
+      expect(
+        h.server.posters,
+        unorderedEquals(['/poster/film.jpg', '/poster/serie.jpg']),
+      );
+      expect(h.video('a', 'poster-movie-1').readAsBytesSync(), h.server.poster);
+      expect(h.notifier.posterOf(film)!.path, endsWith('poster-movie-1'));
+      expect(
+        h.notifier.posterOf(episode('12', 2))!.path,
+        endsWith('poster-series-7'),
+      );
+      // Aucun bout d'URL dans les noms de fichiers.
+      expect(
+        files(h).where((f) => f.contains('jpg') || f.contains(host)),
+        isEmpty,
+      );
+
+      final store = DownloadsStore(
+        File('${h.root.path}/accounts/a/downloads.json'),
+        Directory('${h.root.path}/downloads/a'),
+      );
+      await store.tidy(store.load().values);
+      expect(files(h), {
+        'movie-1.mkv',
+        'episode-11.mp4',
+        'episode-12.mp4',
+        'poster-movie-1',
+        'poster-series-7',
+      });
+    });
+
+    test("elles partent avec la vidéo, celle d'une série avec son dernier "
+        "épisode", () async {
+      final h = await _Harness.start();
+      await h.notifier.add([film, episode('11', 1), episode('12', 2)]);
+      await h.until(
+        () =>
+            h.entries['episode:12']?.status == DownloadStatus.ready &&
+            h.video('a', 'poster-series-7').existsSync() &&
+            h.video('a', 'poster-movie-1').existsSync(),
+      );
+
+      await h.notifier.remove('episode:11');
+      expect(h.video('a', 'poster-series-7').existsSync(), isTrue);
+      await h.notifier.remove('episode:12');
+      expect(h.video('a', 'poster-series-7').existsSync(), isFalse);
+      await h.notifier.remove('movie:1');
+      expect(files(h), isEmpty);
+    });
+
+    test('« Tout supprimer » : aucune affiche ne reste', () async {
+      final h = await _Harness.start();
+      await h.notifier.add([film, episode('11', 1)]);
+      await h.until(
+        () =>
+            h.entries['episode:11']?.status == DownloadStatus.ready &&
+            h.video('a', 'poster-series-7').existsSync() &&
+            h.video('a', 'poster-movie-1').existsSync(),
+      );
+
+      await h.notifier.removeAll();
+      expect(files(h), isEmpty);
+    });
+
+    test("« Effacer une fois vu » : l'affiche part aussi", () async {
+      final h = await _Harness.start();
+      await h.container
+          .read(appSettingsProvider.notifier)
+          .setDeleteWatched(true);
+      await h.notifier.add([film]);
+      await h.until(
+        () =>
+            h.status('1') == DownloadStatus.ready &&
+            h.video('a', 'poster-movie-1').existsSync(),
+      );
+
+      await h.container
+          .read(libraryProvider.notifier)
+          .setWatched(film, watched: true);
+      await h.until(() => files(h).isEmpty);
+    });
+
+    test('compte supprimé : ni vidéo ni affiche', () async {
+      final h = await _Harness.start();
+      await h.notifier.add([film]);
+      await h.until(
+        () =>
+            h.status('1') == DownloadStatus.ready &&
+            h.video('a', 'poster-movie-1').existsSync(),
+      );
+
+      await h.container.read(accountsProvider.notifier).remove('a');
+
+      expect(Directory('${h.root.path}/downloads/a').existsSync(), isFalse);
+    });
+
+    for (final (name, setUp) in [
+      ('refusée (404)', (VideoServer s) => s.posterStatus = 404),
+      ('trop grosse', (VideoServer s) => s.poster = Uint8List(posterLimit + 1)),
+    ]) {
+      test("$name : pas d'affiche, la vidéo se télécharge", () async {
+        final server = VideoServer(_source);
+        setUp(server);
+        final h = await _Harness.start(server: server);
+        await h.notifier.add([film]);
+        await h.until(() => h.status('1') == DownloadStatus.ready);
+        await h.until(() => h.server.posters.isNotEmpty);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(files(h), {'movie-1.mkv'});
+        expect(h.notifier.posterOf(film), isNull);
+      });
+    }
+
+    test("adresse qui n'est pas http(s) : aucune requête", () async {
+      final h = await _Harness.start();
+      await h.notifier.add([
+        const PlayItem.movie(
+          id: '2',
+          extension: 'mkv',
+          name: 'Local',
+          poster: 'file:///etc/passwd',
+        ),
+      ]);
+      await h.until(() => h.status('2') == DownloadStatus.ready);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(h.server.posters, isEmpty);
+      expect(files(h), {'movie-2.mkv'});
+    });
   });
 
   group('erreurs', () {

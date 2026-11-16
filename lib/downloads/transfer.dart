@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
@@ -233,3 +234,39 @@ TransferException _writeError(FileSystemException e) =>
     _diskFull.contains(e.osError?.errorCode)
     ? const NotEnoughSpace()
     : const WriteFailed();
+
+/// Taille maximale d'une affiche : au-delà, elle n'est pas gardée.
+const posterLimit = 4 << 20;
+
+/// Lit l'affiche [url] en mémoire, [limit] octets au plus (comptés à la
+/// réception : la taille annoncée peut mentir). `null` si l'URL n'est pas
+/// en http(s), si le serveur refuse ou coupe, ou si l'image est trop
+/// grosse : la vidéo se télécharge sans elle. Aucune URL n'en sort : celle
+/// d'un fournisseur peut porter des identifiants.
+Future<Uint8List?> fetchPoster(
+  Dio dio,
+  Uri url,
+  CancelToken cancel, {
+  int limit = posterLimit,
+}) async {
+  if (!url.isScheme('http') && !url.isScheme('https')) return null;
+  try {
+    final response = await dio.getUri<ResponseBody>(
+      url,
+      cancelToken: cancel,
+      options: Options(responseType: ResponseType.stream),
+    );
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in response.data!.stream) {
+      bytes.add(chunk);
+      // Quitter la boucle ferme la connexion.
+      if (bytes.length > limit) return null;
+    }
+    return bytes.isEmpty ? null : bytes.takeBytes();
+  } on DioException {
+    return null;
+  } on Exception {
+    // HttpException, SocketException : connexion coupée en route.
+    return null;
+  }
+}

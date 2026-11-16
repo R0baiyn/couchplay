@@ -63,6 +63,9 @@ final class Download {
   /// Nom du fichier en cours de téléchargement.
   String get partName => '$fileName.part';
 
+  /// Voir [posterNameOf].
+  String get posterName => posterNameOf(item);
+
   /// Part reçue, entre 0 et 1, `null` si la taille est inconnue.
   double? get fraction =>
       size > 0 ? (received / size).clamp(0, 1).toDouble() : null;
@@ -123,6 +126,20 @@ final _safeExtension = RegExp(r'^[A-Za-z0-9]{1,10}$');
 String fileNameOf(PlayItem item) =>
     '${item.isEpisode ? 'episode' : 'movie'}-${item.id}.${item.extension}';
 
+/// Nom de l'affiche dans le dossier des vidéos, tiré de la clé et jamais de
+/// l'URL : celle du film (`poster-movie-12`), ou celle de la série pour un
+/// épisode (`poster-series-34`), partagée par ses épisodes. Un id de série
+/// qui ne tient pas dans un nom donne une affiche par épisode
+/// (`poster-episode-56`). Sans extension : l'image est reconnue à son
+/// contenu. Le préfixe la tient à l'écart des noms de vidéos.
+String posterNameOf(PlayItem item) {
+  final series = item.seriesId;
+  if (series == null) return 'poster-movie-${item.id}';
+  return _safeId.hasMatch(series)
+      ? 'poster-series-$series'
+      : 'poster-episode-${item.id}';
+}
+
 /// Lecture et écriture de `accounts/<id>/downloads.json`, et des fichiers
 /// du dossier des vidéos du compte ([videos]).
 final class DownloadsStore {
@@ -138,6 +155,29 @@ final class DownloadsStore {
 
   File partOf(Download download) =>
       File('${videos.path}${Platform.pathSeparator}${download.partName}');
+
+  File posterOf(Download download) =>
+      File('${videos.path}${Platform.pathSeparator}${download.posterName}');
+
+  /// Écrit l'affiche de [download] : dans un fichier à part, renommé une
+  /// fois complet (jamais une image à moitié écrite à l'écran).
+  Future<void> writePoster(Download download, List<int> bytes) async {
+    final poster = posterOf(download);
+    final part = File('${poster.path}.part');
+    await videos.create(recursive: true);
+    await part.writeAsBytes(bytes, flush: true);
+    await part.rename(poster.path);
+  }
+
+  /// Efface l'affiche de [download], si elle existe.
+  Future<void> deletePoster(Download download) async {
+    try {
+      final poster = posterOf(download);
+      if (await poster.exists()) await poster.delete();
+    } on FileSystemException catch (e) {
+      log('Affiche non effacée', error: e.osError?.errorCode);
+    }
+  }
 
   /// Le manifeste n'a pas pu être lu : ni rangement ([tidy]), qui
   /// effacerait des vidéos encore listées, ni écriture, qui l'écraserait
@@ -246,7 +286,7 @@ final class DownloadsStore {
   Future<void> tidy(Iterable<Download> entries) async {
     if (unreadable || _noTidy) return;
     final kept = {
-      for (final d in entries) ...[d.fileName, d.partName],
+      for (final d in entries) ...[d.fileName, d.partName, d.posterName],
     };
     try {
       if (!await videos.exists()) return;

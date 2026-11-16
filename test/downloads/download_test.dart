@@ -157,17 +157,36 @@ void main() {
     expect(fileNameOf(_episode), 'episode-34.mp4');
   });
 
+  test("nom d'affiche : tiré de la clé, jamais de l'URL", () {
+    expect(posterNameOf(_movie), 'poster-movie-12');
+    expect(posterNameOf(_episode), 'poster-series-5');
+    // Id de série qui sortirait du dossier : une affiche par épisode.
+    const odd = PlayItem.episode(
+      id: '34',
+      extension: 'mp4',
+      name: 'x',
+      seriesId: '../5',
+      season: 1,
+      episode: 1,
+    );
+    expect(posterNameOf(odd), 'poster-episode-34');
+  });
+
   test('rangement : seuls les fichiers des entrées restent', () async {
     final keep = Download(item: _movie, addedAt: date);
     store.partOf(keep).writeAsStringSync('a');
     File('${store.videos.path}/movie-99.mkv').writeAsStringSync('b');
     File('${store.videos.path}/movie-99.mkv.part').writeAsStringSync('c');
+    await store.writePoster(keep, [1, 2]);
+    File('${store.videos.path}/poster-movie-99').writeAsStringSync('d');
+    File('${store.videos.path}/poster-movie-12.part').writeAsStringSync('e');
 
     await store.tidy([keep]);
 
-    expect(store.videos.listSync().map((e) => e.uri.pathSegments.last), [
-      'movie-12.mkv.part',
-    ]);
+    expect(
+      store.videos.listSync().map((e) => e.uri.pathSegments.last),
+      unorderedEquals(['movie-12.mkv.part', 'poster-movie-12']),
+    );
   });
 }
 

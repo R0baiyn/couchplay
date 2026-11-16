@@ -229,6 +229,10 @@ final class _Session {
   /// Octets présents dans le fichier partiel en cours.
   var received = 0;
   final sinceProgress = Stopwatch();
+
+  /// Affiches en cours de téléchargement, par nom de fichier.
+  final posters = <String>{};
+  final posterCancel = CancelToken();
 }
 
 class DownloadsNotifier extends Notifier<DownloadsState> {
@@ -277,6 +281,7 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     ref.onDispose(() {
       session.disposed = true;
       session.current?.cancel.cancel();
+      session.posterCancel.cancel();
       dio.close(force: true);
     });
     _watched.clear();
@@ -359,12 +364,22 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     return _session?.store.fileOf(download);
   }
 
+  /// Affiche enregistrée de [item] (celle de sa série pour un épisode), ou
+  /// `null` si elle n'est pas (encore) sur le disque : pour la page des
+  /// téléchargements, qui s'affiche hors ligne.
+  File? posterOf(PlayItem item) {
+    final download = state.entries[item.key];
+    final poster = download == null ? null : _session?.store.posterOf(download);
+    return poster != null && poster.existsSync() ? poster : null;
+  }
+
   /// Ajoute à la file : un film, un épisode, ou une saison entière. Ce qui
   /// y est déjà est laissé tel quel ; ce qui avait échoué repart.
   Future<void> add(Iterable<PlayItem> items) async {
     final session = _session;
     if (session == null) return;
     final entries = {...state.entries};
+    final added = <Download>[];
     for (final item in items) {
       if (!isDownloadable(item)) {
         log('Téléchargement refusé : id ou extension invalide');
@@ -372,9 +387,11 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
       }
       final existing = entries[item.key];
       if (existing == null) {
-        entries[item.key] = Download(
-          item: item,
-          addedAt: DateTime.now().toUtc(),
+        added.add(
+          entries[item.key] = Download(
+            item: item,
+            addedAt: DateTime.now().toUtc(),
+          ),
         );
       } else if (existing.status == DownloadStatus.failed) {
         entries[item.key] = existing.copyWith(status: DownloadStatus.queued);
@@ -382,7 +399,51 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     }
     await _save(session, entries);
     unawaited(_pump(session));
+    for (final download in added) {
+      unawaited(_fetchPoster(session, download));
+    }
   }
+
+  /// Enregistre l'affiche de [download] à côté des vidéos, une fois par
+  /// nom (une saison entière : une affiche). Par le client du transfert ;
+  /// un échec laisse la page retomber sur le réseau puis sur l'icône.
+  Future<void> _fetchPoster(_Session session, Download download) async {
+    final poster = download.item.poster;
+    final url = poster == null ? null : Uri.tryParse(poster);
+    final name = download.posterName;
+    if (url == null || !session.posters.add(name)) return;
+    try {
+      await session.tidied;
+      final store = session.store;
+      if (await store.posterOf(download).exists()) return;
+      final bytes = await fetchPoster(session.dio, url, session.posterCancel);
+      if (bytes == null) {
+        log('Affiche non téléchargée');
+        return;
+      }
+      // Relu juste avant d'écrire : compte supprimé (dossier effacé),
+      // vidéo déjà retirée.
+      if (!_claimed(session, name)) return;
+      await store.writePoster(download, bytes);
+      // Retirée pendant l'écriture : l'affiche part avec elle.
+      if (!_claimed(session, name)) {
+        await store.deletePoster(download);
+        return;
+      }
+      // Nouvelle liste : la page relit les affiches.
+      state = DownloadsState(entries: {...state.entries});
+    } on FileSystemException catch (e) {
+      log('Affiche non écrite', error: e.osError?.errorCode);
+    } finally {
+      session.posters.remove(name);
+    }
+  }
+
+  /// Une entrée du compte encore actif réclame l'affiche [name].
+  bool _claimed(_Session session, String name) =>
+      !session.disposed &&
+      !_released.contains(session.accountId) &&
+      state.entries.values.any((d) => d.posterName == name);
 
   /// Met en pause : la file passe au suivant.
   Future<void> pause(String key) async {
@@ -419,6 +480,11 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     if (session.disposed) return;
     await _save(session, {...state.entries}..remove(key));
     await session.store.deleteFiles(download);
+    // L'affiche d'une série part avec son dernier épisode.
+    if (!session.disposed &&
+        !state.entries.values.any((d) => d.posterName == download.posterName)) {
+      await session.store.deletePoster(download);
+    }
     unawaited(_pump(session));
   }
 
@@ -434,6 +500,7 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     }
     for (final download in all) {
       await session.store.deleteFiles(download);
+      await session.store.deletePoster(download);
     }
   }
 
