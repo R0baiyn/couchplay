@@ -47,6 +47,10 @@ final class VideoServer implements HttpClientAdapter {
   // Début d'un JPEG.
   var poster = Uint8List.fromList([0xFF, 0xD8, 0xFF, ...List.filled(50, 9)]);
 
+  /// Le plus grand nombre de requêtes d'affiche en même temps.
+  var maxPostersInFlight = 0;
+  var _postersInFlight = 0;
+
   /// Ce code pour chaque affiche, sans corps.
   int? posterStatus;
   final dio = Dio();
@@ -62,6 +66,12 @@ final class VideoServer implements HttpClientAdapter {
   ) async {
     if (options.uri.path.startsWith('/poster')) {
       posters.add(options.uri.path);
+      _postersInFlight++;
+      if (_postersInFlight > maxPostersInFlight) {
+        maxPostersInFlight = _postersInFlight;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      _postersInFlight--;
       if (posterStatus case final code?) {
         return ResponseBody.fromString('', code);
       }

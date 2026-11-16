@@ -233,6 +233,10 @@ final class _Session {
   /// Affiches en cours de téléchargement, par nom de fichier.
   final posters = <String>{};
   final posterCancel = CancelToken();
+
+  /// Fin de la dernière affiche demandée : une seule requête à la fois
+  /// (au lancement, toutes les affiches manquantes sont redemandées).
+  Future<void> posterQueue = Future.value();
 }
 
 class DownloadsNotifier extends Notifier<DownloadsState> {
@@ -419,7 +423,12 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     final url = poster == null ? null : Uri.tryParse(poster);
     final name = download.posterName;
     if (url == null || !session.posters.add(name)) return;
+    final previous = session.posterQueue;
+    final done = Completer<void>();
+    session.posterQueue = done.future;
     try {
+      await previous;
+      if (session.disposed) return;
       await session.tidied;
       final store = session.store;
       if (await store.posterOf(download).exists()) return;
@@ -446,6 +455,7 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
       log('Affiche non écrite', error: e.osError?.errorCode);
     } finally {
       session.posters.remove(name);
+      done.complete();
     }
   }
 

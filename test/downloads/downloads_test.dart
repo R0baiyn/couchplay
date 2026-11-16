@@ -402,6 +402,22 @@ void main() {
       expect(h.server.posters, ['/poster/film.jpg']);
     });
 
+    test('une affiche à la fois', () async {
+      final h = await _Harness.start();
+      await h.notifier.add([
+        for (var i = 1; i <= 5; i++)
+          PlayItem.movie(
+            id: '$i',
+            extension: 'mkv',
+            name: 'Film $i',
+            poster: 'http://$host/poster/$i.jpg',
+          ),
+      ]);
+      await h.until(() => h.video('a', 'poster-movie-5').existsSync());
+      expect(h.server.posters, hasLength(5));
+      expect(h.server.maxPostersInFlight, 1);
+    });
+
     test("une réponse qui n'est pas une image n'est pas gardée", () async {
       final h = await _Harness.start();
       h.server.poster = Uint8List.fromList('<html>portail</html>'.codeUnits);

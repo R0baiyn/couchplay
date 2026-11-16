@@ -238,6 +238,9 @@ TransferException _writeError(FileSystemException e) =>
 /// Taille maximale d'une affiche : au-delà, elle n'est pas gardée.
 const posterLimit = 4 << 20;
 
+/// Durée maximale de la réception d'une affiche.
+const posterTimeout = Duration(seconds: 30);
+
 /// Lit l'affiche [url] en mémoire, [limit] octets au plus (comptés à la
 /// réception : la taille annoncée peut mentir). `null` si l'URL n'est pas
 /// en http(s), si le serveur refuse ou coupe, ou si l'image est trop
@@ -258,10 +261,12 @@ Future<Uint8List?> fetchPoster(
       options: Options(responseType: ResponseType.stream),
     );
     final bytes = BytesBuilder(copy: false);
+    final clock = Stopwatch()..start();
     await for (final chunk in response.data!.stream) {
       bytes.add(chunk);
-      // Quitter la boucle ferme la connexion.
-      if (bytes.length > limit) return null;
+      // Quitter la boucle ferme la connexion. La durée aussi est bornée :
+      // un hôte qui envoie au compte-gouttes ne retient pas les suivantes.
+      if (bytes.length > limit || clock.elapsed > posterTimeout) return null;
     }
     final image = bytes.takeBytes();
     return _isImage(image) ? image : null;
