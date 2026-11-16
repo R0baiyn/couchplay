@@ -39,6 +39,9 @@ class DownloadsScreen extends ConsumerWidget {
       (sum, d) =>
           sum + (d.status == DownloadStatus.ready ? d.size : d.received),
     );
+    final running = active
+        .where((d) => d.status == DownloadStatus.running)
+        .firstOrNull;
     final waiting = active.any(
       (d) =>
           d.status == DownloadStatus.queued ||
@@ -77,10 +80,7 @@ class DownloadsScreen extends ConsumerWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Text(
-                    'Place occupée : ${formatSize(used)}',
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  child: _UsedSpace(stored: used, running: running),
                 ),
                 if (message != null)
                   Card(
@@ -151,6 +151,35 @@ class DownloadsScreen extends ConsumerWidget {
       focusCancel: true,
     );
     if (all) await ref.read(downloadsProvider.notifier).removeAll();
+  }
+}
+
+/// Place prise. Le manifeste ne dit que ce qui était reçu à sa dernière
+/// écriture : pour le téléchargement en cours, l'avancement en direct, que
+/// seul ce texte suit.
+class _UsedSpace extends ConsumerWidget {
+  const _UsedSpace({required this.stored, required this.running});
+
+  final int stored;
+  final Download? running;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final running = this.running;
+    final live = running == null
+        ? null
+        : ref.watch(
+            downloadProgressProvider.select(
+              (p) => p?.key == running.key ? p!.received : null,
+            ),
+          );
+    final used = live == null
+        ? stored
+        : stored + (live - running!.received).clamp(0, live);
+    return Text(
+      'Place occupée : ${formatSize(used)}',
+      style: Theme.of(context).textTheme.bodyMedium,
+    );
   }
 }
 

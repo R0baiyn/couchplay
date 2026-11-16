@@ -82,6 +82,25 @@ void main() {
     expect(fake.calls, ['pause movie:1', 'resume movie:2']);
   });
 
+  testWidgets('place occupée : suit l’avancement en direct', (tester) async {
+    await pumpScreen(tester, [
+      download(
+        movie,
+        DownloadStatus.running,
+        size: 2000000000,
+        received: 500000000,
+      ),
+    ]);
+    expect(find.text('Place occupée : 500 Mo'), findsOneWidget);
+
+    ProviderScope.containerOf(tester.element(find.byType(DownloadsScreen)))
+        .read(downloadProgressProvider.notifier)
+        .publish(const DownloadProgress('movie:1', 900000000, 2000000000));
+    await tester.pump();
+
+    expect(find.text('Place occupée : 900 Mo'), findsOneWidget);
+  });
+
   testWidgets('annuler un téléchargement commencé demande confirmation', (
     tester,
   ) async {
