@@ -368,6 +368,26 @@ void main() {
       await h.until(() => h.status('1') == DownloadStatus.ready);
     });
 
+    test('refus, puis lecteur fermé avant la pause : la file repart', () async {
+      final server = VideoServer(_source, status: 403);
+      final h = await _Harness.start(server: server);
+      final holds = h.container.read(downloadHoldsProvider.notifier);
+      holds.streaming = true;
+      // Le lecteur se ferme pendant l'écriture du manifeste qui suit le
+      // refus, avant la pause de la file.
+      h.container.listen(downloadsProvider, (previous, next) {
+        if (previous?.entries['movie:1']?.status == DownloadStatus.running &&
+            next.entries['movie:1']?.status == DownloadStatus.queued) {
+          server.status = null;
+          holds.streaming = false;
+        }
+      });
+
+      await h.notifier.add([_movie('1')]);
+      await h.until(() => h.status('1') == DownloadStatus.ready);
+      expect(h.container.read(downloadHoldsProvider).reasons, isEmpty);
+    });
+
     test(
       'refus pendant une lecture : la suite de la file attend aussi',
       () async {

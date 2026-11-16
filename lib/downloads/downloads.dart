@@ -595,7 +595,11 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
               received: session.received,
             ),
           );
-          holds.pauseAll(DownloadHold.playback);
+          // Relu après l'écriture : le lecteur a pu se fermer entre-temps,
+          // et rien ne lèverait plus la pause.
+          if (!session.disposed && ref.read(downloadHoldsProvider).streaming) {
+            holds.pauseAll(DownloadHold.playback);
+          }
           return;
         }
         if (e is TransferInterrupted && attempt < delays.length) {
