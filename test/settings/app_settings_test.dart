@@ -40,6 +40,18 @@ void main() {
     expect((read.wifiOnly, read.debug), (false, true));
   });
 
+  test(
+    'Effacer une fois vu : désactivé par défaut, gardé avec les autres',
+    () async {
+      expect(container().read(appSettingsProvider).deleteWatched, isFalse);
+      final c = container();
+      await c.read(appSettingsProvider.notifier).setDeleteWatched(true);
+      await c.read(appSettingsProvider.notifier).setWifiOnly(false);
+      final read = container().read(appSettingsProvider);
+      expect((read.deleteWatched, read.wifiOnly), (true, false));
+    },
+  );
+
   test('fichier illisible : debug désactivé', () {
     file.writeAsStringSync('{pas du json');
     expect(container().read(appSettingsProvider).debug, isFalse);

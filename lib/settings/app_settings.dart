@@ -10,7 +10,11 @@ import '../server/json_read.dart';
 /// à la racine du dossier de support : ils survivent à la suppression d'un
 /// compte. Les prochains réglages globaux s'ajoutent ici.
 final class AppSettings {
-  const AppSettings({this.debug = false, this.wifiOnly = true});
+  const AppSettings({
+    this.debug = false,
+    this.wifiOnly = true,
+    this.deleteWatched = false,
+  });
 
   /// Mode debug : le lecteur affiche les infos techniques du flux.
   final bool debug;
@@ -20,15 +24,32 @@ final class AppSettings {
   /// par surprise.
   final bool wifiOnly;
 
+  /// Effacer une fois vu (D-037) : la vidéo téléchargée d'un contenu qui
+  /// passe à « vu » est supprimée, à la sortie du lecteur. Désactivé par
+  /// défaut.
+  final bool deleteWatched;
+
   factory AppSettings.fromJson(Object? json) {
     final map = asMap(json);
     return AppSettings(
       debug: asBool(map['debug']) ?? false,
       wifiOnly: asBool(map['wifiOnly']) ?? true,
+      deleteWatched: asBool(map['deleteWatched']) ?? false,
     );
   }
 
-  Map<String, Object?> toJson() => {'debug': debug, 'wifiOnly': wifiOnly};
+  Map<String, Object?> toJson() => {
+    'debug': debug,
+    'wifiOnly': wifiOnly,
+    'deleteWatched': deleteWatched,
+  };
+
+  AppSettings copyWith({bool? debug, bool? wifiOnly, bool? deleteWatched}) =>
+      AppSettings(
+        debug: debug ?? this.debug,
+        wifiOnly: wifiOnly ?? this.wifiOnly,
+        deleteWatched: deleteWatched ?? this.deleteWatched,
+      );
 }
 
 /// Le fichier des réglages, injecté par `main()`. `null` (tests) : réglages
@@ -56,11 +77,13 @@ final class AppSettingsNotifier extends Notifier<AppSettings> {
     }
   }
 
-  Future<void> setDebug(bool debug) =>
-      _set(AppSettings(debug: debug, wifiOnly: state.wifiOnly));
+  Future<void> setDebug(bool debug) => _set(state.copyWith(debug: debug));
 
   Future<void> setWifiOnly(bool wifiOnly) =>
-      _set(AppSettings(debug: state.debug, wifiOnly: wifiOnly));
+      _set(state.copyWith(wifiOnly: wifiOnly));
+
+  Future<void> setDeleteWatched(bool deleteWatched) =>
+      _set(state.copyWith(deleteWatched: deleteWatched));
 
   Future<void> _set(AppSettings settings) {
     state = settings;
