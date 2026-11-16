@@ -189,7 +189,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    expect(find.textContaining('Hors ligne'), findsNothing);
+    expect(find.textContaining('Hors ligne : catalogue'), findsNothing);
 
     // Nouveau lancement, serveur injoignable, cache d'il y a 25 h.
     server = FakeAdapter.failing(DioExceptionType.connectionError);
@@ -202,7 +202,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await pumpApp(tester);
 
-    expect(find.textContaining('Hors ligne'), findsOneWidget);
+    expect(find.textContaining('Hors ligne : catalogue'), findsOneWidget);
     expect(find.text('Horizon (2024)'), findsOneWidget);
 
     // Plus de cache du tout : message et bouton.
