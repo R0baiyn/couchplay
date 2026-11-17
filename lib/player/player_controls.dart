@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
-import '../format.dart';
-import 'player_tracks.dart';
-import 'tech_info.dart';
+import 'player_bars.dart';
+import 'player_buttons.dart';
+import 'player_progress_bar.dart';
 
 /// Contrôles du lecteur, par-dessus la vidéo.
 ///
@@ -244,7 +244,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             AnimatedOpacity(
               opacity: _visible ? 1 : 0,
               duration: const Duration(milliseconds: 200),
-              child: IgnorePointer(ignoring: !_visible, child: _bars(context)),
+              child: IgnorePointer(ignoring: !_visible, child: _bars()),
             ),
           ],
         ),
@@ -252,308 +252,28 @@ class _PlayerControlsState extends State<PlayerControls> {
     );
   }
 
-  Widget _bars(BuildContext context) {
-    const shade = [Colors.black87, Colors.transparent];
-    // Barre du haut ou du bas : dégradé vers l'image, marges du système de
-    // son côté seulement.
-    Widget bar(Widget child, {required bool top}) => MouseRegion(
-      onEnter: (_) => _overBars = true,
-      onExit: (_) => _overBars = false,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: top ? Alignment.topCenter : Alignment.bottomCenter,
-            end: top ? Alignment.bottomCenter : Alignment.topCenter,
-            colors: shade,
-          ),
-        ),
-        child: SafeArea(top: top, bottom: !top, child: child),
-      ),
-    );
-    return Column(
+  Widget _bars() => PlayerBars(
+    player: _player,
+    title: widget.title,
+    onExit: widget.onExit,
+    onOver: (over) => _overBars = over,
+    bottom: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        bar(
-          top: true,
-          Row(
-            children: [
-              IconButton(
-                key: const ValueKey('player.back'),
-                tooltip: 'Retour',
-                icon: const Icon(Icons.arrow_back),
-                onPressed: widget.onExit,
-              ),
-              Expanded(
-                child: Text(
-                  widget.title,
-                  key: const ValueKey('player.title'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              TechInfo(player: _player),
-            ],
-          ),
-        ),
-        // Laisse passer clics et touchers vers les gestes de l'image.
-        const Spacer(),
-        bar(
-          top: false,
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ProgressBar(player: _player, onSeek: _show),
-                _buttons(),
-              ],
-            ),
-          ),
+        PlayerProgressBar(player: _player, onSeek: _show),
+        PlayerButtons(
+          player: _player,
+          playFocus: _playFocus,
+          fill: widget.fill,
+          fullscreen: widget.fullscreen,
+          volume: widget.volume,
+          onActivity: _show,
+          onRewind: () => _seekBy(-_step),
+          onForward: () => _seekBy(_step),
+          onToggleFill: widget.onToggleFill,
+          onToggleFullscreen: widget.onToggleFullscreen,
         ),
       ],
-    );
-  }
-
-  Widget _buttons() {
-    final fullscreen = widget.fullscreen;
-    return FocusTraversalGroup(
-      child: Row(
-        children: [
-          StreamBuilder<bool>(
-            stream: _player.stream.playing,
-            initialData: _player.state.playing,
-            builder: (context, snapshot) {
-              final playing = snapshot.data ?? false;
-              return IconButton(
-                key: const ValueKey('player.playPause'),
-                focusNode: _playFocus,
-                tooltip: playing ? 'Pause' : 'Lecture',
-                icon: Icon(playing ? Icons.pause : Icons.play_arrow),
-                onPressed: () {
-                  _player.playOrPause();
-                  _show();
-                },
-              );
-            },
-          ),
-          IconButton(
-            key: const ValueKey('player.rewind'),
-            tooltip: 'Reculer de 10 s',
-            icon: const Icon(Icons.replay_10),
-            onPressed: () => _seekBy(-_step),
-          ),
-          IconButton(
-            key: const ValueKey('player.forward'),
-            tooltip: 'Avancer de 10 s',
-            icon: const Icon(Icons.forward_10),
-            onPressed: () => _seekBy(_step),
-          ),
-          if (widget.volume) _VolumeButton(player: _player, onChanged: _show),
-          const Spacer(),
-          TracksMenu(player: _player, onOpened: _show),
-          IconButton(
-            key: const ValueKey('player.fill'),
-            tooltip: widget.fill ? 'Image entière' : 'Remplir l\'écran',
-            icon: Icon(widget.fill ? Icons.fit_screen : Icons.crop_free),
-            onPressed: () {
-              widget.onToggleFill();
-              _show();
-            },
-          ),
-          if (fullscreen != null)
-            IconButton(
-              key: const ValueKey('player.fullscreen'),
-              tooltip: fullscreen ? 'Quitter le plein écran' : 'Plein écran',
-              icon: Icon(fullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
-              onPressed: widget.onToggleFullscreen,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Barre de progression : temps écoulé, curseur, durée.
-class _ProgressBar extends StatefulWidget {
-  const _ProgressBar({required this.player, required this.onSeek});
-
-  final Player player;
-  final VoidCallback onSeek;
-
-  @override
-  State<_ProgressBar> createState() => _ProgressBarState();
-}
-
-class _ProgressBarState extends State<_ProgressBar> {
-  // Une valeur par seconde au lieu d'une par image décodée : la barre ne
-  // se reconstruit qu'une fois par seconde. Créés une fois, pour ne pas se
-  // réabonner à chaque reconstruction des contrôles.
-  late final Stream<int> _seconds = widget.player.stream.position
-      .map((p) => p.inSeconds)
-      .distinct();
-  late final Stream<int> _total = widget.player.stream.duration
-      .map((d) => d.inSeconds)
-      .distinct();
-
-  // Position tenue pendant un glisser, puis jusqu'à ce que la vidéo l'ait
-  // rejointe : le curseur ne revient pas en arrière un instant.
-  double? _held;
-  Timer? _release;
-
-  // ← → avec le focus : 10 s par appui ; maintenue, la touche se répète et
-  // le pas grandit. Seuils comptés en répétitions (≈ 20 par seconde sous
-  // Android, ≈ 30 sous Windows), car les tests n'ont pas d'horloge.
-  static const _keyStep = 10;
-  static const _fasterAfterRepeats = 10;
-  static const _fasterStep = 30;
-  static const _fastestAfterRepeats = 30;
-  static const _fastestStep = 60;
-
-  // Reçoit ← → avant les raccourcis du Slider (5 % du film par appui).
-  late final _focus = FocusNode(debugLabel: 'progression', onKeyEvent: _onKey);
-  var _repeats = 0;
-
-  @override
-  void dispose() {
-    _release?.cancel();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    final key = event.logicalKey;
-    final sign = key == LogicalKeyboardKey.arrowLeft
-        ? -1
-        : key == LogicalKeyboardKey.arrowRight
-        ? 1
-        : 0;
-    final state = widget.player.state;
-    final max = state.duration.inSeconds;
-    if (sign == 0 || event is KeyUpEvent || max <= 0) {
-      return KeyEventResult.ignored;
-    }
-    _repeats = event is KeyRepeatEvent ? _repeats + 1 : 0;
-    final step = _repeats >= _fastestAfterRepeats
-        ? _fastestStep
-        : _repeats >= _fasterAfterRepeats
-        ? _fasterStep
-        : _keyStep;
-    // Depuis la position visée, pas celle de la vidéo, en retard pendant un
-    // maintien.
-    final from = _held ?? state.position.inSeconds.toDouble();
-    _seekTo((from + sign * step).clamp(0, max).toDouble());
-    return KeyEventResult.handled;
-  }
-
-  void _seekTo(double seconds) {
-    widget.player.seek(Duration(seconds: seconds.round()));
-    _release?.cancel();
-    setState(() => _held = seconds);
-    _release = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() => _held = null);
-    });
-    widget.onSeek();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final player = widget.player;
-    return StreamBuilder<int>(
-      stream: _total,
-      initialData: player.state.duration.inSeconds,
-      builder: (context, total) {
-        final max = (total.data ?? 0).toDouble();
-        return StreamBuilder<int>(
-          stream: _seconds,
-          initialData: player.state.position.inSeconds,
-          builder: (context, position) {
-            final current =
-                _held ?? (position.data ?? 0).clamp(0, max).toDouble();
-            return Row(
-              children: [
-                Text(
-                  formatTime(Duration(seconds: current.round())),
-                  key: const ValueKey('player.elapsed'),
-                ),
-                Expanded(
-                  child: Slider(
-                    key: const ValueKey('player.progress'),
-                    focusNode: _focus,
-                    value: max > 0 ? current.clamp(0, max) : 0,
-                    max: max > 0 ? max : 1,
-                    onChanged: max > 0
-                        ? (value) {
-                            _release?.cancel();
-                            setState(() => _held = value);
-                            widget.onSeek();
-                          }
-                        : null,
-                    onChangeEnd: _seekTo,
-                  ),
-                ),
-                Text(
-                  formatTime(Duration(seconds: max.round())),
-                  key: const ValueKey('player.duration'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _VolumeButton extends StatefulWidget {
-  const _VolumeButton({required this.player, required this.onChanged});
-
-  final Player player;
-  final VoidCallback onChanged;
-
-  @override
-  State<_VolumeButton> createState() => _VolumeButtonState();
-}
-
-class _VolumeButtonState extends State<_VolumeButton> {
-  // Volume rendu quand on remet le son.
-  double _beforeMute = 100;
-
-  @override
-  Widget build(BuildContext context) {
-    final player = widget.player;
-    return StreamBuilder<double>(
-      stream: player.stream.volume,
-      initialData: player.state.volume,
-      builder: (context, snapshot) {
-        final volume = snapshot.data ?? 100;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              key: const ValueKey('player.mute'),
-              tooltip: volume == 0 ? 'Remettre le son' : 'Couper le son',
-              icon: Icon(volume == 0 ? Icons.volume_off : Icons.volume_up),
-              onPressed: () {
-                if (volume > 0) _beforeMute = volume;
-                player.setVolume(volume == 0 ? _beforeMute : 0);
-                widget.onChanged();
-              },
-            ),
-            SizedBox(
-              width: 100,
-              child: Slider(
-                key: const ValueKey('player.volume'),
-                value: volume.clamp(0, 100),
-                max: 100,
-                onChanged: (value) {
-                  player.setVolume(value);
-                  widget.onChanged();
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+    ),
+  );
 }

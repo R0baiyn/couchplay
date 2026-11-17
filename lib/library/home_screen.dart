@@ -8,7 +8,7 @@ import '../catalog/poster_grid.dart';
 import '../catalog/versions.dart';
 import '../confirm.dart';
 import '../downloads/downloads.dart';
-import '../player/player_screen.dart';
+import '../player/player_launch.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
