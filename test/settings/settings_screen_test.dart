@@ -32,18 +32,16 @@ void main() {
     final container = ProviderScope.containerOf(context);
     expect(container.read(appSettingsProvider).debug, isFalse);
 
-    await tester.scrollUntilVisible(find.text('Mode debug'), 100);
-    await tester.tap(find.text('Mode debug'));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('settings.debug')),
+      100,
+    );
+    await tester.tap(find.byKey(const ValueKey('settings.debug')));
     await tester.pump();
     expect(container.read(appSettingsProvider).debug, isTrue);
     expect(
       tester
-          .widget<SwitchListTile>(
-            find.ancestor(
-              of: find.text('Mode debug'),
-              matching: find.byType(SwitchListTile),
-            ),
-          )
+          .widget<SwitchListTile>(find.byKey(const ValueKey('settings.debug')))
           .value,
       true,
     );
@@ -59,9 +57,9 @@ void main() {
     expect(container.read(appSettingsProvider).wifiOnly, isTrue);
     expect(container.read(appSettingsProvider).deleteWatched, isFalse);
 
-    await tester.tap(find.text('Télécharger en Wi-Fi seulement'));
+    await tester.tap(find.byKey(const ValueKey('settings.wifiOnly')));
     await tester.pump();
-    await tester.tap(find.text('Effacer une fois vu'));
+    await tester.tap(find.byKey(const ValueKey('settings.deleteWatched')));
     await tester.pump();
 
     expect(container.read(appSettingsProvider).wifiOnly, isFalse);
@@ -72,8 +70,8 @@ void main() {
     tester,
   ) async {
     await pumpSettings(tester, tv: true);
-    expect(find.text('Télécharger en Wi-Fi seulement'), findsNothing);
-    expect(find.text('Effacer une fois vu'), findsNothing);
-    expect(find.text('Mode debug'), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings.wifiOnly')), findsNothing);
+    expect(find.byKey(const ValueKey('settings.deleteWatched')), findsNothing);
+    expect(find.byKey(const ValueKey('settings.debug')), findsOneWidget);
   });
 }

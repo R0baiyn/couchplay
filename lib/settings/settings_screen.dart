@@ -34,6 +34,7 @@ class SettingsButton extends StatelessWidget {
       return MediaQuery.sizeOf(context).width >= railMinWidth
           ? const SizedBox.shrink()
           : IconButton(
+              key: const ValueKey('settings.open'),
               tooltip: 'Réglages',
               icon: const Icon(Icons.settings),
               onPressed: () => _open(context),
@@ -53,6 +54,7 @@ class SettingsButton extends StatelessWidget {
           spacing: 4,
           children: [
             InkWell(
+              key: const ValueKey('settings.open'),
               onTap: () => _open(context),
               customBorder: const StadiumBorder(),
               child: FocusRing(
@@ -88,6 +90,7 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         children: [
           ListTile(
+            key: const ValueKey('settings.accounts'),
             autofocus: true,
             leading: const Icon(Icons.manage_accounts),
             title: const FocusRing(child: Text('Comptes')),
@@ -99,6 +102,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           ListTile(
+            key: const ValueKey('settings.status'),
             leading: const Icon(Icons.verified_user_outlined),
             title: const FocusRing(child: Text('Abonnement')),
             subtitle: const Text('Statut, expiration, connexions'),
@@ -111,6 +115,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           ListTile(
+            key: const ValueKey('settings.catalog'),
             leading: const Icon(Icons.filter_list),
             title: const FocusRing(child: Text('Catalogue')),
             subtitle: const Text('Pays affichés, contenu adulte, catégories'),
@@ -139,6 +144,7 @@ class _WifiOnlyTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SwitchListTile(
+      key: const ValueKey('settings.wifiOnly'),
       secondary: const Icon(Icons.wifi),
       title: const FocusRing(child: Text('Télécharger en Wi-Fi seulement')),
       subtitle: const Text('Sur réseau mobile, les téléchargements attendent'),
@@ -155,6 +161,7 @@ class _DeleteWatchedTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SwitchListTile(
+      key: const ValueKey('settings.deleteWatched'),
       secondary: const Icon(Icons.auto_delete_outlined),
       title: const FocusRing(child: Text('Effacer une fois vu')),
       subtitle: const Text('Supprime la vidéo téléchargée après la lecture'),
@@ -171,6 +178,7 @@ class _DebugTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SwitchListTile(
+      key: const ValueKey('settings.debug'),
       secondary: const Icon(Icons.bug_report_outlined),
       title: const FocusRing(child: Text('Mode debug')),
       subtitle: const Text('Infos techniques dans le lecteur'),
@@ -220,6 +228,7 @@ class _VersionTileState extends ConsumerState<_VersionTile> {
     final version = ref.watch(appVersionProvider);
     final updater = ref.watch(updaterProvider);
     return ListTile(
+      key: const ValueKey('settings.version'),
       leading: const Icon(Icons.info_outline),
       title: FocusRing(child: Text('Version $version')),
       subtitle: updater == null
