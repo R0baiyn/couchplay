@@ -58,12 +58,20 @@ void main() {
     WidgetTester tester, {
     required String host,
   }) async {
-    final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Salon');
-    await tester.enterText(fields.at(1), host);
-    await tester.enterText(fields.at(2), 'moi');
-    await tester.enterText(fields.at(3), 'mdp');
-    await tester.tap(find.text('Se connecter'));
+    await tester.enterText(
+      find.byKey(const ValueKey('accounts.name')),
+      'Salon',
+    );
+    await tester.enterText(find.byKey(const ValueKey('accounts.host')), host);
+    await tester.enterText(
+      find.byKey(const ValueKey('accounts.username')),
+      'moi',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('accounts.password')),
+      'mdp',
+    );
+    await tester.tap(find.byKey(const ValueKey('accounts.submit')));
     // Laisse le faux serveur et le stockage répondre. Pas de pumpAndSettle :
     // après la connexion, le catalogue tourne avec une roue de chargement.
     for (var i = 0; i < 5; i++) {
@@ -215,13 +223,15 @@ void main() {
       bool obscured() =>
           tester.widget<EditableText>(find.byType(EditableText)).obscureText;
       expect(obscured(), isTrue);
-      await tester.tap(find.text('Afficher'));
+      final show = find.text('Afficher');
+      await tester.tap(show);
       await tester.pump();
       expect(obscured(), isFalse);
-      await tester.tap(find.text('Annuler'));
+      final cancel = find.text('Annuler');
+      await tester.tap(cancel);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Se connecter'));
+      await tester.tap(find.byKey(const ValueKey('accounts.submit')));
       await settle(tester);
       final active = container.read(activeAccountProvider)!;
       expect(active.name, 'Salon');
@@ -239,11 +249,12 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(EditableText), 'Salon');
-    await tester.tap(find.text('Annuler'));
+    final cancel = find.text('Annuler');
+    await tester.tap(cancel);
     await tester.pumpAndSettle();
     expect(find.text('Salon'), findsNothing);
 
-    await tester.tap(find.text('Se connecter'));
+    await tester.tap(find.byKey(const ValueKey('accounts.submit')));
     await tester.pump();
     expect(find.text('Champ requis'), findsWidgets);
     expect(server.calls, 0);

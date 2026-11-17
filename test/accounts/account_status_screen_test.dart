@@ -64,10 +64,10 @@ void main() {
     expect(find.text('Serveur injoignable'), findsOneWidget);
 
     reachable = true;
-    await tester.tap(find.text('Réessayer'));
+    await tester.tap(find.byKey(const ValueKey('catalog.errorRetry')));
     await settle(tester);
 
-    expect(find.text('Réessayer'), findsNothing);
+    expect(find.byKey(const ValueKey('accounts.statusError')), findsNothing);
     expect(find.text('Actif'), findsOneWidget);
     expect(find.text('Aucune'), findsOneWidget);
     expect(find.text('0 en cours sur 1 autorisée(s)'), findsOneWidget);
