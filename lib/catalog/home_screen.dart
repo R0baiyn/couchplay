@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/catalog_providers.dart';
-import '../catalog/catalog_screen.dart';
-import '../catalog/versions.dart';
+import 'catalog_providers.dart';
+import 'catalog_screen.dart';
+import 'versions.dart';
 import '../confirm.dart';
 import '../player/player_launch.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
-import 'library.dart';
+import '../library/library.dart';
 import 'home_rows.dart';
-import 'library_store.dart';
+import '../library/library_store.dart';
 
 /// Premier onglet : « Continuer à regarder », puis « Ma liste », en rangées.
 class HomeScreen extends ConsumerWidget {

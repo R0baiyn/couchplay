@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:couchplay/home_shell.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/series_screen.dart';
-import 'package:couchplay/library/history_screen.dart';
+import 'package:couchplay/catalog/history_screen.dart';
 import 'package:couchplay/library/library.dart';
 
 import 'package:couchplay/server/models.dart';

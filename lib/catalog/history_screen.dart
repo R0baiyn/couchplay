@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/catalog_screen.dart';
-import '../catalog/versions.dart';
+import 'catalog_screen.dart';
+import 'versions.dart';
 import '../confirm.dart';
 import '../focus_ring.dart';
 import '../format.dart';
-import 'library.dart';
-import 'library_store.dart';
+import '../library/library.dart';
+import '../library/library_store.dart';
 
 /// « Historique » : une ligne par film ou par épisode lu, du plus récent au
 /// plus ancien, retirés de « Continuer à regarder » et vus compris.

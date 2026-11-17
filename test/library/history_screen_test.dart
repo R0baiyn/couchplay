@@ -1,4 +1,4 @@
-import 'package:couchplay/library/history_screen.dart';
+import 'package:couchplay/catalog/history_screen.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:flutter/material.dart';

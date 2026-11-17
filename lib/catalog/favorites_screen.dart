@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/catalog_screen.dart';
-import '../catalog/poster_grid.dart';
-import '../catalog/versions.dart';
+import 'catalog_screen.dart';
+import 'poster_grid.dart';
+import 'versions.dart';
 import '../focus_ring.dart';
 import '../server/models.dart';
-import 'library_store.dart';
+import '../library/library_store.dart';
 
 /// « Tout voir » : tous les favoris en grille, filtrables Films / Séries.
 class FavoritesScreen extends ConsumerStatefulWidget {

@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:couchplay/catalog/movie_screen.dart';
 import 'package:couchplay/catalog/series_screen.dart';
-import 'package:couchplay/library/favorites_screen.dart';
-import 'package:couchplay/library/history_screen.dart';
+import 'package:couchplay/catalog/favorites_screen.dart';
+import 'package:couchplay/catalog/history_screen.dart';
 import 'package:couchplay/library/library_store.dart';
 
 import 'package:flutter/material.dart';

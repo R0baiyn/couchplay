@@ -9,7 +9,7 @@ import 'catalog/catalog_screen.dart';
 import 'downloads/downloads_screen.dart';
 import 'home_shell_nav.dart';
 import 'settings/settings_screen.dart';
-import 'library/home_screen.dart';
+import 'catalog/home_screen.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
 import 'television.dart';

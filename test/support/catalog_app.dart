@@ -9,7 +9,7 @@ import 'package:couchplay/app.dart';
 import 'package:couchplay/catalog/catalog_index.dart';
 import 'package:couchplay/catalog/catalog_screen.dart';
 import 'package:couchplay/home_shell.dart';
-import 'package:couchplay/library/home_screen.dart';
+import 'package:couchplay/catalog/home_screen.dart';
 
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';

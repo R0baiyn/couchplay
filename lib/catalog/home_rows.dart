@@ -2,7 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/poster_grid.dart';
+import 'poster_grid.dart';
 import '../downloads/downloads.dart';
 
 const tileWidth = 130.0;
