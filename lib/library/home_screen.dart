@@ -1,18 +1,16 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../catalog/catalog_providers.dart';
 import '../catalog/catalog_screen.dart';
-import '../catalog/poster_grid.dart';
 import '../catalog/versions.dart';
 import '../confirm.dart';
-import '../downloads/downloads.dart';
 import '../player/player_launch.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
 import 'library.dart';
+import 'home_rows.dart';
 import 'library_store.dart';
 
 /// Premier onglet : « Continuer à regarder », puis « Ma liste », en rangées.
@@ -56,11 +54,11 @@ class HomeScreen extends ConsumerWidget {
         children: [
           if (started.isNotEmpty) ...[
             header('Continuer à regarder'),
-            _PosterRow(
+            PosterRow(
               children: [
                 for (final (:entry, :next) in started)
                   next != null
-                      ? _tile(
+                      ? posterTile(
                           key: ValueKey(next.key),
                           tileKey: ValueKey('library.continueTile.${next.key}'),
                           title: next.shortTitle,
@@ -68,7 +66,7 @@ class HomeScreen extends ConsumerWidget {
                           onTap: () => openPlayer(context, ref, next),
                           onMenu: () => _confirmHide(context, ref, entry),
                         )
-                      : _tile(
+                      : posterTile(
                           key: ValueKey(entry.item.key),
                           tileKey: ValueKey(
                             'library.continueTile.${entry.item.key}',
@@ -114,14 +112,14 @@ class HomeScreen extends ConsumerWidget {
               ),
             )
           else
-            _LazyPosterRow(
+            LazyPosterRow(
               titles: [
                 for (final favorite in favorites)
                   favorite.item.parsedName.display,
               ],
               itemBuilder: (context, i) {
                 final favorite = favorites[i];
-                return _tile(
+                return posterTile(
                   key: ValueKey(favorite.key),
                   tileKey: ValueKey('library.favoriteTile.${favorite.key}'),
                   title: favorite.item.parsedName.display,
@@ -156,16 +154,16 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  /// Rangée « Vus » : les [_rowLength] plus récents ; l'écran Historique les
+  /// Rangée « Vus » : les [rowLength] plus récents ; l'écran Historique les
   /// a tous. Une affiche ouvre la fiche du film, ou celle de la série pour un
   /// épisode.
   Widget _seenRow(BuildContext context, List<Progress> entries) {
-    final shown = entries.take(_rowLength).toList();
-    return _LazyPosterRow(
+    final shown = entries.take(rowLength).toList();
+    return LazyPosterRow(
       titles: [for (final entry in shown) entry.item.shortTitle],
       itemBuilder: (context, i) {
         final entry = shown[i];
-        return _tile(
+        return posterTile(
           key: ValueKey('seen:${entry.item.key}'),
           tileKey: ValueKey('library.seenTile.${entry.item.key}'),
           downloadKey: entry.item.key,
@@ -201,42 +199,6 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-const _tileWidth = 130.0;
-
-/// Affiches de la rangée « Vus » : elle reste courte.
-const _rowLength = 20;
-
-/// [key] est aussi la clé du contenu (`movie:`, `episode:`, `series:`) :
-/// pastille « téléchargé » si elle est prête.
-Widget _tile({
-  required ValueKey<String> key,
-  required ValueKey<String> tileKey,
-  required String title,
-  required String? imageUrl,
-  required VoidCallback onTap,
-  double? progress,
-  VoidCallback? onMenu,
-  String? downloadKey,
-}) => SizedBox(
-  key: key,
-  width: _tileWidth,
-  child: Consumer(
-    builder: (context, ref, _) => PosterTile(
-      key: tileKey,
-      title: title,
-      imageUrl: imageUrl,
-      onTap: onTap,
-      progress: progress,
-      onMenu: onMenu,
-      downloaded: ref.watch(
-        downloadedKeysProvider.select(
-          (keys) => keys.contains(downloadKey ?? key.value),
-        ),
-      ),
-    ),
-  ),
-);
-
 /// Série dont l'épisode regardé en dernier ([finished]) est fini : l'épisode
 /// qui suit, à lancer depuis le début. `null` tant que la fiche de la série
 /// n'est pas chargée, et à la fin de la série.
@@ -248,70 +210,4 @@ PlayItem? _upNext(WidgetRef ref, Progress finished) {
       .watch(cachedSeriesDetailsProvider(finished.item.seriesId!))
       .value;
   return series == null ? null : nextEpisode(series, finished.item)?.item;
-}
-
-/// Défilement de côté au doigt et à la souris (glisser), en plus de Shift +
-/// molette et des flèches.
-Widget _dragAnyDevice(BuildContext context, Widget child) =>
-    ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context)
-          .copyWith(dragDevices: PointerDeviceKind.values.toSet()),
-      child: child,
-    );
-
-/// Rangée d'affiches qui défile de côté. Construite en entier : « Continuer
-/// à regarder » reste courte, et le titre de l'épisode suivant n'est connu
-/// qu'une fois la fiche de la série chargée (pas de hauteur à l'avance).
-class _PosterRow extends StatelessWidget {
-  const _PosterRow({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return _dragAnyDevice(
-      context,
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: SliverPosterGrid.spacing,
-          children: children,
-        ),
-      ),
-    );
-  }
-}
-
-/// Rangée d'affiches qui défile de côté, construite au fil du défilement :
-/// « Ma liste » peut compter des centaines d'entrées, chacune une image à
-/// télécharger et décoder. Sa hauteur, celle de son plus haut titre, est
-/// calculée d'après [titles] (une case par titre, dans l'ordre).
-class _LazyPosterRow extends StatelessWidget {
-  const _LazyPosterRow({required this.titles, required this.itemBuilder});
-
-  final List<String> titles;
-  final IndexedWidgetBuilder itemBuilder;
-
-  static const _padding = 16.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final height = PosterTile.heightFor(context, _tileWidth, titles);
-    return SizedBox(
-      height: height + 2 * _padding,
-      child: _dragAnyDevice(
-        context,
-        ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(_padding),
-          itemCount: titles.length,
-          itemBuilder: itemBuilder,
-          separatorBuilder: (_, _) =>
-              const SizedBox(width: SliverPosterGrid.spacing),
-        ),
-      ),
-    );
-  }
 }
