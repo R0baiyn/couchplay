@@ -95,12 +95,12 @@ class TechInfo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       ref.watch(appSettingsProvider.select((s) => s.debug))
-      ? _TechInfoText(player: player)
+      ? _TechInfoText(key: const ValueKey('player.techInfo'), player: player)
       : const SizedBox.shrink();
 }
 
 class _TechInfoText extends StatefulWidget {
-  const _TechInfoText({required this.player});
+  const _TechInfoText({super.key, required this.player});
 
   final Player player;
 

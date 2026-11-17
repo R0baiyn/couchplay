@@ -25,6 +25,7 @@ class NextEpisodePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return Card(
+      key: const ValueKey('player.nextPanel'),
       margin: const EdgeInsets.all(24),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -67,8 +68,13 @@ class NextEpisodePanel extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 spacing: 8,
                 children: [
-                  TextButton(onPressed: onCancel, child: const Text('Annuler')),
+                  TextButton(
+                    key: const ValueKey('player.nextCancel'),
+                    onPressed: onCancel,
+                    child: const Text('Annuler'),
+                  ),
                   FilledButton(
+                    key: const ValueKey('player.nextPlay'),
                     focusNode: playNowFocus,
                     onPressed: onPlayNow,
                     child: const Text('Lire maintenant'),

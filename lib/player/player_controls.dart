@@ -234,6 +234,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             // reçoivent leurs clics directement, sans délai ni double-clic
             // détourné.
             GestureDetector(
+              key: const ValueKey('player.video'),
               behavior: HitTestBehavior.opaque,
               onTapUp: _onTapUp,
               onDoubleTapDown: _onDoubleTapDown,
@@ -276,6 +277,7 @@ class _PlayerControlsState extends State<PlayerControls> {
           Row(
             children: [
               IconButton(
+                key: const ValueKey('player.back'),
                 tooltip: 'Retour',
                 icon: const Icon(Icons.arrow_back),
                 onPressed: widget.onExit,
@@ -283,6 +285,7 @@ class _PlayerControlsState extends State<PlayerControls> {
               Expanded(
                 child: Text(
                   widget.title,
+                  key: const ValueKey('player.title'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium,
@@ -322,6 +325,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             builder: (context, snapshot) {
               final playing = snapshot.data ?? false;
               return IconButton(
+                key: const ValueKey('player.playPause'),
                 focusNode: _playFocus,
                 tooltip: playing ? 'Pause' : 'Lecture',
                 icon: Icon(playing ? Icons.pause : Icons.play_arrow),
@@ -333,11 +337,13 @@ class _PlayerControlsState extends State<PlayerControls> {
             },
           ),
           IconButton(
+            key: const ValueKey('player.rewind'),
             tooltip: 'Reculer de 10 s',
             icon: const Icon(Icons.replay_10),
             onPressed: () => _seekBy(-_step),
           ),
           IconButton(
+            key: const ValueKey('player.forward'),
             tooltip: 'Avancer de 10 s',
             icon: const Icon(Icons.forward_10),
             onPressed: () => _seekBy(_step),
@@ -346,6 +352,7 @@ class _PlayerControlsState extends State<PlayerControls> {
           const Spacer(),
           TracksMenu(player: _player, onOpened: _show),
           IconButton(
+            key: const ValueKey('player.fill'),
             tooltip: widget.fill ? 'Image entière' : 'Remplir l\'écran',
             icon: Icon(widget.fill ? Icons.fit_screen : Icons.crop_free),
             onPressed: () {
@@ -355,6 +362,7 @@ class _PlayerControlsState extends State<PlayerControls> {
           ),
           if (fullscreen != null)
             IconButton(
+              key: const ValueKey('player.fullscreen'),
               tooltip: fullscreen ? 'Quitter le plein écran' : 'Plein écran',
               icon: Icon(fullscreen ? Icons.fullscreen_exit : Icons.fullscreen),
               onPressed: widget.onToggleFullscreen,
@@ -463,9 +471,13 @@ class _ProgressBarState extends State<_ProgressBar> {
                 _held ?? (position.data ?? 0).clamp(0, max).toDouble();
             return Row(
               children: [
-                Text(formatTime(Duration(seconds: current.round()))),
+                Text(
+                  formatTime(Duration(seconds: current.round())),
+                  key: const ValueKey('player.elapsed'),
+                ),
                 Expanded(
                   child: Slider(
+                    key: const ValueKey('player.progress'),
                     focusNode: _focus,
                     value: max > 0 ? current.clamp(0, max) : 0,
                     max: max > 0 ? max : 1,
@@ -479,7 +491,10 @@ class _ProgressBarState extends State<_ProgressBar> {
                     onChangeEnd: _seekTo,
                   ),
                 ),
-                Text(formatTime(Duration(seconds: max.round()))),
+                Text(
+                  formatTime(Duration(seconds: max.round())),
+                  key: const ValueKey('player.duration'),
+                ),
               ],
             );
           },
@@ -515,6 +530,7 @@ class _VolumeButtonState extends State<_VolumeButton> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
+              key: const ValueKey('player.mute'),
               tooltip: volume == 0 ? 'Remettre le son' : 'Couper le son',
               icon: Icon(volume == 0 ? Icons.volume_off : Icons.volume_up),
               onPressed: () {
@@ -526,6 +542,7 @@ class _VolumeButtonState extends State<_VolumeButton> {
             SizedBox(
               width: 100,
               child: Slider(
+                key: const ValueKey('player.volume'),
                 value: volume.clamp(0, 100),
                 max: 100,
                 onChanged: (value) {

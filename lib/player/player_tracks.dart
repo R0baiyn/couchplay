@@ -42,6 +42,7 @@ class TracksMenu extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               PopupMenuButton<AudioTrack>(
+                key: const ValueKey('player.audioMenu'),
                 tooltip: 'Audio',
                 icon: const Icon(Icons.audiotrack),
                 enabled: audio.length > 1,
@@ -50,6 +51,7 @@ class TracksMenu extends StatelessWidget {
                 itemBuilder: (_) => [
                   for (final (index, track) in audio.indexed)
                     CheckedPopupMenuItem(
+                      key: ValueKey('player.audioTrack.${track.id}'),
                       value: track,
                       checked: track.id == selectedAudio,
                       child: Text(
@@ -64,12 +66,14 @@ class TracksMenu extends StatelessWidget {
                 ],
               ),
               PopupMenuButton<SubtitleTrack>(
+                key: const ValueKey('player.subtitleMenu'),
                 tooltip: 'Sous-titres',
                 icon: const Icon(Icons.subtitles),
                 onOpened: onOpened,
                 onSelected: player.setSubtitleTrack,
                 itemBuilder: (_) => [
                   PopupMenuItem(
+                    key: const ValueKey('player.subtitleFile'),
                     onTap: () => unawaited(loadSubtitleFile(player)),
                     child: const ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -79,12 +83,14 @@ class TracksMenu extends StatelessWidget {
                   ),
                   const PopupMenuDivider(),
                   CheckedPopupMenuItem(
+                    key: const ValueKey('player.subtitleOff'),
                     value: SubtitleTrack.no(),
                     checked: subtitlesOff,
                     child: const Text('Désactivés'),
                   ),
                   for (final (index, track) in subtitles.indexed)
                     CheckedPopupMenuItem(
+                      key: ValueKey('player.subtitleTrack.${track.id}'),
                       value: track,
                       checked: !subtitlesOff && track.id == selectedSubtitle,
                       child: Text(
