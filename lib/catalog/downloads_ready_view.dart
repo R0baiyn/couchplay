@@ -6,13 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../focus_ring.dart';
 import '../format.dart';
 import '../library/library_store.dart';
-import '../player/player_launch.dart';
-import 'download.dart';
-import 'download_button.dart';
-import 'downloads.dart';
+import 'player_launch.dart';
+import '../downloads/download.dart';
+import '../downloads/download_button.dart';
+import '../downloads/downloads.dart';
 import 'downloads_poster.dart';
-import 'export.dart';
-import 'offline_list.dart';
+import '../downloads/export.dart';
+import '../downloads/offline_list.dart';
 
 /// Un film prêt, seul dans sa carte.
 class ReadyMovie extends StatelessWidget {

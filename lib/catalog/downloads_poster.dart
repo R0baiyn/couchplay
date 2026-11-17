@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../poster_image.dart';
 import '../library/library.dart';
-import 'downloads.dart';
+import '../downloads/downloads.dart';
 
 /// Vignette 2:3 d'un contenu téléchargé : l'affiche enregistrée à côté de
 /// la vidéo (la page s'ouvre hors ligne), sinon celle du serveur, sinon

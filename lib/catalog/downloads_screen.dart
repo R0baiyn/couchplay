@@ -7,12 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../confirm.dart';
 import '../format.dart';
 import '../settings/settings_screen.dart';
-import 'download.dart';
-import 'downloads.dart';
+import '../downloads/download.dart';
+import '../downloads/downloads.dart';
 import 'downloads_active_view.dart';
 import 'downloads_ready_view.dart';
-import 'export.dart';
-import 'offline_list.dart';
+import '../downloads/export.dart';
+import '../downloads/offline_list.dart';
 
 /// Onglet « Téléchargements » : ce qui est en cours ou en attente, puis les
 /// vidéos prêtes (une vidéo prête se lit sans réseau).

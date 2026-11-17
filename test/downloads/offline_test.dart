@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account_files.dart';
-import 'package:couchplay/downloads/downloads_screen.dart';
+import 'package:couchplay/catalog/downloads_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

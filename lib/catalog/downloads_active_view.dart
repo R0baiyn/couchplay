@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../confirm.dart';
 import '../format.dart';
-import 'download.dart';
-import 'download_button.dart';
-import 'downloads.dart';
+import '../downloads/download.dart';
+import '../downloads/download_button.dart';
+import '../downloads/downloads.dart';
 import 'downloads_poster.dart';
-import 'offline_list.dart';
+import '../downloads/offline_list.dart';
 
 /// Octets reçus et taille totale (0 si inconnue) : en direct pour le
 /// téléchargement en cours.

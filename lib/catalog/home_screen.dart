@@ -5,7 +5,7 @@ import 'catalog_providers.dart';
 import 'catalog_screen.dart';
 import 'versions.dart';
 import '../confirm.dart';
-import '../player/player_launch.dart';
+import 'player_launch.dart';
 import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';

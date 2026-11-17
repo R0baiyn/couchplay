@@ -15,7 +15,6 @@ const allowedArcs = <String>[
   'catalog -> settings',
   'downloads -> accounts',
   'downloads -> library',
-  'downloads -> player',
   'downloads -> server',
   'downloads -> settings',
   'library -> accounts',

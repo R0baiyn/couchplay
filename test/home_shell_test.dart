@@ -1,5 +1,5 @@
 import 'package:couchplay/downloads/downloads.dart';
-import 'package:couchplay/downloads/downloads_screen.dart';
+import 'package:couchplay/catalog/downloads_screen.dart';
 import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/television.dart';
 import 'package:flutter/material.dart';

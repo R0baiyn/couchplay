@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'catalog/catalog_index.dart';
 import 'catalog/catalog_screen.dart';
-import 'downloads/downloads_screen.dart';
+import 'catalog/downloads_screen.dart';
 import 'home_shell_nav.dart';
 import 'settings/settings_screen.dart';
 import 'catalog/home_screen.dart';

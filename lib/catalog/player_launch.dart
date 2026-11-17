@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../format.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
-import 'player_screen.dart';
+import '../player/player_screen.dart';
 
 /// Ouvre le lecteur sur un film ou un épisode du compte actif. Un contenu
 /// commencé propose de reprendre ou de recommencer ; avec [resume], la
