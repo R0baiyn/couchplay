@@ -2,131 +2,22 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import '../accounts/account_store.dart';
-import '../accounts/server_session.dart';
 import '../catalog/catalog_providers.dart';
-import '../catalog/status_views.dart';
 import '../downloads/downloads.dart';
-import '../format.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
-import '../server/cloudflare_dns.dart';
-import '../server/models.dart';
 import '../television.dart';
-import 'next_episode_panel.dart';
 import 'playback.dart';
-import 'player_controls.dart';
-import 'tech_info.dart';
+import 'player_next_up.dart';
+import 'player_request.dart';
+import 'player_session.dart';
+import 'player_track_memory.dart';
+import 'player_view.dart';
 
-/// Ouvre le lecteur sur un film ou un épisode du compte actif. Un contenu
-/// commencé propose de reprendre ou de recommencer ; avec [resume], la
-/// lecture reprend là sans rien demander (« Continuer à regarder »).
-Future<void> openPlayer(
-  BuildContext context,
-  WidgetRef ref,
-  PlayItem item, {
-  Duration? resume,
-}) async {
-  // Un double clic sur « Lecture » ne doit pas empiler deux lecteurs.
-  if (ModalRoute.of(context)?.isCurrent == false) return;
-  var start = resume;
-  if (start == null) {
-    if (ref.read(libraryProvider).progress[item.key]?.resumeAt
-        case final saved?) {
-      start = await showDialog<Duration>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(item.title),
-          actions: [
-            TextButton(
-              key: const ValueKey('player.resumeRestart'),
-              onPressed: () => Navigator.pop(context, Duration.zero),
-              child: const Text('Recommencer'),
-            ),
-            FilledButton(
-              key: const ValueKey('player.resumeContinue'),
-              autofocus: true,
-              onPressed: () => Navigator.pop(context, saved),
-              child: Text('Reprendre à ${formatTime(saved)}'),
-            ),
-          ],
-        ),
-      );
-      // Fermé sans choisir : on reste sur la fiche.
-      if (start == null || !context.mounted) return;
-    }
-  }
-  await Navigator.push(
-    context,
-    MaterialPageRoute<void>(
-      builder: (_) => PlayerScreen(item: item, startAt: start),
-    ),
-  );
-}
-
-/// Flux d'un contenu sur le compte actif, ou `null` sans compte. Le nom du
-/// serveur est résolu par Cloudflare, comme pour le reste de l'app.
-Future<PlayRequest?> _requestFor(
-  WidgetRef ref,
-  PlayItem item, {
-  String? audioLanguage,
-  String? subtitleLanguage,
-  Duration? start,
-}) async {
-  final account = ref.read(activeAccountProvider);
-  final client = ref.read(serverClientProvider);
-  if (account == null || client == null) return null;
-  final (url, headers) = await resolveForPlayer(
-    client.streamUri(
-      item.isEpisode ? ContentKind.series : ContentKind.movies,
-      item.id,
-      item.extension,
-    ),
-  );
-  return PlayRequest(
-    title: item.title,
-    url: url,
-    headers: headers,
-    userAgent: account.userAgent,
-    secrets: [account.username, account.password],
-    audioLanguage: audioLanguage,
-    subtitleLanguage: subtitleLanguage,
-    start: start,
-  );
-}
-
-/// Fichier téléchargé d'un contenu : ni serveur, ni nom à résoudre, ni
-/// identifiants (D-034).
-PlayRequest localRequest(
-  PlayItem item,
-  File file, {
-  String? audioLanguage,
-  String? subtitleLanguage,
-  Duration? start,
-}) => PlayRequest(
-  title: item.title,
-  url: Uri.file(file.path),
-  userAgent: '',
-  audioLanguage: audioLanguage,
-  subtitleLanguage: subtitleLanguage,
-  start: start,
-);
-
-/// Fin du fichier bien avant la fin annoncée (plus de 30 s) : le serveur a
-/// coupé. Sans durée connue, on ne peut rien dire.
-bool endedEarly(Duration position, Duration duration) =>
-    duration > Duration.zero &&
-    position < duration - const Duration(seconds: 30);
-
-/// Cloudflare ne connaît pas le nom du serveur.
-final class _NameNotResolved implements Exception {
-  const _NameNotResolved();
-}
+export 'player_request.dart' show endedEarly, localRequest;
 
 /// Lecture plein cadre. La position est enregistrée toutes les 10 s, à la
 /// pause et à la sortie. Quitter l'écran arrête le flux.
@@ -145,39 +36,20 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final Playback _playback = ref.read(playbackProvider);
 
-  /// Lu dans initState, pas à la première sauvegarde : `ref` n'est plus
-  /// utilisable dans dispose, et une erreur là y sauterait l'arrêt du flux.
-  late final LibraryNotifier _library;
+  /// Lus dans initState : `ref` n'est plus utilisable dans dispose.
   late final DownloadsNotifier _downloads;
   late final DownloadHoldsNotifier _holds;
+  late final PlayerSession _session;
   late final AppLifecycleListener _lifecycle;
   StreamSubscription<bool>? _completed;
-  StreamSubscription<bool>? _playing;
-  Timer? _saveTimer;
-
-  static const _saveEvery = Duration(seconds: 10);
 
   /// Ce qu'on regarde : change quand l'épisode suivant s'enchaîne.
   late PlayItem _item = widget.item;
 
-  /// Langues des pistes choisies à la main, gardées pour l'épisode suivant
-  /// (et pour « Réessayer »). Suivies au fil de la lecture : à la fin du
-  /// fichier, media_kit remet la piste courante à « auto ».
-  String? _audioLanguage;
-  String? _subtitleLanguage;
+  /// Pistes choisies à la main, gardées pour l'épisode suivant et « Réessayer ».
+  late final TrackMemory _tracks = TrackMemory(_playback.player);
 
-  /// Noms des pistes choisies : départagent plusieurs pistes de la même
-  /// langue (sous-titres complets ou seulement les passages étrangers…).
-  String? _audioTitle;
-  String? _subtitleTitle;
-  StreamSubscription<Track>? _track;
-
-  /// Épisode suivant proposé à la fin de celui-ci, et son compte à rebours.
-  ({PlayItem item, String? image})? _next;
-  Timer? _countdown;
-  var _secondsLeft = 0;
-  static const _nextDelay = 10;
-  final _playNowFocus = FocusNode();
+  final _nextUp = NextUp();
 
   // Sur mobile, le lecteur est toujours en plein écran paysage.
   static final _mobile = Platform.isAndroid || Platform.isIOS;
@@ -192,72 +64,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _library = ref.read(libraryProvider.notifier);
     _downloads = ref.read(downloadsProvider.notifier);
     _holds = ref.read(downloadHoldsProvider.notifier);
     _downloads.playerOpened();
     if (_mobile) _setFullscreen(true);
     _lifecycle = AppLifecycleListener(onHide: _onHide);
     _completed = _playback.player.stream.completed.listen(_onCompleted);
-    _playing = _playback.player.stream.playing.listen((playing) {
-      if (!playing) _save();
-    });
-    _track = _playback.player.stream.track.listen((track) {
-      if (track.audio.language case final language?) {
-        _audioLanguage = language;
-        _audioTitle = track.audio.title;
-      }
-      if (track.subtitle.id == 'no') {
-        _subtitleLanguage = null;
-        _subtitleTitle = null;
-      } else if (track.subtitle.language case final language?) {
-        _subtitleLanguage = language;
-        _subtitleTitle = track.subtitle.title;
-      }
-    });
-    _saveTimer = Timer.periodic(_saveEvery, (_) {
-      if (_playback.player.state.playing) _save();
-    });
+    _session = PlayerSession(
+      playback: _playback,
+      library: ref.read(libraryProvider.notifier),
+      holds: _holds,
+      item: () => _item,
+      // Pas pendant le chargement ni après un échec ; pas si un autre
+      // lecteur a déjà pris le flux (sa position n'est pas la nôtre).
+      ready: () => _ticket == _playback.ticket && !_opening && _error == null,
+    );
     if (widget.startAt case final start? when start > Duration.zero) {
       _resumeAt = start;
     }
     _open();
-  }
-
-  /// Arrête notre flux, s'il l'est encore (pas déjà arrêté, pas remplacé
-  /// par un autre lecteur). Une fois fermé, le téléchargement peut repartir
-  /// (D-036), sauf si un autre lecteur a ouvert un flux entre-temps.
-  Future<void> _stopStream(int ticket) {
-    if (ticket != _playback.ticket) return Future.value();
-    final holds = _holds;
-    final stopping = _playback.stop(ticket);
-    // Lu juste après l'arrêt : une ouverture plus récente le change.
-    final after = _playback.ticket;
-    return stopping.whenComplete(() {
-      if (_playback.ticket == after) holds.streaming = false;
-    });
-  }
-
-  /// Enregistre où on en est, seulement sur un flux bien démarré : quitter
-  /// pendant le chargement ou après un échec (position à 0) ne doit pas
-  /// effacer la position enregistrée. À appeler avant tout arrêt du flux.
-  void _save() {
-    // Un autre lecteur a déjà pris le flux (écran en train de se fermer) :
-    // sa position n'est pas la nôtre.
-    if (_ticket != _playback.ticket) return;
-    if (_opening || _error != null) return;
-    final state = _playback.player.state;
-    if (state.position <= Duration.zero) return;
-    final item = _item;
-    final position = state.position;
-    final duration = state.duration;
-    // Écrit juste après : appelé depuis dispose, modifier la bibliothèque
-    // pendant le démontage de l'écran est interdit.
-    scheduleMicrotask(
-      () => unawaited(
-        _library.saveProgress(item, position: position, duration: duration),
-      ),
-    );
   }
 
   /// Sur mobile, passer l'app en arrière-plan arrête le flux tout de suite
@@ -265,9 +90,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// pas la fermeture de l'écran), puis quitte le lecteur, menu ouvert ou non.
   void _onHide() {
     if (!_mobile || !mounted) return;
-    _save();
+    _session.save();
     // Sans ticket, rien n'a été ouvert ici : le flux en cours n'est pas le nôtre.
-    if (_ticket case final ticket?) unawaited(_stopStream(ticket));
+    if (_ticket case final ticket?) unawaited(_session.stopStream(ticket));
     final route = ModalRoute.of(context);
     final navigator = Navigator.of(context);
     if (route != null && route.isActive) {
@@ -284,18 +109,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!mounted) return;
     // Retour en arrière pendant le compte à rebours : on regarde encore.
     if (!completed) {
-      if (_next != null) _cancelNext();
+      if (_nextUp.next != null) _cancelNext();
       return;
     }
     if (_opening) return;
-    _save();
+    _session.save();
     if (cutShort) {
       _resumeAt = state.position;
       setState(
         () => _error =
             'La lecture s\'est interrompue : le serveur a coupé la connexion.',
       );
-    } else if (_item.seriesId case final seriesId? when _next == null) {
+    } else if (_item.seriesId case final seriesId? when _nextUp.next == null) {
       _offerNext(seriesId);
     }
   }
@@ -312,36 +137,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return;
     }
     setState(() {
-      _next = next;
-      _secondsLeft = _nextDelay;
+      _nextUp.offer(next, onTick: () => setState(() {}), onElapsed: _playNext);
     });
-    _countdown = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_secondsLeft <= 1) {
-        _playNext();
-      } else {
-        setState(() => _secondsLeft--);
-      }
-    });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _playNowFocus.requestFocus(),
-    );
   }
 
   void _cancelNext() {
-    _countdown?.cancel();
-    setState(() => _next = null);
+    setState(_nextUp.cancel);
   }
 
   /// Enchaîne sur l'épisode suivant dans le même écran, avec les mêmes
   /// langues de pistes. `Playback.open` ferme le flux courant avant d'ouvrir
   /// le suivant : une seule connexion à la fois.
   void _playNext() {
-    final next = _next;
+    final next = _nextUp.next;
     if (next == null) return;
-    _countdown?.cancel();
     setState(() {
+      _nextUp.cancel();
       _item = next.item;
-      _next = null;
       _resumeAt = null;
     });
     _open();
@@ -356,8 +168,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _error = null;
     });
     final item = _item;
-    final audioLanguage = _audioLanguage;
-    final subtitleLanguage = _subtitleLanguage;
+    final audioLanguage = _tracks.audioLanguage;
+    final subtitleLanguage = _tracks.subtitleLanguage;
     final start = _resumeAt;
     int? ticket;
     // Une ouverture remplacée (écran fermé, épisode suivant lancé) ne touche
@@ -374,19 +186,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           start: start,
         ),
         stream: () async {
-          final PlayRequest? request;
-          try {
-            request = await _requestFor(
-              ref,
-              item,
-              audioLanguage: audioLanguage,
-              subtitleLanguage: subtitleLanguage,
-              start: start,
-            );
-          } on Exception {
-            // Seule la résolution du nom par Cloudflare peut échouer ici.
-            throw const _NameNotResolved();
-          }
+          final request = await requestFor(
+            ref,
+            item,
+            audioLanguage: audioLanguage,
+            subtitleLanguage: subtitleLanguage,
+            start: start,
+          );
           // Écran fermé pendant la résolution : rien à ouvrir.
           if (!mounted) throw const PlaybackAbandoned();
           return request;
@@ -409,10 +215,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         return;
       }
       _resumeAt = null;
-      if (current()) _matchTracksByTitle();
+      if (current()) _tracks.matchByTitle();
     } on PlaybackAbandoned {
       return;
-    } on _NameNotResolved {
+    } on NameNotResolved {
       if (mounted && (ticket == null || current())) {
         setState(
           () => _error =
@@ -428,29 +234,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
-  /// mpv prend la première piste de la langue demandée. S'il y en a
-  /// plusieurs, on passe à celle qui porte le même nom que la précédente.
-  void _matchTracksByTitle() {
-    final player = _playback.player;
-    final tracks = player.state.tracks;
-    final audio = sameTitleTrack(
-      tracks.audio,
-      language: _audioLanguage,
-      title: _audioTitle,
-      languageOf: (t) => t.language,
-      titleOf: (t) => t.title,
-    );
-    if (audio != null) unawaited(player.setAudioTrack(audio));
-    final subtitle = sameTitleTrack(
-      tracks.subtitle,
-      language: _subtitleLanguage,
-      title: _subtitleTitle,
-      languageOf: (t) => t.language,
-      titleOf: (t) => t.title,
-    );
-    if (subtitle != null) unawaited(player.setSubtitleTrack(subtitle));
-  }
-
   Future<void> _setFullscreen(bool on) async {
     setState(() => _fullscreen = on);
     await (on ? defaultEnterNativeFullscreen() : defaultExitNativeFullscreen());
@@ -462,23 +245,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// ordinateur, comme dans les contrôles, puis le lecteur.
   void _back() => _fullscreen && !_mobile ? _setFullscreen(false) : _exit();
 
-  late final _escape = <ShortcutActivator, VoidCallback>{
-    const SingleActivator(LogicalKeyboardKey.escape): _back,
-  };
-
   @override
   void dispose() {
     _lifecycle.dispose();
-    _saveTimer?.cancel();
-    _countdown?.cancel();
-    _playNowFocus.dispose();
+    _session.dispose();
+    _nextUp.dispose();
     unawaited(_completed?.cancel());
-    unawaited(_playing?.cancel());
-    unawaited(_track?.cancel());
-    _save();
+    _tracks.dispose();
+    _session.save();
     final downloads = _downloads;
     final stopped = switch (_ticket) {
-      final ticket? => _stopStream(ticket),
+      final ticket? => _session.stopStream(ticket),
       null => Future<void>.value(),
     };
     // Fichier fermé : une vidéo vue peut être effacée.
@@ -495,71 +272,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (_item.seriesId case final seriesId?) {
       ref.watch(seriesDetailsProvider(seriesId));
     }
-    final next = _next;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Video(
-            controller: _playback.controller,
-            controls: NoVideoControls,
-            fit: _fill ? BoxFit.cover : BoxFit.contain,
-            // Le lecteur gère lui-même l'arrière-plan (voir _onHide).
-            pauseUponEnteringBackgroundMode: false,
-          ),
-          if (error != null)
-            CallbackShortcuts(
-              bindings: _escape,
-              // Texte blanc sur le fond noir du lecteur.
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(color: Colors.white),
-                child: ErrorView(
-                  key: const ValueKey('player.error'),
-                  message: error,
-                  onRetry: _open,
-                  onExit: _exit,
-                ),
-              ),
-            )
-          else ...[
-            PlayerControls(
-              player: _playback.player,
-              title: _item.title,
-              fill: _fill,
-              onToggleFill: () => setState(() => _fill = !_fill),
-              // Sur mobile, toujours en plein écran : pas de bouton.
-              fullscreen: _mobile ? null : _fullscreen,
-              onToggleFullscreen: () {
-                if (!_mobile) _setFullscreen(!_fullscreen);
-              },
-              onExit: _exit,
-              volume: !ref.watch(televisionProvider),
-            ),
-            if (_opening)
-              const IgnorePointer(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            if (next != null)
-              Align(
-                alignment: Alignment.bottomRight,
-                // Le focus est sur l'encart, hors des contrôles : Échap doit
-                // quand même quitter.
-                child: CallbackShortcuts(
-                  bindings: _escape,
-                  child: NextEpisodePanel(
-                    title: next.item.title,
-                    image: next.image ?? next.item.poster,
-                    secondsLeft: _secondsLeft,
-                    playNowFocus: _playNowFocus,
-                    onPlayNow: _playNext,
-                    onCancel: _cancelNext,
-                  ),
-                ),
-              ),
-          ],
-        ],
-      ),
+    return PlayerView(
+      playback: _playback,
+      title: _item.title,
+      fill: _fill,
+      // Sur mobile, toujours en plein écran : pas de bouton.
+      fullscreen: _mobile ? null : _fullscreen,
+      volume: !ref.watch(televisionProvider),
+      opening: _opening,
+      error: error,
+      next: _nextUp.next,
+      secondsLeft: _nextUp.secondsLeft,
+      playNowFocus: _nextUp.focus,
+      onToggleFill: () => setState(() => _fill = !_fill),
+      onToggleFullscreen: () {
+        if (!_mobile) _setFullscreen(!_fullscreen);
+      },
+      onExit: _exit,
+      onBack: _back,
+      onRetry: _open,
+      onPlayNext: _playNext,
+      onCancelNext: _cancelNext,
     );
   }
 }

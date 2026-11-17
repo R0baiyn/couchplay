@@ -8,7 +8,7 @@ import '../focus_ring.dart';
 import '../library/favorite_button.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
-import '../player/player_screen.dart';
+import '../player/player_launch.dart';
 import 'catalog_index.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
