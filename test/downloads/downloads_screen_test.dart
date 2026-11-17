@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/confirm_finders.dart';
 import '../support/fake_downloads.dart';
 import '../support/real_font.dart';
 import '../support/settle.dart';
@@ -70,8 +71,8 @@ void main() {
     tester,
   ) async {
     await pumpScreen(tester, []);
-    expect(find.text('Aucun téléchargement'), findsOneWidget);
-    expect(find.text('Tout supprimer'), findsNothing);
+    expect(find.byKey(const ValueKey('downloads.empty')), findsOneWidget);
+    expect(find.byKey(const ValueKey('downloads.removeAll')), findsNothing);
   });
 
   testWidgets('en cours : avancement, pause, reprise ; place occupée', (
@@ -96,11 +97,19 @@ void main() {
     expect(find.text('En cours et en attente'), findsOneWidget);
     expect(find.text('25 % · 500 Mo / 2 Go'), findsOneWidget);
     expect(find.text('En pause · 50 % · 500 Mo / 1 Go'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('downloads.activeRow.movie:1')),
+      findsOneWidget,
+    );
     // Ce qui est déjà reçu compte dans la place prise.
     expect(find.text('Place occupée : 1 Go'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Mettre en pause'));
-    await tester.tap(find.byTooltip('Reprendre'));
+    await tester.tap(
+      find.byKey(const ValueKey('downloads.pauseResume.movie:1')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('downloads.pauseResume.movie:2')),
+    );
     expect(fake.calls, ['pause movie:1', 'resume movie:2']);
   });
 
@@ -129,15 +138,15 @@ void main() {
     final fake = await pumpScreen(tester, [
       download(movie, DownloadStatus.running, received: 100),
     ]);
-    await tester.tap(find.byTooltip('Annuler'));
+    await tester.tap(find.byKey(const ValueKey('downloads.cancel.movie:1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Annuler'));
+    await tester.tap(confirmCancel);
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
 
-    await tester.tap(find.byTooltip('Annuler'));
+    await tester.tap(find.byKey(const ValueKey('downloads.cancel.movie:1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Annuler le téléchargement'));
+    await tester.tap(confirmAction);
     await tester.pumpAndSettle();
     expect(fake.calls, ['remove movie:1']);
   });
@@ -148,7 +157,7 @@ void main() {
     final fake = await pumpScreen(tester, [
       download(movie, DownloadStatus.queued),
     ]);
-    await tester.tap(find.byTooltip('Annuler'));
+    await tester.tap(find.byKey(const ValueKey('downloads.cancel.movie:1')));
     await tester.pump();
     expect(fake.calls, ['remove movie:1']);
   });
@@ -158,7 +167,9 @@ void main() {
       download(movie, DownloadStatus.failed, error: 'Serveur injoignable'),
     ]);
     expect(find.text('Serveur injoignable'), findsOneWidget);
-    await tester.tap(find.byTooltip('Réessayer'));
+    await tester.tap(
+      find.byKey(const ValueKey('downloads.pauseResume.movie:1')),
+    );
     expect(fake.calls, ['resume movie:1']);
   });
 
@@ -168,6 +179,7 @@ void main() {
     ], mobileOnly: true);
     await tester.pump();
     expect(find.textContaining('réseau Wi-Fi'), findsOneWidget);
+    expect(find.byKey(const ValueKey('downloads.holdMessage')), findsOneWidget);
   });
 
   testWidgets('pas de message Wi-Fi quand rien n\'attend', (tester) async {
@@ -202,10 +214,10 @@ void main() {
     final fake = await pumpScreen(tester, [
       download(movie, DownloadStatus.ready, size: 1000),
     ]);
-    await tester.tap(find.byTooltip('Supprimer la vidéo'));
+    await tester.tap(find.byKey(const ValueKey('downloads.delete.movie:1')));
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
-    await tester.tap(find.text('Supprimer'));
+    await tester.tap(confirmAction);
     await tester.pumpAndSettle();
     expect(fake.calls, ['remove movie:1']);
   });
@@ -215,16 +227,16 @@ void main() {
       download(movie, DownloadStatus.ready, size: 1000),
       download(_episode('21', 1, 1), DownloadStatus.running),
     ]);
-    await tester.tap(find.text('Tout supprimer'));
+    await tester.tap(find.byKey(const ValueKey('downloads.removeAll')));
     await tester.pumpAndSettle();
     expect(find.text('Tout supprimer ?'), findsOneWidget);
-    await tester.tap(find.text('Annuler'));
+    await tester.tap(confirmCancel);
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
 
-    await tester.tap(find.text('Tout supprimer'));
+    await tester.tap(find.byKey(const ValueKey('downloads.removeAll')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Tout supprimer'));
+    await tester.tap(confirmAction);
     await tester.pumpAndSettle();
     expect(fake.calls, ['removeAll']);
   });
@@ -257,7 +269,7 @@ void main() {
           openFolderProvider.overrideWithValue((d) async => opened.add(d.path)),
         ],
       );
-      await tester.tap(find.byTooltip('Ouvrir le dossier des vidéos'));
+      await tester.tap(find.byKey(const ValueKey('downloads.openFolder')));
       await tester.pump();
       expect(opened, [Directory('/vidéos/compte').path]);
     });
@@ -277,14 +289,14 @@ void main() {
           ),
         ],
       );
-      await tester.tap(find.byTooltip('Ouvrir le dossier des vidéos'));
+      await tester.tap(find.byKey(const ValueKey('downloads.openFolder')));
       await tester.pump();
       expect(find.text("Impossible d'ouvrir le dossier."), findsOneWidget);
     });
 
     testWidgets('Android et Android TV : pas de bouton', (tester) async {
       await pumpScreen(tester, [download(movie, DownloadStatus.ready)]);
-      expect(find.byTooltip('Ouvrir le dossier des vidéos'), findsNothing);
+      expect(find.byKey(const ValueKey('downloads.openFolder')), findsNothing);
     });
   });
 
@@ -318,7 +330,7 @@ void main() {
 
     testWidgets('copie sous le vrai titre, puis le dit', (tester) async {
       await pump(tester, picked: target.path);
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await settle(tester);
       expect(File('${target.path}/Mirage.mkv').readAsBytesSync(), [
         1,
@@ -330,7 +342,9 @@ void main() {
       expect(find.text('Exporté dans ${target.path}'), findsOneWidget);
       expect(
         tester
-            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_alt))
+            .widget<IconButton>(
+              find.byKey(const ValueKey('downloads.export.movie:1')),
+            )
             .onPressed,
         isNotNull,
       );
@@ -341,12 +355,14 @@ void main() {
       tester,
     ) async {
       await pump(tester, picked: target.path);
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await tester.pump();
       expect(find.textContaining('Export en cours'), findsOneWidget);
       expect(
         tester
-            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_alt))
+            .widget<IconButton>(
+              find.byKey(const ValueKey('downloads.export.movie:1')),
+            )
             .onPressed,
         isNull,
       );
@@ -368,9 +384,9 @@ void main() {
         overrides: [pickFolderProvider.overrideWithValue(() => choice.future)],
       );
       IconButton export() => tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.save_alt),
+        find.byKey(const ValueKey('downloads.export.movie:1')),
       );
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await tester.pump();
       expect(export().onPressed, isNull);
 
@@ -392,7 +408,7 @@ void main() {
           ),
         ],
       );
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await settle(tester);
       expect(
         find.text('Impossible d\'ouvrir le choix du dossier.'),
@@ -400,7 +416,9 @@ void main() {
       );
       expect(
         tester
-            .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_alt))
+            .widget<IconButton>(
+              find.byKey(const ValueKey('downloads.export.movie:1')),
+            )
             .onPressed,
         isNotNull,
       );
@@ -410,7 +428,7 @@ void main() {
       tester,
     ) async {
       await pump(tester);
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await settle(tester);
       expect(target.listSync(), isEmpty);
       expect(find.byType(SnackBar), findsNothing);
@@ -419,7 +437,7 @@ void main() {
     testWidgets('fichier déjà là : jamais écrasé', (tester) async {
       File('${target.path}/Mirage.mkv').writeAsStringSync('à moi');
       await pump(tester, picked: target.path);
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await settle(tester);
       expect(File('${target.path}/Mirage.mkv').readAsStringSync(), 'à moi');
       expect(File('${target.path}/Mirage (2).mkv').readAsBytesSync(), [
@@ -436,7 +454,7 @@ void main() {
     ) async {
       await pump(tester, picked: target.path);
       fake.files.clear();
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await settle(tester);
       expect(find.text('La vidéo n\'existe plus.'), findsOneWidget);
       expect(target.listSync(), isEmpty);
@@ -447,7 +465,7 @@ void main() {
     ) async {
       fake.files[movie.key]!.deleteSync();
       await pump(tester, picked: target.path);
-      await tester.tap(find.byTooltip('Exporter la vidéo'));
+      await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
       await settle(tester);
       expect(find.text('La vidéo n\'existe plus.'), findsOneWidget);
       expect(target.listSync(), isEmpty);
@@ -457,8 +475,14 @@ void main() {
       tester,
     ) async {
       await pump(tester, desktop: false);
-      expect(find.byTooltip('Exporter la vidéo'), findsNothing);
-      expect(find.byTooltip('Supprimer la vidéo'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('downloads.export.movie:1')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('downloads.delete.movie:1')),
+        findsOneWidget,
+      );
     });
   });
 
@@ -532,10 +556,7 @@ void main() {
       tester,
     ) async {
       await pumpKeyboardApp(tester);
-      final button = find.widgetWithIcon(
-        IconButton,
-        Icons.folder_open_outlined,
-      );
+      final button = find.byKey(const ValueKey('downloads.openFolder'));
       expect(sideOf(tester, button), BorderSide.none);
       await tabTo(tester, button);
       await tester.pumpAndSettle();
@@ -547,7 +568,7 @@ void main() {
 
     testWidgets('exporter : anneau de focus, Entrée agit', (tester) async {
       await pumpKeyboardApp(tester);
-      final button = find.widgetWithIcon(IconButton, Icons.save_alt);
+      final button = find.byKey(const ValueKey('downloads.export.movie:1'));
       expect(sideOf(tester, button), BorderSide.none);
       await tabTo(tester, button);
       await tester.pumpAndSettle();
@@ -566,10 +587,7 @@ void main() {
       tester,
     ) async {
       await pumpKeyboardApp(tester, size: const Size(360, 740));
-      final button = find.widgetWithIcon(
-        IconButton,
-        Icons.delete_sweep_outlined,
-      );
+      final button = find.byKey(const ValueKey('downloads.removeAll'));
       expect(sideOf(tester, button), BorderSide.none);
       await tabTo(tester, button);
       await tester.pumpAndSettle();
@@ -641,8 +659,13 @@ void main() {
         ),
       })..videos = Directory('${root.path}/vidéos');
       await pumpKeyboardApp(tester, size: const Size(320, 640));
-      expect(find.byTooltip('Exporter la vidéo'), findsNWidgets(3));
-      expect(find.byTooltip('Ouvrir le dossier des vidéos'), findsOneWidget);
+      for (final id in ['movie:1', 'movie:9', 'episode:22']) {
+        expect(find.byKey(ValueKey('downloads.export.$id')), findsOneWidget);
+      }
+      expect(
+        find.byKey(const ValueKey('downloads.openFolder')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
   });
@@ -741,10 +764,10 @@ void main() {
         download(movie, DownloadStatus.ready),
       ], size: const Size(360, 740));
       expect(find.text('Tout supprimer'), findsNothing);
-      await tester.tap(find.byTooltip('Tout supprimer'));
+      await tester.tap(find.byKey(const ValueKey('downloads.removeAll')));
       await tester.pumpAndSettle();
       expect(find.text('Tout supprimer ?'), findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Tout supprimer'));
+      await tester.tap(confirmAction);
       await tester.pumpAndSettle();
       expect(fake.calls, ['removeAll']);
     });
@@ -814,10 +837,7 @@ void main() {
       await pumpScreen(tester, [
         download(film, DownloadStatus.ready, size: 46000000),
       ]);
-      final row = find.ancestor(
-        of: find.text('Mirage'),
-        matching: find.byType(Card),
-      );
+      final row = find.byKey(const ValueKey('downloads.readyRow.movie:3'));
       expect(
         find.descendant(of: row, matching: find.byType(PosterImage)),
         findsOneWidget,
@@ -829,7 +849,7 @@ void main() {
       expect(
         find.descendant(
           of: row,
-          matching: find.byTooltip('Supprimer la vidéo'),
+          matching: find.byKey(const ValueKey('downloads.delete.movie:3')),
         ),
         findsOneWidget,
       );
@@ -845,8 +865,10 @@ void main() {
 
       expect(find.text('Les Veilleurs · 3 épisodes · 6 Mo'), findsOneWidget);
       expect(find.byType(PosterImage), findsOneWidget);
-      expect(find.byTooltip('Supprimer la vidéo'), findsNWidgets(3));
-      expect(find.byTooltip('Exporter la vidéo'), findsNWidgets(3));
+      for (final id in ['episode:21', 'episode:22', 'episode:23']) {
+        expect(find.byKey(ValueKey('downloads.delete.$id')), findsOneWidget);
+        expect(find.byKey(ValueKey('downloads.export.$id')), findsOneWidget);
+      }
       final top = [
         'S1E1 · Titre 1',
         'S1E2 · Titre 2',
@@ -892,7 +914,10 @@ void main() {
       expect(find.text('46 Mo · Reprendre à 10:00'), findsOneWidget);
       expect(find.text('1 Mo · Reprendre à 50:00'), findsOneWidget);
       // Vu : la coche, sans reprise. Aucune barre de visionnage (D-046).
-      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('downloads.watched.episode:21')),
+        findsOneWidget,
+      );
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 

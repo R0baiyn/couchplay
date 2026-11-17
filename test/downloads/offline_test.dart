@@ -46,7 +46,7 @@ void main() {
           ),
         ],
       );
-      await tester.tap(find.text('Hors ligne'));
+      await tester.tap(find.byIcon(Icons.download_outlined));
       await settle(tester);
 
       expect(find.byType(DownloadsScreen), findsOneWidget);

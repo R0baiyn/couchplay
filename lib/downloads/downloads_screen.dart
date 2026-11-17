@@ -58,6 +58,7 @@ class DownloadsScreen extends ConsumerWidget {
           // PC seulement : la vidéo est un fichier que l'on peut aller voir.
           if (ref.watch(desktopFilesProvider))
             IconButton(
+              key: const ValueKey('downloads.openFolder'),
               tooltip: 'Ouvrir le dossier des vidéos',
               icon: const Icon(Icons.folder_open_outlined),
               onPressed: () => _openFolder(context, ref),
@@ -66,6 +67,7 @@ class DownloadsScreen extends ConsumerWidget {
             // Étroit : une icône, pour que le titre tienne en entier.
             if (MediaQuery.sizeOf(context).width < railMinWidth)
               IconButton(
+                key: const ValueKey('downloads.removeAll'),
                 tooltip: 'Tout supprimer',
                 icon: const Icon(Icons.delete_sweep_outlined),
                 onPressed: () =>
@@ -73,6 +75,7 @@ class DownloadsScreen extends ConsumerWidget {
               )
             else
               TextButton(
+                key: const ValueKey('downloads.removeAll'),
                 onPressed: () =>
                     _confirmRemoveAll(context, ref, entries.length),
                 child: const Text('Tout supprimer'),
@@ -96,6 +99,7 @@ class DownloadsScreen extends ConsumerWidget {
                     ),
                     if (message != null)
                       Card(
+                        key: const ValueKey('downloads.holdMessage'),
                         margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                         child: ListTile(
                           leading: const Icon(Icons.wifi_off),
@@ -181,6 +185,7 @@ class _UsedSpace extends ConsumerWidget {
           );
     final used = live == null ? stored : usedBytesLive(stored, running!, live);
     return Text(
+      key: const ValueKey('downloads.usedSpace'),
       'Place occupée : ${formatSize(used)}',
       style: Theme.of(context).textTheme.bodyMedium,
     );
@@ -194,6 +199,7 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
+      key: const ValueKey('downloads.empty'),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
@@ -292,6 +298,7 @@ class _ActiveRow extends ConsumerWidget {
     // La ✕ et la pause à côté de la ligne et non en `trailing` : voir
     // l'historique (flèches de la télécommande).
     return Card(
+      key: ValueKey('downloads.activeRow.${d.key}'),
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -325,6 +332,7 @@ class _ActiveRow extends ConsumerWidget {
                 ),
               ),
               IconButton(
+                key: ValueKey('downloads.pauseResume.${d.key}'),
                 tooltip: switch (d.status) {
                   DownloadStatus.failed => 'Réessayer',
                   DownloadStatus.paused => 'Reprendre',
@@ -341,6 +349,7 @@ class _ActiveRow extends ConsumerWidget {
                     stopped ? notifier.resume(d.key) : notifier.pause(d.key),
               ),
               IconButton(
+                key: ValueKey('downloads.cancel.${d.key}'),
                 tooltip: 'Annuler',
                 icon: const Icon(Icons.close),
                 onPressed: () => _cancel(context, ref),
@@ -455,6 +464,7 @@ class _ReadySeries extends StatelessWidget {
     final size = totalSize(episodes);
     final count = episodes.length;
     return Card(
+      key: ValueKey('downloads.seriesCard.${first.seriesId}'),
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -555,9 +565,11 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
             if (resume != null) 'Reprendre à ${formatTime(resume)}',
           ].join(' · ');
     return Row(
+      key: ValueKey('downloads.readyRow.${download.key}'),
       children: [
         Expanded(
           child: InkWell(
+            key: ValueKey('downloads.open.${download.key}'),
             onTap: () => openPlayer(context, ref, item),
             child: FocusRing(
               child: Padding(
@@ -576,6 +588,9 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
                             children: [
                               if (watched)
                                 Icon(
+                                  key: ValueKey(
+                                    'downloads.watched.${download.key}',
+                                  ),
                                   Icons.check_circle,
                                   size: 18,
                                   semanticLabel: 'Vu',
@@ -608,11 +623,13 @@ class _ReadyRowState extends ConsumerState<_ReadyRow> {
         ),
         if (ref.watch(desktopFilesProvider))
           IconButton(
+            key: ValueKey('downloads.export.${download.key}'),
             tooltip: 'Exporter la vidéo',
             icon: const Icon(Icons.save_alt),
             onPressed: _exporting ? null : _export,
           ),
         IconButton(
+          key: ValueKey('downloads.delete.${download.key}'),
           tooltip: 'Supprimer la vidéo',
           icon: const Icon(Icons.delete_outline),
           onPressed: () => confirmDelete(context, ref, download),

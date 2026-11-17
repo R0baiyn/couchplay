@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/confirm_finders.dart';
 import '../support/fake_downloads.dart';
 
 Future<FakeDownloads> pumpButton(
@@ -27,7 +28,11 @@ Future<FakeDownloads> pumpButton(
       child: MaterialApp(
         home: Scaffold(
           body: Center(
-            child: DownloadButton(item: item, compact: compact),
+            child: DownloadButton(
+              key: const ValueKey('catalog.download'),
+              item: item,
+              compact: compact,
+            ),
           ),
         ),
       ),
@@ -41,7 +46,7 @@ void main() {
     tester,
   ) async {
     final fake = await pumpButton(tester);
-    await tester.tap(find.text('Télécharger'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     expect(fake.calls, ['add movie:1']);
   });
 
@@ -60,7 +65,7 @@ void main() {
       state: download(movie, DownloadStatus.queued),
     );
     expect(find.text('En attente'), findsOneWidget);
-    await tester.tap(find.text('En attente'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     expect(fake.calls, ['pause movie:1']);
   });
 
@@ -70,7 +75,7 @@ void main() {
       state: download(movie, DownloadStatus.running, received: 340),
     );
     expect(find.text('34 %'), findsOneWidget);
-    await tester.tap(find.text('34 %'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     expect(fake.calls, ['pause movie:1']);
   });
 
@@ -80,7 +85,7 @@ void main() {
       state: download(movie, DownloadStatus.paused, received: 500),
     );
     expect(find.text('En pause · 50 %'), findsOneWidget);
-    await tester.tap(find.text('En pause · 50 %'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     expect(fake.calls, ['resume movie:1']);
   });
 
@@ -91,17 +96,17 @@ void main() {
       tester,
       state: download(movie, DownloadStatus.ready, received: 1000),
     );
-    await tester.tap(find.text('Téléchargé'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     await tester.pumpAndSettle();
     expect(find.text('Supprimer la vidéo ?'), findsOneWidget);
 
-    await tester.tap(find.text('Annuler'));
+    await tester.tap(confirmCancel);
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
 
-    await tester.tap(find.text('Téléchargé'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Supprimer'));
+    await tester.tap(confirmAction);
     await tester.pumpAndSettle();
     expect(fake.calls, ['remove movie:1']);
   });
@@ -116,7 +121,13 @@ void main() {
       ),
     );
     expect(find.text('Espace disque insuffisant'), findsOneWidget);
-    await tester.tap(find.text('Réessayer'));
+    // La raison est au-dessus du bouton : on appuie sur le bouton lui-même.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('catalog.download')),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
+    );
     expect(fake.calls, ['resume movie:1']);
   });
 
@@ -125,7 +136,7 @@ void main() {
   ) async {
     final fake = await pumpButton(tester, compact: true);
     expect(find.text('Télécharger'), findsNothing);
-    await tester.tap(find.byTooltip('Télécharger'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     expect(fake.calls, ['add movie:1']);
   });
 
