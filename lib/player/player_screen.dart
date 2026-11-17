@@ -44,10 +44,12 @@ Future<void> openPlayer(
           title: Text(item.title),
           actions: [
             TextButton(
+              key: const ValueKey('player.resumeRestart'),
               onPressed: () => Navigator.pop(context, Duration.zero),
               child: const Text('Recommencer'),
             ),
             FilledButton(
+              key: const ValueKey('player.resumeContinue'),
               autofocus: true,
               onPressed: () => Navigator.pop(context, saved),
               child: Text('Reprendre à ${formatTime(saved)}'),
@@ -512,7 +514,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               // Texte blanc sur le fond noir du lecteur.
               child: DefaultTextStyle.merge(
                 style: const TextStyle(color: Colors.white),
-                child: ErrorView(message: error, onRetry: _open, onExit: _exit),
+                child: ErrorView(
+                  key: const ValueKey('player.error'),
+                  message: error,
+                  onRetry: _open,
+                  onExit: _exit,
+                ),
               ),
             )
           else ...[
