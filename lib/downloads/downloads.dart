@@ -110,6 +110,9 @@ final class DownloadHoldsNotifier extends Notifier<DownloadHolds> {
   /// Voir [DownloadHolds.streaming]. La sortie du lecteur lève
   /// [DownloadHold.playback].
   set streaming(bool open) {
+    // Le lecteur s'arrête après coup (`PlayerSession.stopStream`) : les
+    // providers peuvent déjà être jetés, il n'y a plus rien à suivre.
+    if (!ref.mounted) return;
     state = DownloadHolds(
       reasons: open
           ? state.reasons

@@ -795,6 +795,15 @@ void main() {
   });
 
   group('pauses de toute la file', () {
+    test('lecteur arrêté après la fin des providers : rien à écrire', () async {
+      final h = await _Harness.start();
+      final holds = h.container.read(downloadHoldsProvider.notifier);
+      // `PlayerSession.stopStream` écrit après coup : le conteneur peut
+      // déjà être jeté (fin d'un essai de bout en bout).
+      h.container.dispose();
+      expect(() => holds.streaming = false, returnsNormally);
+    });
+
     test('pauseAll arrête le téléchargement, resumeAll le reprend', () async {
       final server = VideoServer(_source, cutAt: 500, hangAtCut: true);
       final h = await _Harness.start(server: server);
