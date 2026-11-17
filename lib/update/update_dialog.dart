@@ -29,7 +29,8 @@ Future<void> showUpdateDialog(
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 16,
           children: [
-            if (update.notes.isNotEmpty) Text(update.notes),
+            if (update.notes.isNotEmpty)
+              Text(update.notes, key: const ValueKey('update.notes')),
             Text(
               'Plus tard : elle s\'installera ${updater.installer.later}.',
               style: Theme.of(context).textTheme.bodySmall,
@@ -39,10 +40,12 @@ Future<void> showUpdateDialog(
       ),
       actions: [
         TextButton(
+          key: const ValueKey('update.later'),
           onPressed: () => Navigator.pop(context, false),
           child: const Text('Plus tard'),
         ),
         FilledButton(
+          key: const ValueKey('update.install'),
           autofocus: true,
           onPressed: () => Navigator.pop(context, true),
           child: const Text('Mettre à jour'),
@@ -94,14 +97,21 @@ Future<void> showUpdateDialog(
               mainAxisSize: MainAxisSize.min,
               spacing: 16,
               children: [
-                LinearProgressIndicator(value: value),
+                LinearProgressIndicator(
+                  key: const ValueKey('update.progress'),
+                  value: value,
+                ),
                 Text('Téléchargement : ${(value * 100).round()} %'),
               ],
             ),
           ),
           actions: [
             // Une connexion lente mais vivante ne bloque jamais l'app.
-            TextButton(onPressed: updater.cancel, child: const Text('Annuler')),
+            TextButton(
+              key: const ValueKey('update.cancel'),
+              onPressed: updater.cancel,
+              child: const Text('Annuler'),
+            ),
           ],
         ),
       ),
@@ -138,14 +148,18 @@ Future<void> _showPageDialog(
       title: Text('Version ${update.version} disponible'),
       content: update.notes.isEmpty
           ? null
-          : SingleChildScrollView(child: Text(update.notes)),
+          : SingleChildScrollView(
+              child: Text(update.notes, key: const ValueKey('update.notes')),
+            ),
       actions: [
         TextButton(
+          key: const ValueKey('update.later'),
           onPressed: () => Navigator.pop(context, false),
           child: const Text('Plus tard'),
         ),
         if (page != null)
           FilledButton(
+            key: const ValueKey('update.openPage'),
             autofocus: true,
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Ouvrir la page'),

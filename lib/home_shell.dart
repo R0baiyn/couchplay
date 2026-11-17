@@ -34,23 +34,34 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   /// L'icône d'un onglet, à la taille de sa pastille ([width] × 32) : comme
   /// le bouton Réglages du rail, l'anneau entoure la pastille, pas le libellé.
-  static Widget _tabIcon(IconData icon, double width) => FocusRing(
+  static Widget _tabIcon(IconData icon, double width, [Key? key]) => FocusRing(
+    key: key,
     hug: true,
     radius: 16,
     child: SizedBox(width: width, height: 32, child: Icon(icon)),
   );
 
   static const _tabs = [
-    (Icons.home_outlined, Icons.home, 'Accueil'),
-    (Icons.movie_outlined, Icons.movie, 'Films'),
-    (Icons.tv_outlined, Icons.tv, 'Séries'),
-    (Icons.search_outlined, Icons.search, 'Recherche'),
-    (Icons.download_outlined, Icons.download, 'Hors ligne'),
+    (Icons.home_outlined, Icons.home, 'Accueil', ValueKey('shell.tabHome')),
+    (Icons.movie_outlined, Icons.movie, 'Films', ValueKey('shell.tabMovies')),
+    (Icons.tv_outlined, Icons.tv, 'Séries', ValueKey('shell.tabSeries')),
+    (
+      Icons.search_outlined,
+      Icons.search,
+      'Recherche',
+      ValueKey('shell.tabSearch'),
+    ),
+    (
+      Icons.download_outlined,
+      Icons.download,
+      'Hors ligne',
+      ValueKey('shell.tabDownloads'),
+    ),
   ];
   static const _searchTab = 3;
 
   /// Pas d'onglet « Hors ligne » sur TV (D-034) : le dernier est retiré.
-  List<(IconData, IconData, String)> get _shown =>
+  List<(IconData, IconData, String, Key)> get _shown =>
       ref.read(televisionProvider) ? _tabs.sublist(0, _tabs.length - 1) : _tabs;
 
   var _index = 0;
@@ -351,9 +362,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                           child: SettingsButton(inRail: true),
                         ),
                         destinations: [
-                          for (final (icon, selected, label) in tabs)
+                          for (final (icon, selected, label, key) in tabs)
                             NavigationRailDestination(
-                              icon: _tabIcon(icon, 56),
+                              icon: _tabIcon(icon, 56, key),
                               selectedIcon: _tabIcon(selected, 56),
                               label: Text(label),
                             ),
@@ -376,9 +387,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: _select,
         destinations: [
-          for (final (icon, selected, label) in tabs)
+          for (final (icon, selected, label, key) in tabs)
             NavigationDestination(
-              icon: _tabIcon(icon, 64),
+              icon: _tabIcon(icon, 64, key),
               selectedIcon: _tabIcon(selected, 64),
               label: label,
             ),

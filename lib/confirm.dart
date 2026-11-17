@@ -24,11 +24,13 @@ Future<bool> confirm(
           content: Text(content),
           actions: [
             TextButton(
+              key: const ValueKey('confirm.cancel'),
               autofocus: focusCancel,
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Annuler'),
             ),
             FilledButton(
+              key: const ValueKey('confirm.action'),
               autofocus: focusAction,
               onPressed: () => Navigator.pop(context, true),
               child: Text(action),

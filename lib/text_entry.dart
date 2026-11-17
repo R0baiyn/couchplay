@@ -163,6 +163,7 @@ class _EntryDialogState extends State<_EntryDialog> {
     return AlertDialog(
       title: Text(decoration.labelText ?? decoration.hintText ?? ''),
       content: TextField(
+        key: const ValueKey('textEntry.dialogField'),
         controller: _controller,
         autofocus: true,
         obscureText: _obscure,
@@ -176,14 +177,17 @@ class _EntryDialogState extends State<_EntryDialog> {
         // Avec les autres boutons, pas dans le champ : les flèches y vont.
         if (_field.obscureText)
           TextButton(
+            key: const ValueKey('textEntry.dialogToggle'),
             onPressed: () => setState(() => _obscure = !_obscure),
             child: Text(_obscure ? 'Afficher' : 'Masquer'),
           ),
         TextButton(
+          key: const ValueKey('textEntry.dialogCancel'),
           onPressed: () => Navigator.pop(context),
           child: const Text('Annuler'),
         ),
         FilledButton(
+          key: const ValueKey('textEntry.dialogOk'),
           onPressed: () => Navigator.pop(context, _controller.text),
           child: const Text('OK'),
         ),
