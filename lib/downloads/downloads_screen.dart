@@ -16,6 +16,7 @@ import 'download.dart';
 import 'download_button.dart';
 import 'downloads.dart';
 import 'export.dart';
+import 'offline_list.dart';
 
 /// Onglet « Téléchargements » : ce qui est en cours ou en attente, puis les
 /// vidéos prêtes (une vidéo prête se lit sans réseau).
@@ -31,32 +32,11 @@ class DownloadsScreen extends ConsumerWidget {
     final holds = ref.watch(downloadHoldsProvider);
     final theme = Theme.of(context);
 
-    final active = [
-      for (final d in entries.values)
-        if (d.status != DownloadStatus.ready) d,
-    ];
-    // Un film seul, ou les épisodes d'une même série ensemble, dans l'ordre
-    // d'ajout du premier.
-    final groups = <String, List<Download>>{};
-    for (final d in entries.values) {
-      if (d.status == DownloadStatus.ready) {
-        (groups[d.item.seriesId ?? d.key] ??= []).add(d);
-      }
-    }
-    // Place prise : les vidéos prêtes, et ce qui est déjà reçu des autres.
-    final used = entries.values.fold(
-      0,
-      (sum, d) =>
-          sum + (d.status == DownloadStatus.ready ? d.size : d.received),
-    );
-    final running = active
-        .where((d) => d.status == DownloadStatus.running)
-        .firstOrNull;
-    final waiting = active.any(
-      (d) =>
-          d.status == DownloadStatus.queued ||
-          d.status == DownloadStatus.running,
-    );
+    final active = activeDownloads(entries.values);
+    final groups = readyGroups(entries.values);
+    final used = usedBytes(entries.values);
+    final running = runningDownload(active);
+    final waiting = hasWaitingDownload(active);
     final message = !waiting
         ? null
         : holds.waitingForWifi
@@ -199,9 +179,7 @@ class _UsedSpace extends ConsumerWidget {
               (p) => p?.key == running.key ? p!.received : null,
             ),
           );
-    final used = live == null
-        ? stored
-        : stored + (live - running!.received).clamp(0, live);
+    final used = live == null ? stored : usedBytesLive(stored, running!, live);
     return Text(
       'Place occupée : ${formatSize(used)}',
       style: Theme.of(context).textTheme.bodyMedium,
@@ -294,7 +272,7 @@ class _Poster extends ConsumerWidget {
 
 double? _fraction((int, int) bytes) {
   final (received, size) = bytes;
-  return size > 0 ? (received / size).clamp(0, 1).toDouble() : null;
+  return receivedFraction(received, size);
 }
 
 /// Un téléchargement en cours, en attente, en pause ou en échec. Seuls
@@ -472,15 +450,9 @@ class _ReadySeries extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...episodes]
-      ..sort((a, b) {
-        final season = a.item.season!.compareTo(b.item.season!);
-        return season != 0
-            ? season
-            : a.item.episode!.compareTo(b.item.episode!);
-      });
+    final sorted = sortedEpisodes(episodes);
     final first = sorted.first.item;
-    final size = episodes.fold(0, (sum, d) => sum + d.size);
+    final size = totalSize(episodes);
     final count = episodes.length;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
