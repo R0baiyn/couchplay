@@ -108,7 +108,7 @@ void main() {
   });
 
   group('fichier abîmé', () {
-    final bak = () => File('${manifest.path}.bak');
+    File bak() => File('${manifest.path}.bak');
 
     test('vide : mis de côté en .bak, liste vide, on peut réécrire', () {
       manifest.writeAsStringSync('');
