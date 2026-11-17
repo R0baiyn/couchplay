@@ -106,6 +106,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 spacing: 16,
                 children: [
                   TextEntry(
+                    key: const ValueKey('accounts.name'),
                     controller: _name,
                     autofocus: !editing,
                     textInputAction: TextInputAction.next,
@@ -115,6 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   TextEntry(
+                    key: const ValueKey('accounts.host'),
                     controller: _host,
                     keyboardType: TextInputType.url,
                     textInputAction: TextInputAction.next,
@@ -126,6 +128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   TextEntry(
+                    key: const ValueKey('accounts.username'),
                     controller: _username,
                     textInputAction: TextInputAction.next,
                     autocorrect: false,
@@ -136,6 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: const InputDecoration(labelText: 'Utilisateur'),
                   ),
                   TextEntry(
+                    key: const ValueKey('accounts.password'),
                     controller: _password,
                     obscureText: _hidePassword,
                     textInputAction: TextInputAction.next,
@@ -150,6 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ? 'Laisser vide pour garder le mot de passe actuel'
                           : null,
                       suffixIcon: IconButton(
+                        key: const ValueKey('accounts.showPassword'),
                         tooltip: _hidePassword
                             ? 'Afficher le mot de passe'
                             : 'Masquer le mot de passe',
@@ -164,6 +169,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   TextEntry(
+                    key: const ValueKey('accounts.userAgent'),
                     controller: _userAgent,
                     textInputAction: TextInputAction.done,
                     autocorrect: false,
@@ -176,11 +182,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   if (_error case final error?)
                     Text(
                       error,
+                      key: const ValueKey('accounts.formError'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
                   FilledButton(
+                    key: const ValueKey('accounts.submit'),
                     onPressed: _busy ? null : _submit,
                     child: _busy
                         ? const SizedBox.square(

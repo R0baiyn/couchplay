@@ -21,6 +21,7 @@ class AccountStatusScreen extends ConsumerWidget {
         title: Text(name == null ? 'Abonnement' : 'Abonnement · $name'),
         actions: [
           IconButton(
+            key: const ValueKey('accounts.statusRefresh'),
             tooltip: 'Actualiser',
             icon: const Icon(Icons.refresh),
             onPressed: info.isLoading
@@ -35,6 +36,7 @@ class AccountStatusScreen extends ConsumerWidget {
           AsyncValue(isLoading: true) => const CircularProgressIndicator(),
           AsyncData(:final value) => _Details(value),
           AsyncError(:final error) => ErrorView(
+            key: const ValueKey('accounts.statusError'),
             error: error,
             onRetry: () => ref.invalidate(accountInfoProvider),
           ),
@@ -76,6 +78,7 @@ class _Details extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 480),
       child: Card(
+        key: const ValueKey('accounts.statusDetails'),
         margin: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
