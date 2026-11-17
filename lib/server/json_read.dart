@@ -52,12 +52,17 @@ String? asString(Object? value) => switch (value) {
 /// nombre, tantôt en texte.
 String? asId(Object? value) => asString(value)?.trim();
 
+/// Plus grande date que `DateTime` sait représenter, en secondes.
+const _maxSeconds = 8640000000000;
+
 /// Date en secondes epoch (nombre ou texte), ou date texte ISO / `AAAA-MM-JJ hh:mm:ss`.
 /// `0` signifie « pas de date ».
 DateTime? asDate(Object? value) {
   final seconds = asInt(value);
   if (seconds != null) {
-    return seconds > 0
+    // Au-delà, DateTime lève une RangeError : pas de date plutôt qu'une
+    // exception (horodatage en millisecondes, valeur extrême).
+    return seconds > 0 && seconds <= _maxSeconds
         ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true)
         : null;
   }

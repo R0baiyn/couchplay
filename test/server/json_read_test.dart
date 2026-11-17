@@ -89,6 +89,21 @@ void main() {
     }
   });
 
+  test(
+    'asDate : un nombre hors des dates possibles (millisecondes…) : null',
+    () {
+      // Horodatage en millisecondes lu comme des secondes, ou entier extrême :
+      // DateTime lèverait une RangeError jusqu'à l'interface.
+      for (final value in [
+        1700000000000000,
+        9223372036854775807,
+        '9999999999999999',
+      ]) {
+        expect(asDate(value), isNull, reason: '$value');
+      }
+    },
+  );
+
   test('asList accepte une liste ou un objet indexé, sinon liste vide', () {
     expect(asList([1, 2]), [1, 2]);
     expect(asList({'0': 'a', '1': 'b'}), ['a', 'b']);
