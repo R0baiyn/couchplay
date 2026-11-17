@@ -11,7 +11,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, openMovies: false);
-    await tapLabel(tester, 'Recherche');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSearch')));
     await settle(tester);
 
     final field = find.byKey(const ValueKey('search.field'));

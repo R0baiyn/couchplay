@@ -18,7 +18,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/confirm_finders.dart';
 import '../support/fake_downloads.dart';
 import '../support/real_font.dart';
 import '../support/settle.dart';
@@ -140,13 +139,13 @@ void main() {
     ]);
     await tester.tap(find.byKey(const ValueKey('downloads.cancel.movie:1')));
     await tester.pumpAndSettle();
-    await tester.tap(confirmCancel);
+    await tester.tap(find.byKey(const ValueKey('confirm.cancel')));
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
 
     await tester.tap(find.byKey(const ValueKey('downloads.cancel.movie:1')));
     await tester.pumpAndSettle();
-    await tester.tap(confirmAction);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
     await tester.pumpAndSettle();
     expect(fake.calls, ['remove movie:1']);
   });
@@ -217,7 +216,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('downloads.delete.movie:1')));
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
-    await tester.tap(confirmAction);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
     await tester.pumpAndSettle();
     expect(fake.calls, ['remove movie:1']);
   });
@@ -230,13 +229,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('downloads.removeAll')));
     await tester.pumpAndSettle();
     expect(find.text('Tout supprimer ?'), findsOneWidget);
-    await tester.tap(confirmCancel);
+    await tester.tap(find.byKey(const ValueKey('confirm.cancel')));
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
 
     await tester.tap(find.byKey(const ValueKey('downloads.removeAll')));
     await tester.pumpAndSettle();
-    await tester.tap(confirmAction);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
     await tester.pumpAndSettle();
     expect(fake.calls, ['removeAll']);
   });
@@ -767,7 +766,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('downloads.removeAll')));
       await tester.pumpAndSettle();
       expect(find.text('Tout supprimer ?'), findsOneWidget);
-      await tester.tap(confirmAction);
+      await tester.tap(find.byKey(const ValueKey('confirm.action')));
       await tester.pumpAndSettle();
       expect(fake.calls, ['removeAll']);
     });

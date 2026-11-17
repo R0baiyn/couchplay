@@ -46,7 +46,7 @@ void main() {
           ),
         ],
       );
-      await tester.tap(find.byIcon(Icons.download_outlined));
+      await tester.tap(find.byKey(const ValueKey('shell.tabDownloads')));
       await settle(tester);
 
       expect(find.byType(DownloadsScreen), findsOneWidget);

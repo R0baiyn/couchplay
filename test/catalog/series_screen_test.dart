@@ -18,7 +18,7 @@ void main() {
   testWidgets('progression enregistrée (toutes les 10 s sous le lecteur) : '
       "seul l'épisode se refait, pas la fiche", (tester) async {
     await pumpApp(tester, openMovies: false);
-    await tapLabel(tester, 'Séries');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
@@ -124,7 +124,7 @@ void main() {
       openMovies: false,
       overrides: [downloadsProvider.overrideWith(() => fake)],
     );
-    await tapLabel(tester, 'Séries');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
@@ -164,7 +164,7 @@ void main() {
       openMovies: false,
       overrides: [downloadsProvider.overrideWith(() => fake)],
     );
-    await tapLabel(tester, 'Séries');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);

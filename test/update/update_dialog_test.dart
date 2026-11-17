@@ -95,6 +95,7 @@ void main() {
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
+              key: const ValueKey('test.open'),
               onPressed: () => showUpdateDialog(context, updater, update),
               child: const Text('Ouvrir'),
             ),
@@ -102,7 +103,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Ouvrir'));
+    await tester.tap(find.byKey(const ValueKey('test.open')));
     await tester.pumpAndSettle();
     expect(find.text('Version 0.1.1 disponible'), findsOneWidget);
     return (updater, installer);
@@ -125,9 +126,11 @@ void main() {
     tester,
   ) async {
     final (_, installer) = await open(tester);
-    await tester.tap(find.text('Mettre à jour'));
+    await tester.tap(find.byKey(const ValueKey('update.install')));
     await tester.pump();
     expect(find.text('Téléchargement : 0 %'), findsOneWidget);
+    expect(find.byKey(const ValueKey('update.progress')), findsOneWidget);
+    expect(find.byKey(const ValueKey('update.cancel')), findsOneWidget);
 
     await waitFor(tester, () => installer.installs > 0);
     expect(installer.installs, 1);
@@ -139,7 +142,7 @@ void main() {
     tester,
   ) async {
     final (_, installer) = await open(tester, fails: true);
-    await tester.tap(find.text('Mettre à jour'));
+    await tester.tap(find.byKey(const ValueKey('update.install')));
     await waitFor(tester, () => installer.installs > 0);
     expect(find.textContaining('Téléchargement'), findsNothing);
     expect(find.text(impossible), findsOneWidget);
@@ -150,7 +153,7 @@ void main() {
   ) async {
     // La liste de la release n'est pas signée : refus net.
     final (_, installer) = await open(tester, signed: true);
-    await tester.tap(find.text('Mettre à jour'));
+    await tester.tap(find.byKey(const ValueKey('update.install')));
     await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
     expect(find.textContaining('Téléchargement'), findsNothing);
     expect(find.text(impossible), findsOneWidget);
@@ -168,10 +171,10 @@ void main() {
       tester,
       adapter: FakeAdapter((_) async => ResponseBody(body.stream, 200)),
     );
-    await tester.tap(find.text('Mettre à jour'));
+    await tester.tap(find.byKey(const ValueKey('update.install')));
     await waitFor(tester, () => updater.progress.value > 0);
 
-    await tester.tap(find.text('Annuler'));
+    await tester.tap(find.byKey(const ValueKey('update.cancel')));
     await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
     expect(find.textContaining('Téléchargement'), findsNothing);
     expect(find.text('Mise à jour annulée.'), findsOneWidget);
@@ -182,7 +185,7 @@ void main() {
     tester,
   ) async {
     final (_, installer) = await open(tester);
-    await tester.tap(find.text('Plus tard'));
+    await tester.tap(find.byKey(const ValueKey('update.later')));
     await waitFor(tester, () => installer.prepares > 0);
     expect(installer.prepares, 1);
     expect(installer.installs, 0);
@@ -202,7 +205,7 @@ void main() {
       tester,
       adapter: FakeAdapter.replying('', status: 404),
     );
-    await tester.tap(find.text('Plus tard'));
+    await tester.tap(find.byKey(const ValueKey('update.later')));
     await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
     expect(find.text(impossible), findsOneWidget);
     expect(installer.prepares, 0);
@@ -210,7 +213,7 @@ void main() {
 
   testWidgets('« Plus tard » puis signature refusée : dit', (tester) async {
     final (_, installer) = await open(tester, signed: true);
-    await tester.tap(find.text('Plus tard'));
+    await tester.tap(find.byKey(const ValueKey('update.later')));
     await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
     expect(find.text(impossible), findsOneWidget);
     expect(installer.prepares, 0);
@@ -244,6 +247,7 @@ void main() {
           home: Scaffold(
             body: Builder(
               builder: (context) => TextButton(
+                key: const ValueKey('test.open'),
                 onPressed: () =>
                     showUpdateDialog(context, updater, linuxUpdate),
                 child: const Text('Ouvrir'),
@@ -252,11 +256,12 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text('Ouvrir'));
+      await tester.tap(find.byKey(const ValueKey('test.open')));
       await tester.pumpAndSettle();
       expect(find.text('Version 0.1.1 disponible'), findsOneWidget);
       expect(find.text('Nouveautés'), findsOneWidget);
-      expect(find.text('Mettre à jour'), findsNothing);
+      expect(find.byKey(const ValueKey('update.notes')), findsOneWidget);
+      expect(find.byKey(const ValueKey('update.install')), findsNothing);
     }
 
     testWidgets('« Ouvrir la page » : la release, sans téléchargement', (
@@ -264,7 +269,7 @@ void main() {
     ) async {
       final opened = <Uri>[];
       await openLinux(tester, opened, releasePage: page);
-      await tester.tap(find.text('Ouvrir la page'));
+      await tester.tap(find.byKey(const ValueKey('update.openPage')));
       await tester.pumpAndSettle();
       expect(opened, [page]);
       expect(find.text('Version 0.1.1 disponible'), findsNothing);
@@ -276,7 +281,7 @@ void main() {
     ) async {
       final opened = <Uri>[];
       await openLinux(tester, opened, releasePage: page);
-      await tester.tap(find.text('Plus tard'));
+      await tester.tap(find.byKey(const ValueKey('update.later')));
       await tester.pumpAndSettle();
       expect(opened, isEmpty);
       expect(find.text('Version 0.1.1 disponible'), findsNothing);
@@ -285,7 +290,7 @@ void main() {
 
     testWidgets("sans page sûre : pas de bouton pour l'ouvrir", (tester) async {
       await openLinux(tester, []);
-      expect(find.text('Ouvrir la page'), findsNothing);
+      expect(find.byKey(const ValueKey('update.openPage')), findsNothing);
     });
   });
 }

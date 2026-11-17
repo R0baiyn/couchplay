@@ -101,7 +101,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tapLabel(tester, 'Séries');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
     await settle(tester);
 
     expect(find.text('Séries PLATEFORME A'), findsOneWidget);
@@ -256,9 +256,9 @@ void main() {
     await pumpApp(tester);
     expect(find.text('AR · ARABE أفلام عربية'), findsNothing);
 
-    await tapLabel(tester, 'Réglages');
+    await tester.tap(find.byKey(const ValueKey('settings.open')));
     await settle(tester);
-    await tapLabel(tester, 'Catalogue');
+    await tester.tap(find.byKey(const ValueKey('settings.catalog')));
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('catalog.tag.AR')));
     await settle(tester);
@@ -493,7 +493,7 @@ void main() {
     }
     expect(fullLists, 2, reason: 'la liste complète redemandée, une fois');
 
-    await tapLabel(tester, 'Recherche');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSearch')));
     await settle(tester);
     await tester.enterText(
       find.descendant(

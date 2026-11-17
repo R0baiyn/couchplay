@@ -46,7 +46,7 @@ void main() {
         openMovies: false,
         overrides: [televisionProvider.overrideWithValue(true)],
       );
-      await tapLabel(tester, 'Recherche');
+      await tester.tap(find.byKey(const ValueKey('shell.tabSearch')));
       await settle(tester);
       expect(find.byType(EditableText), findsNothing);
 
@@ -174,7 +174,7 @@ void main() {
       'fiche série : le focus descend dans les épisodes, la page suit',
       (tester) async {
         await pumpTv(tester, seriesInfo: longSeries());
-        await tapLabel(tester, 'Séries');
+        await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
         await settle(tester);
         await tester.tap(
           find.byKey(const ValueKey('catalog.poster.series-17')),
@@ -246,7 +246,7 @@ void main() {
         expect(focused(), 'Historique');
         await press(tester, LogicalKeyboardKey.select);
         expect(find.byType(HistoryScreen), findsOneWidget);
-        await tapLabel(tester, "Effacer l'historique");
+        await tester.tap(find.byKey(const ValueKey('library.historyClear')));
         await settle(tester);
         expect(focused(), 'Annuler');
         await press(tester, LogicalKeyboardKey.arrowRight);
@@ -426,7 +426,7 @@ void main() {
     expect(rail().selectedIndex, 1);
 
     // Retour de l'onglet vers l'Accueil : déjà vérifié par le test du focus TV.
-    await tapLabel(tester, 'Accueil');
+    await tester.tap(find.byKey(const ValueKey('shell.tabHome')));
     await settle(tester);
     expect(rail().selectedIndex, 0);
 

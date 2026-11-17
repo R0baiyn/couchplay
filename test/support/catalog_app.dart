@@ -124,16 +124,9 @@ Future<void> pumpApp(
   }
   // L'app s'ouvre sur l'accueil.
   if (openMovies) {
-    await tapLabel(tester, 'Films');
+    await tester.tap(find.byKey(const ValueKey('shell.tabMovies')));
     await settle(tester);
   }
-}
-
-/// Touche un élément d'une autre fonctionnalité (onglets, réglages) par son
-/// libellé, en attendant sa Key D-048 (plans S034, S035, S037).
-Future<void> tapLabel(WidgetTester tester, String label) async {
-  final target = find.text(label);
-  await tester.tap(target);
 }
 
 /// Progression enregistrée dans `library.json`, relue jusqu'à ce que

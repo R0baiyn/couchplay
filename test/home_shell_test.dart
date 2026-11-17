@@ -46,7 +46,7 @@ void main() {
         tester.getSize(find.text('Hors ligne')).height,
         tester.getSize(find.text('Films')).height,
       );
-      await tester.tap(find.text('Hors ligne'));
+      await tester.tap(find.byKey(const ValueKey('shell.tabDownloads')));
       await settle(tester);
       expect(find.byType(DownloadsScreen), findsOneWidget);
       // Le titre de l'écran garde son nom complet.
@@ -94,6 +94,6 @@ void main() {
     );
     expect(find.text('Recherche'), findsOneWidget);
     expect(find.text('Hors ligne'), findsNothing);
-    expect(find.byIcon(Icons.download_outlined), findsNothing);
+    expect(find.byKey(const ValueKey('shell.tabDownloads')), findsNothing);
   });
 }

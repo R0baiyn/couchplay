@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/confirm_finders.dart';
 import '../support/fake_downloads.dart';
 
 Future<FakeDownloads> pumpButton(
@@ -100,13 +99,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Supprimer la vidéo ?'), findsOneWidget);
 
-    await tester.tap(confirmCancel);
+    await tester.tap(find.byKey(const ValueKey('confirm.cancel')));
     await tester.pumpAndSettle();
     expect(fake.calls, isEmpty);
 
     await tester.tap(find.byKey(const ValueKey('catalog.download')));
     await tester.pumpAndSettle();
-    await tester.tap(confirmAction);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
     await tester.pumpAndSettle();
     expect(fake.calls, ['remove movie:1']);
   });

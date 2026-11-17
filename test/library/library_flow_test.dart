@@ -12,7 +12,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/confirm_finders.dart';
 import '../support/settle.dart';
 import '../support/catalog_app.dart';
 
@@ -28,7 +27,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tapLabel(tester, 'Films');
+    await tester.tap(find.byKey(const ValueKey('shell.tabMovies')));
     await settle(tester);
     await tester.tap(
       find.byKey(const ValueKey('catalog.poster.movies-144016')),
@@ -40,7 +39,7 @@ void main() {
     await settle(tester);
 
     // Retour sur l'accueil, sans redémarrer.
-    await tapLabel(tester, 'Accueil');
+    await tester.tap(find.byKey(const ValueKey('shell.tabHome')));
     await settle(tester);
     expect(find.byKey(const ValueKey('library.favoritesEmpty')), findsNothing);
     expect(find.text('Horizon (2024)'), findsOneWidget);
@@ -121,7 +120,7 @@ void main() {
 
   testWidgets('flèches : → depuis un épisode mène à son menu', (tester) async {
     await pumpApp(tester);
-    await tapLabel(tester, 'Séries');
+    await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
@@ -145,7 +144,7 @@ void main() {
 
   testWidgets('un épisode se marque vu ou non vu, et le reste', (tester) async {
     Future<void> openVeilleurs() async {
-      await tapLabel(tester, 'Séries');
+      await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
       await settle(tester);
       await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
       await settle(tester);
@@ -242,7 +241,7 @@ void main() {
       find.byKey(const ValueKey('library.continueTile.movie:144014')),
     );
     await settle(tester);
-    await tester.tap(confirmAction);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
     await settle(tester);
     expect(inContinue('Horizon (2024) HD VF'), findsNothing);
     expect(inContinue('Les Veilleurs · S1E2'), findsOneWidget);
@@ -380,12 +379,12 @@ void main() {
     // Effacer : confirmation, état vide, favoris intacts.
     await tester.tap(find.byKey(const ValueKey('library.historyClear')));
     await settle(tester);
-    await tester.tap(confirmCancel);
+    await tester.tap(find.byKey(const ValueKey('confirm.cancel')));
     await settle(tester);
     expect(find.text('Les Veilleurs · S1E1'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('library.historyClear')));
     await settle(tester);
-    await tester.tap(confirmAction);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
     await settle(tester);
     expect(find.byKey(const ValueKey('library.historyEmpty')), findsOneWidget);
     final container = ProviderScope.containerOf(
