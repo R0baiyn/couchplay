@@ -38,7 +38,11 @@ void main() {
         ),
       );
       // La ligne la plus récente est la première.
-      Focus.of(tester.element(find.text('Récent'))).requestFocus();
+      Focus.of(
+        tester.element(
+          find.byKey(const ValueKey('library.historyRow.movie:Récent')),
+        ),
+      ).requestFocus();
       await tester.pump();
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);

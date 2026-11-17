@@ -128,14 +128,11 @@ void main() {
     );
     await tester.pump();
 
-    Finder badgeOf(String title) => find.descendant(
-      of: find.ancestor(
-        of: find.text(title),
-        matching: find.byType(PosterTile),
-      ),
+    Finder badgeOf(PlayItem item) => find.descendant(
+      of: find.byKey(ValueKey('library.continueTile.${item.key}')),
       matching: find.byIcon(Icons.download_done),
     );
-    expect(badgeOf('Horizon'), findsOneWidget);
-    expect(badgeOf('Dune'), findsNothing);
+    expect(badgeOf(ready), findsOneWidget);
+    expect(badgeOf(other), findsNothing);
   });
 }
