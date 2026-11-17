@@ -6,11 +6,11 @@ import '../library/library.dart';
 import '../library/library_store.dart';
 import 'catalog_index.dart';
 import '../server/models.dart';
-import 'poster_tile.dart';
+import '../poster_tile.dart';
 import 'versions.dart';
 
-export 'poster_image.dart';
-export 'poster_tile.dart';
+export '../poster_image.dart';
+export '../poster_tile.dart';
 
 /// Grille d'affiches, en sliver : elle défile avec l'en-tête de l'écran.
 ///

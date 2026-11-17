@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../focus_ring.dart';
+import 'focus_ring.dart';
 import 'poster_image.dart';
 
 /// Une affiche et son titre ; l'anneau autour de l'affiche quand elle a le

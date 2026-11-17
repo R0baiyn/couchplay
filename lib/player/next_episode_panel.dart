@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../catalog/poster_grid.dart';
+import '../poster_image.dart';
 
 /// « Épisode suivant dans 10 s », en bas à droite, par-dessus la fin.
 class NextEpisodePanel extends StatelessWidget {

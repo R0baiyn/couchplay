@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/poster_grid.dart';
+import '../poster_image.dart';
 import '../library/library.dart';
 import 'downloads.dart';
 
