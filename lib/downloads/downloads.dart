@@ -14,7 +14,7 @@ import '../library/library_store.dart';
 import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
-import '../settings/app_settings.dart';
+import '../accounts/app_settings.dart';
 import '../television.dart';
 import 'download.dart';
 import 'free_space.dart';

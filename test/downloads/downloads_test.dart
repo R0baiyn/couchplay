@@ -13,7 +13,7 @@ import 'package:couchplay/downloads/transfer.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/player/playback.dart';
-import 'package:couchplay/settings/app_settings.dart';
+import 'package:couchplay/accounts/app_settings.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';

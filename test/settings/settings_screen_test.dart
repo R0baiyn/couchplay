@@ -1,4 +1,4 @@
-import 'package:couchplay/settings/app_settings.dart';
+import 'package:couchplay/accounts/app_settings.dart';
 import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/television.dart';
 import 'package:couchplay/update/updater.dart';

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:couchplay/settings/app_settings.dart';
+import 'package:couchplay/accounts/app_settings.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

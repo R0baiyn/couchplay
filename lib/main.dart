@@ -11,11 +11,11 @@ import 'package:path_provider/path_provider.dart';
 
 import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
+import 'accounts/app_settings.dart';
 import 'app.dart';
 import 'downloads/downloads.dart';
 import 'downloads/downloads_folder.dart';
 import 'server/cloudflare_dns.dart';
-import 'settings/app_settings.dart';
 import 'television.dart';
 import 'update/android_installer.dart';
 import 'update/linux_installer.dart';

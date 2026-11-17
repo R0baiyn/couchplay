@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../accounts/account_status_screen.dart';
 import '../accounts/accounts_screen.dart';
+import '../accounts/app_settings.dart';
 import '../catalog/catalog_settings_screen.dart';
 import '../focus_ring.dart';
 import '../television.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
-import 'app_settings.dart';
 
 /// Roue des réglages : en haut à droite des onglets, ou en bas du rail, avec
 /// son libellé comme les onglets.

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../accounts/account_files.dart';
+import 'account_files.dart';
 import '../server/json_read.dart';
 
 /// Réglages globaux de l'app (pas par compte), gardés dans `settings.json`

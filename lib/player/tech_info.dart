@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
-import '../settings/app_settings.dart';
+import '../accounts/app_settings.dart';
 
 /// Vraie piste du fichier, pas l'un des choix « auto » ou « no » de mpv.
 bool isRealTrack(String id) => id != 'auto' && id != 'no';

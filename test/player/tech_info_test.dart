@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:couchplay/player/player_controls.dart';
 import 'package:couchplay/player/tech_info.dart';
-import 'package:couchplay/settings/app_settings.dart';
+import 'package:couchplay/accounts/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
