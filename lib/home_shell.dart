@@ -186,11 +186,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   final _built = <int, Widget>{};
 
   Widget _tab(int index) => switch (index) {
-    0 => const HomeScreen(),
-    1 => const CatalogScreen(kind: ContentKind.movies),
-    2 => const CatalogScreen(kind: ContentKind.series),
+    0 => const HomeScreen(settingsButton: SettingsButton()),
+    1 => const CatalogScreen(
+      kind: ContentKind.movies,
+      settingsButton: SettingsButton(),
+    ),
+    2 => const CatalogScreen(
+      kind: ContentKind.series,
+      settingsButton: SettingsButton(),
+    ),
     3 => SearchScreen(focusNode: _searchField),
-    _ => const DownloadsScreen(),
+    _ => const DownloadsScreen(settingsButton: SettingsButton()),
   };
 
   @override

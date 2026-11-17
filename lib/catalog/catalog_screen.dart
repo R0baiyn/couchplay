@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../focus_ring.dart';
 import 'catalog_index.dart';
 import '../server/models.dart';
-import '../settings/settings_screen.dart';
 import '../library/library.dart';
 import 'catalog_providers.dart';
 import 'catalog_settings.dart';
@@ -35,9 +34,13 @@ void openDetails(
 /// un bouton dans un en-tête qui se replie au défilement ouvre leur liste.
 /// Chercher un titre passe par l'onglet Recherche.
 class CatalogScreen extends ConsumerStatefulWidget {
-  const CatalogScreen({super.key, required this.kind});
+  const CatalogScreen({super.key, required this.kind, this.settingsButton});
 
   final ContentKind kind;
+
+  /// Bouton Réglages de l'en-tête, posé par la coquille : les réglages sont
+  /// au-dessus du catalogue (D-050).
+  final Widget? settingsButton;
 
   @override
   ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
@@ -125,7 +128,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       icon: const Icon(Icons.refresh),
       onPressed: categories.isLoading || _refreshing ? null : _refresh,
     ),
-    const SettingsButton(),
+    ?widget.settingsButton,
   ];
 
   @override

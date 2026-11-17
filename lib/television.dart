@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+/// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
+/// réglages en bas de ce rail plutôt que dans l'en-tête de chaque onglet :
+/// 600 dp, le seuil de Material, qu'une tablette de 8″ en portrait dépasse.
+const railMinWidth = 600.0;
+
 /// L'app tourne sur une TV (Android TV, Google TV) : la télécommande y est
 /// la seule saisie, et le clavier à l'écran couvre la moitié de l'image.
 /// Fourni par `main()`.

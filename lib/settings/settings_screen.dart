@@ -10,11 +10,6 @@ import '../update/update_dialog.dart';
 import '../update/updater.dart';
 import 'app_settings.dart';
 
-/// Largeur à partir de laquelle l'accueil a un rail sur le côté, et les
-/// réglages en bas de ce rail plutôt que dans l'en-tête de chaque onglet :
-/// 600 dp, le seuil de Material, qu'une tablette de 8″ en portrait dépasse.
-const railMinWidth = 600.0;
-
 /// Roue des réglages : en haut à droite des onglets, ou en bas du rail, avec
 /// son libellé comme les onglets.
 class SettingsButton extends StatelessWidget {

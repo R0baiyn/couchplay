@@ -6,7 +6,6 @@ import 'catalog_screen.dart';
 import 'versions.dart';
 import '../confirm.dart';
 import 'player_launch.dart';
-import '../settings/settings_screen.dart';
 import 'favorites_screen.dart';
 import 'history_screen.dart';
 import '../library/library.dart';
@@ -15,7 +14,11 @@ import '../library/library_store.dart';
 
 /// Premier onglet : « Continuer à regarder », puis « Ma liste », en rangées.
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.settingsButton});
+
+  /// Bouton Réglages de l'en-tête, posé par la coquille : les réglages sont
+  /// au-dessus du catalogue (D-050).
+  final Widget? settingsButton;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,10 +48,7 @@ class HomeScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Accueil'),
-        actions: const [SettingsButton()],
-      ),
+      appBar: AppBar(title: const Text('Accueil'), actions: [?settingsButton]),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
