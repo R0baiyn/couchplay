@@ -5,10 +5,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/main.dart';
 import 'package:couchplay/server/cloudflare_dns.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -79,6 +81,76 @@ Future<void> runFor(WidgetTester tester, Duration duration) async {
   }
 }
 
+/// Secondes affichées par le texte `m:ss` ou `h:mm:ss` de la Key [key].
+int shownSeconds(WidgetTester tester, String key) {
+  final text = tester.widget<Text>(byKey(key)).data!;
+  return text.split(':').fold(0, (total, part) => total * 60 + int.parse(part));
+}
+
+/// Les contrôles du lecteur se masquent seuls pendant la lecture : la souris
+/// sur l'image les réaffiche (survol), sans les basculer comme un clic.
+Future<TestGesture> showPlayerControls(WidgetTester tester) async {
+  final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+  await mouse.addPointer(location: tester.getCenter(byKey('player.video')));
+  await mouse.moveBy(const Offset(1, 1));
+  await tester.pump();
+  return mouse;
+}
+
+/// Sans compte : remplit le formulaire avec le compte « Salon » du faux
+/// serveur et attend l'Accueil.
+Future<void> addBenchAccount(WidgetTester tester, FakeServer server) async {
+  await waitFor(tester, byKey('accounts.name'));
+  expect(find.text('Ajouter un compte'), findsOneWidget);
+  await tester.enterText(byKey('accounts.name'), 'Salon');
+  await tester.enterText(byKey('accounts.host'), server.host);
+  await tester.enterText(byKey('accounts.username'), benchUser);
+  await tester.enterText(byKey('accounts.password'), benchPassword);
+  await tester.tap(byKey('accounts.submit'));
+  // L'onglet choisi perd sa Key (icône choisie sans Key) : l'Accueil se
+  // reconnaît aux autres onglets, le formulaire fermé.
+  await waitFor(tester, byKey('shell.tabMovies'));
+  expect(byKey('accounts.submit'), findsNothing);
+}
+
+/// Onglet Films : première catégorie, puis fiche du premier film.
+Future<void> openFirstMovie(WidgetTester tester) async {
+  await tester.tap(byKey('shell.tabMovies'));
+  final tiles = byKeyPrefix('catalog.categoryTile.');
+  final picker = byKey('catalog.categoryPicker');
+  await waitUntil(
+    tester,
+    () => tiles.evaluate().isNotEmpty || picker.evaluate().isNotEmpty,
+    what: 'liste des catégories de films',
+  );
+  if (tiles.evaluate().isNotEmpty) {
+    await tester.tap(tiles.first);
+  } else {
+    await tester.tap(picker);
+    final sheetTile = byKeyPrefix('catalog.categorySheetTile.');
+    await waitFor(tester, sheetTile);
+    await tester.tap(sheetTile.first);
+  }
+  final posters = byKeyPrefix('catalog.poster.movies-');
+  await waitFor(tester, posters);
+  await tester.tap(posters.first);
+  await waitFor(tester, byKey('catalog.play'));
+}
+
+/// Attend que la lecture avance (position > 0), sans erreur du lecteur.
+Future<void> waitPlaying(WidgetTester tester) async {
+  await waitUntil(
+    tester,
+    // L'erreur remplace la position : on ne lit celle-ci que si elle est là.
+    () =>
+        byKey('player.error').evaluate().isNotEmpty ||
+        (byKey('player.elapsed').evaluate().isNotEmpty &&
+            shownSeconds(tester, 'player.elapsed') > 0),
+    what: 'la lecture avance',
+  );
+  expect(byKey('player.error'), findsNothing);
+}
+
 /// Lance l'app comme `main`, mais sur des dossiers temporaires et un coffre
 /// simulé vide (donc sans compte). Tout est démonté et effacé à la fin du
 /// test.
@@ -109,6 +181,9 @@ Future<void> startIsolatedApp(WidgetTester tester) async {
       );
     } finally {
       container.dispose();
+      // La sortie du lecteur enregistre la position dans un isolate : le
+      // fichier encore ouvert empêcherait d'effacer le dossier (Windows).
+      await SerialFileWriter.flushAll();
       await root.delete(recursive: true);
     }
   });
