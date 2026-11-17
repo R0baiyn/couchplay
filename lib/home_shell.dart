@@ -7,11 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'catalog/catalog_index.dart';
 import 'catalog/catalog_screen.dart';
 import 'downloads/downloads_screen.dart';
-import 'focus_ring.dart';
+import 'home_shell_nav.dart';
+import 'settings/settings_screen.dart';
 import 'library/home_screen.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
-import 'settings/settings_screen.dart';
 import 'television.dart';
 import 'update/update_dialog.dart';
 import 'update/updater.dart';
@@ -32,37 +32,13 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  /// L'icône d'un onglet, à la taille de sa pastille ([width] × 32) : comme
-  /// le bouton Réglages du rail, l'anneau entoure la pastille, pas le libellé.
-  static Widget _tabIcon(IconData icon, double width, [Key? key]) => FocusRing(
-    key: key,
-    hug: true,
-    radius: 16,
-    child: SizedBox(width: width, height: 32, child: Icon(icon)),
-  );
-
-  static const _tabs = [
-    (Icons.home_outlined, Icons.home, 'Accueil', ValueKey('shell.tabHome')),
-    (Icons.movie_outlined, Icons.movie, 'Films', ValueKey('shell.tabMovies')),
-    (Icons.tv_outlined, Icons.tv, 'Séries', ValueKey('shell.tabSeries')),
-    (
-      Icons.search_outlined,
-      Icons.search,
-      'Recherche',
-      ValueKey('shell.tabSearch'),
-    ),
-    (
-      Icons.download_outlined,
-      Icons.download,
-      'Hors ligne',
-      ValueKey('shell.tabDownloads'),
-    ),
-  ];
   static const _searchTab = 3;
 
   /// Pas d'onglet « Hors ligne » sur TV (D-034) : le dernier est retiré.
   List<(IconData, IconData, String, Key)> get _shown =>
-      ref.read(televisionProvider) ? _tabs.sublist(0, _tabs.length - 1) : _tabs;
+      ref.read(televisionProvider)
+      ? shellTabs.sublist(0, shellTabs.length - 1)
+      : shellTabs;
 
   var _index = 0;
 
@@ -73,13 +49,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   /// Pour Ctrl+F : le champ de la recherche.
   final _searchField = FocusNode();
 
-  /// Sur TV, le rail et l'onglet sont deux zones : ← au bord gauche de
-  /// l'onglet revient à l'onglet choisi du rail, → depuis le rail revient au
-  /// dernier élément visité de l'onglet, et les bouts du rail le gardent.
-  /// Sans elles, les flèches visent l'élément le plus proche à l'écran (le
-  /// bouton des réglages, une affiche coupée en haut).
-  final _rail = FocusScopeNode(debugLabel: 'rail');
-  final _content = FocusScopeNode(debugLabel: 'onglet');
+  /// Les deux zones de focus du rail et de l'onglet (TV).
+  late final _zones = ShellZones(selectedIndex: () => _index);
 
   @override
   void initState() {
@@ -127,70 +98,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     HardwareKeyboard.instance.removeHandler(_onKey);
     _exitArmed?.cancel();
     _searchField.dispose();
-    _rail.dispose();
-    _content.dispose();
+    _zones.dispose();
     super.dispose();
   }
 
-  /// Les éléments que les flèches atteignent dans [scope], de haut en bas
-  /// puis de gauche à droite.
-  static List<FocusNode> _reachable(FocusScopeNode scope) =>
-      scope.traversalDescendants.where((node) => node.canRequestFocus).toList()
-        ..sort((a, b) {
-          final top = a.rect.top.compareTo(b.rect.top);
-          return top != 0 ? top : a.rect.left.compareTo(b.rect.left);
-        });
-
-  KeyEventResult _railKey(FocusNode _, KeyEvent event) {
-    if (arrowDirection(event) != TraversalDirection.right) {
-      return KeyEventResult.ignored;
-    }
-    final last = _content.focusedChild;
-    if (last != null && last.canRequestFocus) {
-      last.requestFocus();
-    } else {
-      // Première visite : le contenu (une affiche) plutôt que les boutons
-      // de l'en-tête (« Actualiser », en haut à droite).
-      final reachable = _reachable(_content);
-      bool inHeader(FocusNode node) =>
-          node.context?.findAncestorWidgetOfExactType<AppBar>() != null;
-      (reachable.where((node) => !inHeader(node)).firstOrNull ??
-              reachable.firstOrNull)
-          ?.requestFocus();
-    }
-    return KeyEventResult.handled;
-  }
-
-  KeyEventResult _contentKey(FocusNode _, KeyEvent event) {
-    final direction = arrowDirection(event);
-    if (direction == null) return KeyEventResult.ignored;
-    final focused = FocusManager.instance.primaryFocus;
-    // La zone elle-même a le focus : l'élément qui l'avait a disparu (liste
-    // vidée, tuile retirée). Une flèche le redonne au premier élément de
-    // l'onglet, ou au rail s'il n'y en a aucun : sinon la télécommande ne
-    // répondrait plus.
-    if (focused is FocusScopeNode) {
-      final first = _reachable(_content).firstOrNull;
-      if (first != null) {
-        first.requestFocus();
-      } else {
-        _focusTab();
-      }
-      return KeyEventResult.handled;
-    }
-    if (direction != TraversalDirection.left) return KeyEventResult.ignored;
-    if (focused == null || !focused.focusInDirection(TraversalDirection.left)) {
-      _focusTab();
-    }
-    return KeyEventResult.handled;
-  }
-
-  /// L'onglet choisi, dans le rail.
-  void _focusTab() {
-    // Les onglets d'abord, de haut en bas, puis les réglages.
-    final tabs = _reachable(_rail);
-    if (_index < tabs.length) tabs[_index].requestFocus();
-  }
+  void _focusTab() => _zones.focusTab();
 
   /// Sur TV, le lecteur se ferme parfois seul (fin du dernier épisode,
   /// veille) ou au premier de deux appuis rapprochés : le retour suivant
@@ -340,60 +252,24 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         body: Row(
           children: [
             zone(
-              _rail,
-              _railKey,
+              _zones.rail,
+              _zones.railKey,
               // Peu de hauteur (fenêtre basse, clavier ouvert) : le rail défile
               // au lieu de superposer les réglages aux onglets.
-              LayoutBuilder(
-                builder: (context, constraints) => SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: IntrinsicHeight(
-                      child: NavigationRail(
-                        selectedIndex: _index,
-                        onDestinationSelected: _select,
-                        labelType: NavigationRailLabelType.all,
-                        // Les réglages, tout en bas du rail.
-                        trailingAtBottom: true,
-                        trailing: const Padding(
-                          padding: EdgeInsets.only(bottom: 16),
-                          child: SettingsButton(inRail: true),
-                        ),
-                        destinations: [
-                          for (final (icon, selected, label, key) in tabs)
-                            NavigationRailDestination(
-                              icon: _tabIcon(icon, 56, key),
-                              selectedIcon: _tabIcon(selected, 56),
-                              label: Text(label),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              ShellRail(tabs: tabs, selectedIndex: _index, onSelect: _select),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: zone(_content, _contentKey, body)),
+            Expanded(child: zone(_zones.content, _zones.contentKey, body)),
           ],
         ),
       );
     }
     return Scaffold(
       body: body,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: ShellBottomBar(
+        tabs: tabs,
         selectedIndex: _index,
-        onDestinationSelected: _select,
-        destinations: [
-          for (final (icon, selected, label, key) in tabs)
-            NavigationDestination(
-              icon: _tabIcon(icon, 64, key),
-              selectedIcon: _tabIcon(selected, 64),
-              label: label,
-            ),
-        ],
+        onSelect: _select,
       ),
     );
   }

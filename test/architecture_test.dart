@@ -44,7 +44,12 @@ const allowedArcs = <String>[
 
 const composition = 'composition';
 const shared = 'racine';
-const compositionFiles = {'main.dart', 'app.dart', 'home_shell.dart'};
+const compositionFiles = {
+  'main.dart',
+  'app.dart',
+  'home_shell.dart',
+  'home_shell_nav.dart',
+};
 
 class Arc {
   const Arc(this.source, this.target, this.where);
