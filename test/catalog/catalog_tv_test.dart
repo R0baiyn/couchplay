@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:couchplay/home_shell.dart';
 import 'package:couchplay/catalog/movie_screen.dart';
-import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/catalog/series_screen.dart';
 import 'package:couchplay/library/history_screen.dart';
 import 'package:couchplay/library/library.dart';
@@ -47,7 +46,7 @@ void main() {
         openMovies: false,
         overrides: [televisionProvider.overrideWithValue(true)],
       );
-      await tester.tap(find.text('Recherche'));
+      await tapLabel(tester, 'Recherche');
       await settle(tester);
       expect(find.byType(EditableText), findsNothing);
 
@@ -175,9 +174,11 @@ void main() {
       'fiche série : le focus descend dans les épisodes, la page suit',
       (tester) async {
         await pumpTv(tester, seriesInfo: longSeries());
-        await tester.tap(find.text('Séries'));
+        await tapLabel(tester, 'Séries');
         await settle(tester);
-        await tester.tap(find.byType(PosterTile).first);
+        await tester.tap(
+          find.byKey(const ValueKey('catalog.poster.series-17')),
+        );
         await settle(tester);
         expect(find.byType(SeriesScreen), findsOneWidget);
 
@@ -245,7 +246,7 @@ void main() {
         expect(focused(), 'Historique');
         await press(tester, LogicalKeyboardKey.select);
         expect(find.byType(HistoryScreen), findsOneWidget);
-        await tester.tap(find.text("Effacer l'historique"));
+        await tapLabel(tester, "Effacer l'historique");
         await settle(tester);
         expect(focused(), 'Annuler');
         await press(tester, LogicalKeyboardKey.arrowRight);
@@ -415,7 +416,9 @@ void main() {
     expect(rail().selectedIndex, 1);
 
     // Une fiche se ferme d'abord.
-    await tester.tap(find.text('Horizon (2024)'));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.poster.movies-144016')),
+    );
     await settle(tester);
     expect(find.byType(MovieScreen), findsOneWidget);
     expect(await back(), isTrue);
@@ -423,7 +426,7 @@ void main() {
     expect(rail().selectedIndex, 1);
 
     // Retour de l'onglet vers l'Accueil : déjà vérifié par le test du focus TV.
-    await tester.tap(find.text('Accueil'));
+    await tapLabel(tester, 'Accueil');
     await settle(tester);
     expect(rail().selectedIndex, 0);
 

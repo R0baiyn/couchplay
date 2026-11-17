@@ -28,9 +28,9 @@ const _episode = PlayItem.episode(
 );
 
 /// Pastille « téléchargé » d'une affiche de la grille.
-Finder _badge(String title) => find.descendant(
-  of: find.ancestor(of: find.text(title), matching: find.byType(PosterTile)),
-  matching: find.byIcon(Icons.download_done),
+Finder _badge(String posterId) => find.descendant(
+  of: find.byKey(ValueKey('catalog.poster.$posterId')),
+  matching: find.byKey(const ValueKey('catalog.badgeDownloaded')),
 );
 
 void main() {
@@ -80,8 +80,8 @@ void main() {
       download(movie, DownloadStatus.ready),
       download(_episode, DownloadStatus.ready),
     ]);
-    expect(_badge('Mirage'), findsOneWidget);
-    expect(_badge('Les Veilleurs'), findsOneWidget);
+    expect(_badge('movies-1'), findsOneWidget);
+    expect(_badge('series-7'), findsOneWidget);
     expect(
       tester.widget<Icon>(find.byIcon(Icons.download_done).first).semanticLabel,
       'Téléchargé',
@@ -107,7 +107,7 @@ void main() {
     final fake = await pumpGrid(tester, [
       download(movie, DownloadStatus.ready),
     ]);
-    expect(_badge('Mirage'), findsOneWidget);
+    expect(_badge('movies-1'), findsOneWidget);
 
     fake.state = const DownloadsState();
     await tester.pump();
@@ -168,9 +168,9 @@ void main() {
         },
       ),
     );
-    expect(_badge('Mirage'), findsOneWidget);
-    expect(find.byIcon(Icons.favorite), findsOneWidget);
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(_badge('movies-1'), findsOneWidget);
+    expect(find.byKey(const ValueKey('catalog.badgeFavorite')), findsOneWidget);
+    expect(find.byKey(const ValueKey('catalog.badgeWatched')), findsOneWidget);
     final tile = tester.getRect(
       find.ancestor(of: find.text('Mirage'), matching: find.byType(PosterTile)),
     );

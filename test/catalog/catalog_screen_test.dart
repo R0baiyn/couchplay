@@ -38,7 +38,9 @@ void main() {
     // les trois versions de « Horizon » en une seule affiche.
     expect(find.text('Horizon (2024)'), findsOneWidget);
 
-    await tester.tap(find.text('Horizon (2024)'));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.poster.movies-144016')),
+    );
     await settle(tester);
 
     expect(find.byType(MovieScreen), findsOneWidget);
@@ -71,7 +73,9 @@ void main() {
       ],
     );
     final offer = find.text('Version 0.1.1 disponible');
-    await tester.tap(find.text('Horizon (2024)'));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.poster.movies-144016')),
+    );
     await settle(tester);
 
     // Trouvée pendant qu'une fiche est ouverte : rien par-dessus.
@@ -97,13 +101,13 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.text('Séries'));
+    await tapLabel(tester, 'Séries');
     await settle(tester);
 
     expect(find.text('Séries PLATEFORME A'), findsOneWidget);
     expect(find.text('Séries SUB-AR'), findsNothing);
 
-    await tester.tap(find.text('Les Veilleurs'));
+    await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
 
     expect(find.byType(SeriesScreen), findsOneWidget);
@@ -113,8 +117,11 @@ void main() {
     await tester.scrollUntilVisible(firstEpisode, 300);
     expect(firstEpisode, findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('Saison 2'), -300);
-    await tester.tap(find.text('Saison 2'));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('catalog.seasonChip.2')),
+      -300,
+    );
+    await tester.tap(find.byKey(const ValueKey('catalog.seasonChip.2')));
     await tester.pump();
     expect(firstEpisode, findsNothing);
     await tester.scrollUntilVisible(find.textContaining('S02E01'), 300);
@@ -151,8 +158,8 @@ void main() {
 
     // Le bouton montre la catégorie choisie et ouvre le panneau ; toucher à
     // côté le ferme sans rien changer.
-    final picker = find.widgetWithText(OutlinedButton, 'Films 4K');
-    expect(picker, findsOneWidget);
+    final picker = find.byKey(const ValueKey('catalog.categoryPicker'));
+    expect(find.widgetWithText(OutlinedButton, 'Films 4K'), findsOneWidget);
     await tester.tap(picker);
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsOneWidget);
@@ -165,17 +172,14 @@ void main() {
     await tester.tap(picker);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(
-        of: find.byType(BottomSheet),
-        matching: find.text('FR · Drame'),
-      ),
+      find.byKey(const ValueKey('catalog.categorySheetTile.118')),
     );
     await settle(tester);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'FR · Drame'), findsOneWidget);
 
     // Descendre replie l'en-tête, remonter un peu le fait revenir.
-    final refresh = find.byTooltip('Actualiser').hitTestable();
+    final refresh = find.byKey(const ValueKey('catalog.refresh')).hitTestable();
     expect(refresh, findsOneWidget);
     await tester.dragFrom(const Offset(200, 400), const Offset(0, -300));
     await tester.pumpAndSettle();
@@ -219,7 +223,7 @@ void main() {
   ) async {
     await pumpApp(tester);
     // Une catégorie de deux films : Horizon, puis Marée Haute.
-    await openCategory(tester, 'FR · FILMS HD');
+    await openCategory(tester, '148');
 
     // Tab jusqu'à la première affiche (après les onglets et les catégories),
     // puis flèche droite : la seconde.
@@ -252,11 +256,11 @@ void main() {
     await pumpApp(tester);
     expect(find.text('AR · ARABE أفلام عربية'), findsNothing);
 
-    await tester.tap(find.text('Réglages'));
+    await tapLabel(tester, 'Réglages');
     await settle(tester);
-    await tester.tap(find.text('Catalogue'));
+    await tapLabel(tester, 'Catalogue');
     await settle(tester);
-    await tester.tap(find.text('Arabe'));
+    await tester.tap(find.byKey(const ValueKey('catalog.tag.AR')));
     await settle(tester);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
@@ -285,7 +289,7 @@ void main() {
     final fake = server as FakeAdapter;
     final before = fake.calls;
 
-    await tester.tap(find.byTooltip('Actualiser'));
+    await tester.tap(find.byKey(const ValueKey('catalog.refresh')));
     await tester.pump();
     // Pendant le rechargement, la grille reste là.
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
@@ -308,7 +312,11 @@ void main() {
     final fake = server as FakeAdapter;
     final before = fake.calls;
 
-    await tester.fling(find.text('Horizon (2024)'), const Offset(0, 400), 1000);
+    await tester.fling(
+      find.byKey(const ValueKey('catalog.grid')),
+      const Offset(0, 400),
+      1000,
+    );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await settle(tester);
@@ -366,7 +374,9 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.text('Horizon (2024)'));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.poster.movies-144016')),
+    );
     await settle(tester);
 
     ChoiceChip chip(String label) =>
@@ -375,12 +385,12 @@ void main() {
     expect(chip('FHD VF').selected, isFalse);
     expect(chip('HD VF').selected, isFalse);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'HD VF'));
+    await tester.tap(find.byKey(const ValueKey('catalog.versionChip.144014')));
     await settle(tester);
     expect(chip('HD VF').selected, isTrue);
     expect(chip('4K').selected, isFalse);
 
-    await tester.tap(find.byTooltip('Ajouter à ma liste'));
+    await tester.tap(find.byKey(const ValueKey('catalog.favorite')));
     await settle(tester);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(MovieScreen)),
@@ -396,7 +406,9 @@ void main() {
     expect(find.byType(EditableText), findsNothing);
 
     // Sur une fiche, Ctrl+F et « / » ne font rien.
-    await tester.tap(find.text('Horizon (2024)'));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.poster.movies-144016')),
+    );
     await settle(tester);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
@@ -432,12 +444,14 @@ void main() {
       return routes.fetch(options, null, null);
     });
     await pumpApp(tester);
-    await tester.tap(find.text('Horizon (2024)'));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.poster.movies-144016')),
+    );
     await settle(tester);
     expect(find.text('Réessayer'), findsOneWidget);
     expect(find.text('Lecture'), findsNothing);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'HD VF'));
+    await tester.tap(find.byKey(const ValueKey('catalog.versionChip.144014')));
     await settle(tester);
     expect(find.text('Réessayer'), findsNothing);
     expect(find.text('Lecture'), findsOneWidget);
@@ -472,14 +486,14 @@ void main() {
     expect(fullLists, 1);
 
     added = true;
-    await tester.tap(find.byTooltip('Actualiser'));
+    await tester.tap(find.byKey(const ValueKey('catalog.refresh')));
     await settle(tester);
     for (var i = 0; i < 40 && fullLists < 2; i++) {
       await settle(tester);
     }
     expect(fullLists, 2, reason: 'la liste complète redemandée, une fois');
 
-    await tester.tap(find.text('Recherche'));
+    await tapLabel(tester, 'Recherche');
     await settle(tester);
     await tester.enterText(
       find.descendant(

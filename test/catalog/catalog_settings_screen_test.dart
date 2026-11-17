@@ -34,14 +34,14 @@ void main() {
     );
     await settle(tester);
 
-    await tester.tap(find.text('Films'));
+    await tester.tap(find.byKey(const ValueKey('catalog.kindTile.movies')));
     await settle(tester);
     expect(
       find.byType(CheckboxListTile, skipOffstage: false).evaluate().length,
       lessThan(60),
     );
 
-    final first = find.widgetWithText(CheckboxListTile, 'FR · Catégorie 0');
+    final first = find.byKey(const ValueKey('catalog.categoryCheck.movies.0'));
     expect(tester.widget<CheckboxListTile>(first).value, isTrue);
     await tester.tap(first);
     await tester.runAsync(

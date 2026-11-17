@@ -54,15 +54,12 @@ void main() {
       ),
     );
     await settle(tester);
-    await tester.tap(find.text('HD'));
+    await tester.tap(find.byKey(const ValueKey('catalog.versionChip.901')));
     await tester.pump();
 
     expect(find.text('Fichier introuvable'), findsNothing);
     final play = tester.widget<ButtonStyleButton>(
-      find.ancestor(
-        of: find.text('Lecture'),
-        matching: find.bySubtype<ButtonStyleButton>(),
-      ),
+      find.byKey(const ValueKey('catalog.play')),
     );
     expect(play.onPressed, isNull);
     // Sans fichier connu, rien à télécharger non plus.
@@ -102,9 +99,9 @@ void main() {
       ),
     );
     await settle(tester);
-    await tester.tap(find.text('HD'));
+    await tester.tap(find.byKey(const ValueKey('catalog.versionChip.902')));
     await settle(tester);
-    await tester.tap(find.text('Télécharger'));
+    await tester.tap(find.byKey(const ValueKey('catalog.download')));
     await tester.pump();
 
     expect(fake.calls, ['add movie:902']);

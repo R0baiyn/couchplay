@@ -18,9 +18,9 @@ void main() {
   testWidgets('progression enregistrée (toutes les 10 s sous le lecteur) : '
       "seul l'épisode se refait, pas la fiche", (tester) async {
     await pumpApp(tester, openMovies: false);
-    await tester.tap(find.text('Séries'));
+    await tapLabel(tester, 'Séries');
     await settle(tester);
-    await tester.tap(find.text('Les Veilleurs'));
+    await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
     expect(find.byType(LinearProgressIndicator), findsNothing);
 
@@ -124,19 +124,21 @@ void main() {
       openMovies: false,
       overrides: [downloadsProvider.overrideWith(() => fake)],
     );
-    await tester.tap(find.text('Séries'));
+    await tapLabel(tester, 'Séries');
     await settle(tester);
-    await tester.tap(find.text('Les Veilleurs'));
+    await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
 
     // Un bouton par épisode de la saison 1.
     expect(find.byTooltip('Télécharger'), findsNWidgets(3));
-    await tester.tap(find.byTooltip('Télécharger').at(1));
+    await tester.tap(
+      find.byKey(const ValueKey('catalog.episodeDownload.6913')),
+    );
     await tester.pump();
     expect(fake.calls, ['add episode:6913']);
 
     fake.calls.clear();
-    await tester.tap(find.text('Télécharger la saison'));
+    await tester.tap(find.byKey(const ValueKey('catalog.seasonDownload')));
     await tester.pump();
     expect(fake.calls, ['add episode:6912 episode:6913 episode:6914']);
   });
@@ -162,14 +164,14 @@ void main() {
       openMovies: false,
       overrides: [downloadsProvider.overrideWith(() => fake)],
     );
-    await tester.tap(find.text('Séries'));
+    await tapLabel(tester, 'Séries');
     await settle(tester);
-    await tester.tap(find.text('Les Veilleurs'));
+    await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
 
     final button = tester.widget<OutlinedButton>(
-      find.ancestor(
-        of: find.text('Saison téléchargée'),
+      find.descendant(
+        of: find.byKey(const ValueKey('catalog.seasonDownload')),
         matching: find.bySubtype<OutlinedButton>(),
       ),
     );

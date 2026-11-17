@@ -49,7 +49,7 @@ void main() {
       'sans décodage du cache jeté avant la requête', (tester) async {
     await pumpCountingApp(tester);
 
-    await tester.tap(find.byTooltip('Actualiser'));
+    await tester.tap(find.byKey(const ValueKey('catalog.refresh')));
     await settle(tester);
 
     expect(loads, 2);
