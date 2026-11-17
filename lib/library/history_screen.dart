@@ -26,13 +26,19 @@ class HistoryScreen extends ConsumerWidget {
         actions: [
           if (entries.isNotEmpty)
             TextButton(
+              key: const ValueKey('library.historyClear'),
               onPressed: () => _confirmClear(context, ref),
               child: const Text('Effacer l\'historique'),
             ),
         ],
       ),
       body: entries.isEmpty
-          ? const Center(child: Text('Rien regardé pour l\'instant'))
+          ? const Center(
+              child: Text(
+                'Rien regardé pour l\'instant',
+                key: ValueKey('library.historyEmpty'),
+              ),
+            )
           : ListView.builder(
               itemCount: entries.length,
               itemBuilder: (context, i) =>
@@ -73,7 +79,12 @@ class _HistoryRow extends ConsumerWidget {
       children: [
         Expanded(
           child: ListTile(
-            title: FocusRing(child: Text(item.shortTitle)),
+            title: FocusRing(
+              child: Text(
+                item.shortTitle,
+                key: ValueKey('library.historyRow.${item.key}'),
+              ),
+            ),
             subtitle: Text(
               '${item.episodeTitle == null ? '' : '${item.episodeTitle} · '}'
               '${formatDate(entry.updatedAt)} · $state',
@@ -88,6 +99,7 @@ class _HistoryRow extends ConsumerWidget {
           ),
         ),
         IconButton(
+          key: ValueKey('library.historyRemove.${item.key}'),
           tooltip: 'Retirer de l\'historique',
           icon: const Icon(Icons.close),
           onPressed: () =>

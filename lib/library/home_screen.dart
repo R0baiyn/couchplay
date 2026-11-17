@@ -62,6 +62,7 @@ class HomeScreen extends ConsumerWidget {
                   next != null
                       ? _tile(
                           key: ValueKey(next.key),
+                          tileKey: ValueKey('library.continueTile.${next.key}'),
                           title: next.shortTitle,
                           imageUrl: next.poster,
                           onTap: () => openPlayer(context, ref, next),
@@ -69,6 +70,9 @@ class HomeScreen extends ConsumerWidget {
                         )
                       : _tile(
                           key: ValueKey(entry.item.key),
+                          tileKey: ValueKey(
+                            'library.continueTile.${entry.item.key}',
+                          ),
                           title: entry.item.shortTitle,
                           imageUrl: entry.item.poster,
                           progress: entry.fraction,
@@ -90,6 +94,7 @@ class HomeScreen extends ConsumerWidget {
             favorites.isEmpty
                 ? null
                 : TextButton(
+                    key: const ValueKey('library.favoritesAll'),
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute<void>(
@@ -103,6 +108,7 @@ class HomeScreen extends ConsumerWidget {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text(
+                key: ValueKey('library.favoritesEmpty'),
                 'Ma liste est vide.\n'
                 'Le cœur d\'une fiche de film ou de série l\'y ajoute.',
               ),
@@ -117,6 +123,7 @@ class HomeScreen extends ConsumerWidget {
                 final favorite = favorites[i];
                 return _tile(
                   key: ValueKey(favorite.key),
+                  tileKey: ValueKey('library.favoriteTile.${favorite.key}'),
                   title: favorite.item.parsedName.display,
                   imageUrl: favorite.poster,
                   onTap: () =>
@@ -132,6 +139,7 @@ class HomeScreen extends ConsumerWidget {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
+                  key: const ValueKey('library.historyButton'),
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
@@ -159,6 +167,7 @@ class HomeScreen extends ConsumerWidget {
         final entry = shown[i];
         return _tile(
           key: ValueKey('seen:${entry.item.key}'),
+          tileKey: ValueKey('library.seenTile.${entry.item.key}'),
           downloadKey: entry.item.key,
           title: entry.item.shortTitle,
           imageUrl: entry.item.poster,
@@ -201,6 +210,7 @@ const _rowLength = 20;
 /// pastille « téléchargé » si elle est prête.
 Widget _tile({
   required ValueKey<String> key,
+  required ValueKey<String> tileKey,
   required String title,
   required String? imageUrl,
   required VoidCallback onTap,
@@ -212,6 +222,7 @@ Widget _tile({
   width: _tileWidth,
   child: Consumer(
     builder: (context, ref, _) => PosterTile(
+      key: tileKey,
       title: title,
       imageUrl: imageUrl,
       onTap: onTap,

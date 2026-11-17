@@ -42,15 +42,24 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 segments: const [
                   ButtonSegment(
                     value: null,
-                    label: FocusRing(child: Text('Tout')),
+                    label: FocusRing(
+                      key: ValueKey('library.kindFilter.all'),
+                      child: Text('Tout'),
+                    ),
                   ),
                   ButtonSegment(
                     value: ContentKind.movies,
-                    label: FocusRing(child: Text('Films')),
+                    label: FocusRing(
+                      key: ValueKey('library.kindFilter.movies'),
+                      child: Text('Films'),
+                    ),
                   ),
                   ButtonSegment(
                     value: ContentKind.series,
-                    label: FocusRing(child: Text('Séries')),
+                    label: FocusRing(
+                      key: ValueKey('library.kindFilter.series'),
+                      child: Text('Séries'),
+                    ),
                   ),
                 ],
                 selected: {_kind},
@@ -62,7 +71,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
           if (entries.isEmpty)
             const SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: Text('Rien dans ma liste ici.')),
+              child: Center(
+                child: Text(
+                  'Rien dans ma liste ici.',
+                  key: ValueKey('library.favoritesNone'),
+                ),
+              ),
             )
           else
             SliverPadding(
