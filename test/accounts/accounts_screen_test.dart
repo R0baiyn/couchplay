@@ -121,7 +121,7 @@ void main() {
     ]);
     expect(container.read(activeAccountProvider)!.id, 'a');
 
-    await tester.tap(find.text('Compte b'));
+    await tester.tap(find.byKey(const ValueKey('accounts.row.b')));
     await settle(tester);
 
     expect(container.read(activeAccountProvider)!.id, 'b');
@@ -142,10 +142,12 @@ void main() {
       await File('${data.path}/library.json').writeAsString('{}');
     });
 
-    await tester.tap(find.byTooltip('Supprimer').first);
+    await tester.tap(find.byKey(const ValueKey('accounts.delete.a')));
     await tester.pumpAndSettle();
     expect(find.text('Supprimer « Compte a » ?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+    // Bouton de confirm.dart : Key à venir (S037).
+    final confirmDelete = find.widgetWithText(FilledButton, 'Supprimer');
+    await tester.tap(confirmDelete);
     await settle(tester);
 
     expect(container.read(accountsProvider).accounts.map((a) => a.id), ['b']);
@@ -156,9 +158,11 @@ void main() {
   testWidgets('annuler la suppression ne change rien', (tester) async {
     final container = await pumpAccounts(tester, [_account('a')]);
 
-    await tester.tap(find.byTooltip('Supprimer'));
+    await tester.tap(find.byKey(const ValueKey('accounts.delete.a')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Annuler'));
+    // Bouton de confirm.dart : Key à venir (S037), finder par texte en attendant.
+    final cancel = find.text('Annuler');
+    await tester.tap(cancel);
     await settle(tester);
 
     expect(container.read(accountsProvider).accounts, hasLength(1));
@@ -169,9 +173,11 @@ void main() {
   ) async {
     await pumpAccounts(tester, [_account('a')]);
 
-    await tester.tap(find.byTooltip('Supprimer'));
+    await tester.tap(find.byKey(const ValueKey('accounts.delete.a')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+    // Bouton de confirm.dart : Key à venir (S037).
+    final confirmDelete = find.widgetWithText(FilledButton, 'Supprimer');
+    await tester.tap(confirmDelete);
     await settle(tester);
 
     expect(find.text('Ajouter un compte'), findsOneWidget);
@@ -184,10 +190,13 @@ void main() {
       _account('b'),
     ]);
 
-    await tester.tap(find.byTooltip('Modifier').last);
+    await tester.tap(find.byKey(const ValueKey('accounts.edit.b')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).at(3), 'nouveau');
-    await tester.tap(find.text('Enregistrer'));
+    await tester.enterText(
+      find.byKey(const ValueKey('accounts.password')),
+      'nouveau',
+    );
+    await tester.tap(find.byKey(const ValueKey('accounts.submit')));
     await settle(tester);
 
     final b = container
@@ -204,18 +213,26 @@ void main() {
   ) async {
     final container = await pumpAccounts(tester, [_account('a')]);
 
-    await tester.tap(find.byTooltip('Modifier'));
+    await tester.tap(find.byKey(const ValueKey('accounts.edit.a')));
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<TextFormField>(find.byType(TextFormField).at(3))
+          .widget<TextFormField>(
+            find.descendant(
+              of: find.byKey(const ValueKey('accounts.password')),
+              matching: find.byType(TextFormField),
+            ),
+          )
           .controller!
           .text,
       isEmpty,
       reason: 'le mot de passe enregistré n\'est jamais affiché',
     );
-    await tester.enterText(find.byType(TextFormField).at(0), 'Chambre');
-    await tester.tap(find.text('Enregistrer'));
+    await tester.enterText(
+      find.byKey(const ValueKey('accounts.name')),
+      'Chambre',
+    );
+    await tester.tap(find.byKey(const ValueKey('accounts.submit')));
     await settle(tester);
 
     final a = container.read(accountsProvider).accounts.single;

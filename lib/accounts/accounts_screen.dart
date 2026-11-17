@@ -65,6 +65,7 @@ class AccountsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Comptes')),
       floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('accounts.add'),
         onPressed: () => _edit(context),
         icon: const Icon(Icons.add),
         label: const Text('Ajouter un compte'),
@@ -80,6 +81,7 @@ class AccountsScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: ListTile(
+                    key: ValueKey('accounts.row.${account.id}'),
                     leading: Icon(
                       account.id == state.activeId
                           ? Icons.radio_button_checked
@@ -95,11 +97,13 @@ class AccountsScreen extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
+                  key: ValueKey('accounts.edit.${account.id}'),
                   tooltip: 'Modifier',
                   icon: const Icon(Icons.edit),
                   onPressed: () => _edit(context, account),
                 ),
                 IconButton(
+                  key: ValueKey('accounts.delete.${account.id}'),
                   tooltip: 'Supprimer',
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () => _remove(context, ref, account),
