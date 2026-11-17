@@ -96,4 +96,36 @@ void main() {
     expect(find.text('Hors ligne'), findsNothing);
     expect(find.byKey(const ValueKey('shell.tabDownloads')), findsNothing);
   });
+
+  // Écran étroit : pas de rail, chaque onglet porte son bouton Réglages dans
+  // l'en-tête (passé par la coquille depuis S042).
+  testWidgets('barre du bas : Réglages s ouvre depuis chaque onglet', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      size: const Size(360, 740),
+      openMovies: false,
+      overrides: [downloadsProvider.overrideWith(FakeDownloads.new)],
+    );
+    // L'app s'ouvre sur l'accueil : son onglet choisi n'a pas de Key.
+    for (final tab in [
+      null,
+      'shell.tabMovies',
+      'shell.tabSeries',
+      'shell.tabSearch',
+      'shell.tabDownloads',
+    ]) {
+      if (tab != null) {
+        await tester.tap(find.byKey(ValueKey(tab)));
+        await settle(tester);
+      }
+      await tester.tap(find.byKey(const ValueKey('settings.open')));
+      await settle(tester);
+      expect(find.byType(SettingsScreen), findsOneWidget, reason: tab);
+      await tester.pageBack();
+      await settle(tester);
+      expect(find.byType(SettingsScreen), findsNothing, reason: tab);
+    }
+  });
 }
