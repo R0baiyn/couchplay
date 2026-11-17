@@ -135,3 +135,34 @@ final accountFilesProvider = Provider<AccountFiles>(
 /// `<dossier local de l'app>/downloads/<id>/`, créé dans `main()` (voir
 /// `downloadsRoot`). `null` (tests) : pas de téléchargement.
 final downloadFilesProvider = Provider<AccountFiles?>((ref) => null);
+
+/// Téléchargements de chaque compte, vus de sa suppression
+/// ([whileDownloadsReleased]). Tenus par la file des téléchargements, hors
+/// de ses providers (ils dépendent du compte actif) ; déclarés ici, sous
+/// elle, pour que la suppression d'un compte n'importe pas la file (D-051).
+abstract final class AccountDownloads {
+  /// Comptes en cours de suppression : rien ne repart.
+  static final released = <String>{};
+
+  /// Arrêt du téléchargement en cours de chaque compte, pour
+  /// [whileDownloadsReleased] et pour la construction suivante du même
+  /// compte.
+  static final running = <String, Future<void> Function()>{};
+}
+
+/// Suppression du compte [accountId] : arrête d'abord son téléchargement en
+/// cours et attend que son fichier soit fermé, puis lance [delete] (Windows
+/// n'efface pas un fichier ouvert). Rien ne repart pour ce compte pendant
+/// ce temps.
+Future<void> whileDownloadsReleased(
+  String accountId,
+  Future<void> Function() delete,
+) async {
+  AccountDownloads.released.add(accountId);
+  try {
+    await AccountDownloads.running[accountId]?.call();
+    await delete();
+  } finally {
+    AccountDownloads.released.remove(accountId);
+  }
+}

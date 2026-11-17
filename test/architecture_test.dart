@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 // Arcs permis entre dossiers de `lib/` (D-047, D-048), « source -> cible ».
 // Ne peut que rétrécir ; un arc retiré du code se retire d'ici.
 const allowedArcs = <String>[
-  'accounts -> downloads',
   'accounts -> server',
   'catalog -> accounts',
   'catalog -> downloads',

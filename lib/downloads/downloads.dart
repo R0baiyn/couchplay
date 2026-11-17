@@ -8,13 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../accounts/account_files.dart';
 import '../accounts/account_store.dart';
+import '../accounts/app_settings.dart';
 import '../accounts/server_session.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
-import '../accounts/app_settings.dart';
 import '../television.dart';
 import 'download.dart';
 import 'free_space.dart';
@@ -261,15 +261,6 @@ final class _Session {
 class DownloadsNotifier extends Notifier<DownloadsState> {
   _Session? _session;
 
-  /// Comptes en cours de suppression ([whileDownloadsReleased]) : rien ne
-  /// repart.
-  static final _released = <String>{};
-
-  /// Téléchargement en cours de chaque compte, pour [whileDownloadsReleased]
-  /// et pour la construction suivante du même compte : lu hors du provider,
-  /// qui dépend du compte actif.
-  static final _running = <String, Future<void> Function()>{};
-
   @override
   DownloadsState build() {
     _session = null;
@@ -481,7 +472,7 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
   /// Une entrée du compte encore actif réclame l'affiche [name].
   bool _claimed(_Session session, String name) =>
       !session.disposed &&
-      !_released.contains(session.accountId) &&
+      !AccountDownloads.released.contains(session.accountId) &&
       state.entries.values.any((d) => d.posterName == name);
 
   /// Met en pause : la file passe au suivant.
@@ -573,7 +564,7 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
 
   bool _blocked(_Session session) =>
       session.disposed ||
-      _released.contains(session.accountId) ||
+      AccountDownloads.released.contains(session.accountId) ||
       ref.read(downloadHoldsProvider).reasons.isNotEmpty;
 
   /// Lance le premier téléchargement en attente, s'il n'y en a aucun en
@@ -585,7 +576,7 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     final account = session.accountId;
     // Le même compte rechargé (User-Agent modifié) : le transfert de la
     // construction précédente ferme d'abord son fichier partiel.
-    if (_running[account] case final previous?) {
+    if (AccountDownloads.running[account] case final previous?) {
       await previous();
       if (session.current != null || _blocked(session)) return;
     }
@@ -601,9 +592,11 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
       return done;
     }
 
-    _running[account] = stop;
+    AccountDownloads.running[account] = stop;
     await done;
-    if (identical(_running[account], stop)) _running.remove(account);
+    if (identical(AccountDownloads.running[account], stop)) {
+      AccountDownloads.running.remove(account);
+    }
     session.current = null;
     if (session.disposed) return;
     ref.read(downloadProgressProvider.notifier).publish(null);
@@ -768,22 +761,5 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     if (session.disposed) return Future.value();
     state = DownloadsState(entries: entries);
     return session.store.save(entries);
-  }
-}
-
-/// Suppression du compte [accountId] : arrête d'abord son téléchargement en
-/// cours et attend que son fichier soit fermé, puis lance [delete] (Windows
-/// n'efface pas un fichier ouvert). Rien ne repart pour ce compte pendant
-/// ce temps.
-Future<void> whileDownloadsReleased(
-  String accountId,
-  Future<void> Function() delete,
-) async {
-  DownloadsNotifier._released.add(accountId);
-  try {
-    await DownloadsNotifier._running[accountId]?.call();
-    await delete();
-  } finally {
-    DownloadsNotifier._released.remove(accountId);
   }
 }
