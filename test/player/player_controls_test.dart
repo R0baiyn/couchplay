@@ -286,7 +286,9 @@ void main() {
     tester,
   ) async {
     await pumpControls(tester, volume: false);
-    expect(find.byTooltip('Couper le son'), findsNothing);
+    expect(find.byKey(const ValueKey('player.mute')), findsNothing);
+    expect(find.byKey(const ValueKey('player.volume')), findsNothing);
+    expect(find.byKey(const ValueKey('player.progress')), findsOneWidget);
     expect(find.byType(Slider), findsOneWidget, reason: 'la progression seule');
   });
 }

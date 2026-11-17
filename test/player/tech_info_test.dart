@@ -97,12 +97,14 @@ void main() {
     await pumpControls(tester, debug: false);
     expect(find.textContaining('1920'), findsNothing);
     expect(find.textContaining('h264'), findsNothing);
+    expect(find.byKey(const ValueKey('player.techInfo')), findsNothing);
   });
 
   testWidgets('option cochée : résolution et codecs visibles', (tester) async {
     await pumpControls(tester, debug: true);
     expect(find.textContaining('1920 × 1080 · h264'), findsOneWidget);
     expect(find.textContaining('aac · 5.1'), findsOneWidget);
+    expect(find.byKey(const ValueKey('player.techInfo')), findsOneWidget);
   });
 
   group('sameTitleTrack', () {
