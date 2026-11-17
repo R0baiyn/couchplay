@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account_store.dart';
+import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/main.dart';
 import 'package:couchplay/server/cloudflare_dns.dart';
 import 'package:flutter/material.dart';
@@ -97,10 +98,14 @@ Future<void> startIsolatedApp(WidgetTester tester) async {
     television: false,
   );
   addTearDown(() async {
-    // Démonter l'app, laisser finir l'arrêt du flux (il écrit encore dans
-    // ses providers), puis seulement jeter les providers.
+    // Démonter l'app, attendre la fin de l'arrêt du flux (il écrit encore
+    // dans `downloadHoldsProvider`), puis seulement jeter les providers.
     await tester.pumpWidget(const SizedBox.shrink());
-    await runFor(tester, const Duration(seconds: 2));
+    await waitUntil(
+      tester,
+      () => !container.read(downloadHoldsProvider).streaming,
+      what: 'arrêt du flux du lecteur',
+    );
     container.dispose();
     await root.delete(recursive: true);
   });
