@@ -10,6 +10,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/main.dart';
 import 'package:couchplay/server/cloudflare_dns.dart';
+import 'package:couchplay/update/updater.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -22,6 +23,9 @@ const benchPort = 18097;
 /// Identifiants du compte d'essai (faux serveur : mot de passe quelconque).
 const benchUser = 'demo';
 const benchPassword = 'abc';
+
+/// Version de l'app d'essai : toute release publiée est plus récente.
+const benchVersion = '0.0.0';
 
 Finder byKey(String key) => find.byKey(ValueKey(key));
 
@@ -153,8 +157,8 @@ Future<void> waitPlaying(WidgetTester tester) async {
 
 /// Lance l'app comme `main`, mais sur des dossiers temporaires et un coffre
 /// simulé vide (donc sans compte). Tout est démonté et effacé à la fin du
-/// test.
-Future<void> startIsolatedApp(WidgetTester tester) async {
+/// test. Sans [updater], pas de mise à jour (comme un build local).
+Future<void> startIsolatedApp(WidgetTester tester, {Updater? updater}) async {
   HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
   FlutterSecureStorage.setMockInitialValues({});
@@ -166,8 +170,9 @@ Future<void> startIsolatedApp(WidgetTester tester) async {
     accounts: await AccountStore.open(),
     support: support,
     downloads: downloads,
-    version: '0.0.0',
+    version: benchVersion,
     television: false,
+    updater: updater,
   );
   addTearDown(() async {
     // Démonter l'app, attendre la fin de l'arrêt du flux (il écrit encore

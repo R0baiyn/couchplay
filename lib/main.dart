@@ -40,7 +40,9 @@ Future<void> main() async {
     downloads: await downloadsRoot(support),
     version: package.version,
     television: television,
-    installer: installer,
+    updater: installer == null
+        ? null
+        : Updater(version: package.version, installer: installer),
   );
 }
 
@@ -53,7 +55,7 @@ ProviderContainer startApp({
   required Directory downloads,
   required String version,
   required bool television,
-  Installer? installer,
+  Updater? updater,
 }) {
   final files = AccountFiles(Directory('${support.path}/accounts'));
   final videos = AccountFiles(downloads);
@@ -69,10 +71,7 @@ ProviderContainer startApp({
       ),
       appVersionProvider.overrideWithValue(version),
       televisionProvider.overrideWithValue(television),
-      if (installer != null)
-        updaterProvider.overrideWithValue(
-          Updater(version: version, installer: installer),
-        ),
+      if (updater != null) updaterProvider.overrideWithValue(updater),
     ],
   );
   // Écoutée dès le démarrage : un téléchargement interrompu reprend, et la
