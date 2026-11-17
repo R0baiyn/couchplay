@@ -57,8 +57,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   /// Pistes choisies à la main, gardées pour l'épisode suivant et « Réessayer ».
   late final TrackMemory _tracks = TrackMemory(_playback.player);
-
   final _nextUp = NextUp();
+
+  /// Position où reprendre après une coupure.
+  Duration? _resumeAt;
 
   // Sur mobile, le lecteur est toujours en plein écran paysage.
   static final _mobile = Platform.isAndroid || Platform.isIOS;
@@ -88,9 +90,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // lecteur a déjà pris le flux (sa position n'est pas la nôtre).
       ready: () => _ticket == _playback.ticket && !_opening && _error == null,
     );
-    if (widget.startAt case final start? when start > Duration.zero) {
-      _resumeAt = start;
-    }
+    final start = widget.startAt;
+    if (start != null && start > Duration.zero) _resumeAt = start;
     _open();
   }
 
@@ -141,18 +142,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final series = ref.read(widget.seriesDetails(seriesId)).value;
     if (series == null) return;
     final next = nextEpisode(series, _item);
-    if (next == null) {
-      _exit();
-      return;
-    }
+    if (next == null) return _exit();
     setState(() {
       _nextUp.offer(next, onTick: () => setState(() {}), onElapsed: _playNext);
     });
   }
 
-  void _cancelNext() {
-    setState(_nextUp.cancel);
-  }
+  void _cancelNext() => setState(_nextUp.cancel);
 
   /// Enchaîne sur l'épisode suivant dans le même écran, avec les mêmes
   /// langues de pistes. `Playback.open` ferme le flux courant avant d'ouvrir
@@ -167,9 +163,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
     _open();
   }
-
-  /// Position où reprendre après une coupure.
-  Duration? _resumeAt;
 
   Future<void> _open() async {
     setState(() {
@@ -262,20 +255,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     unawaited(_completed?.cancel());
     _tracks.dispose();
     _session.save();
-    final downloads = _downloads;
-    final stopped = switch (_ticket) {
-      final ticket? => _session.stopStream(ticket),
-      null => Future<void>.value(),
-    };
+    final ticket = _ticket;
+    final stopped = ticket == null
+        ? Future<void>.value()
+        : _session.stopStream(ticket);
     // Fichier fermé : une vidéo vue peut être effacée.
-    unawaited(stopped.whenComplete(downloads.playerClosed));
+    unawaited(stopped.whenComplete(_downloads.playerClosed));
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final error = _error;
     // Fiche de la série gardée chargée pendant un épisode, pour connaître le
     // suivant à la fin, même lancé depuis l'accueil.
     if (_item.seriesId case final seriesId?) {
@@ -289,7 +280,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       fullscreen: _mobile ? null : _fullscreen,
       volume: !ref.watch(televisionProvider),
       opening: _opening,
-      error: error,
+      error: _error,
       next: _nextUp.next,
       secondsLeft: _nextUp.secondsLeft,
       playNowFocus: _nextUp.focus,
