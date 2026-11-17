@@ -77,6 +77,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           title: Text(widget.item.parsedName.display),
           actions: [
             FavoriteButton(
+              key: const ValueKey('catalog.favorite'),
               favoriteKey: widget.item.libraryKey,
               name: widget.item.name,
               poster: widget.item.poster,
@@ -87,6 +88,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       body: switch (ref.watch(provider)) {
         AsyncData(:final value) => _content(value),
         AsyncError(:final error) => ErrorView(
+          key: const ValueKey('catalog.error'),
           error: error,
           onRetry: () => ref.invalidate(provider),
         ),
@@ -136,7 +138,10 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text('Aucun épisode disponible.'),
+              child: Text(
+                'Aucun épisode disponible.',
+                key: ValueKey('catalog.noEpisodes'),
+              ),
             ),
           )
         else ...[
@@ -150,6 +155,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                   children: [
                     for (final s in series.seasons)
                       ChoiceChip(
+                        key: ValueKey('catalog.seasonChip.${s.number}'),
                         label: FocusRing(child: Text(s.name)),
                         selected: s == season,
                         onSelected: (_) => setState(() => _season = s.number),
@@ -165,6 +171,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: _SeasonDownloadButton(
+                  key: const ValueKey('catalog.seasonDownload'),
                   items: [
                     for (final episode in season.episodes)
                       ?_item(episode, season),
@@ -206,7 +213,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
 /// saison affichée qui ne sont ni téléchargés ni déjà en file (ceux en échec
 /// repartent).
 class _SeasonDownloadButton extends ConsumerWidget {
-  const _SeasonDownloadButton({required this.items});
+  const _SeasonDownloadButton({super.key, required this.items});
 
   final List<PlayItem> items;
 
@@ -293,6 +300,7 @@ class _EpisodeTile extends ConsumerWidget {
         children: [
           Expanded(
             child: InkWell(
+              key: ValueKey('catalog.episode.${episode.id}'),
               focusNode: focusNode,
               onTap: onPlay,
               // Rayon de la carte, qui coupe ce qui dépasse.
@@ -371,15 +379,21 @@ class _EpisodeTile extends ConsumerWidget {
               ),
             ),
           ),
-          DownloadButton(item: item, compact: true),
+          DownloadButton(
+            key: ValueKey('catalog.episodeDownload.${e.id}'),
+            item: item,
+            compact: true,
+          ),
           // Menu plutôt qu'appui long : il marche aussi au clavier et à la
           // télécommande.
           if (onWatched != null)
             PopupMenuButton<bool>(
+              key: ValueKey('catalog.episodeMenu.${e.id}'),
               tooltip: "Plus d'options",
               onSelected: onWatched,
               itemBuilder: (_) => [
                 PopupMenuItem(
+                  key: const ValueKey('catalog.episodeToggleWatched'),
                   value: !watched,
                   child: FocusRing(
                     child: Text(

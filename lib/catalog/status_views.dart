@@ -27,6 +27,7 @@ class ErrorView extends StatelessWidget {
     final error = this.error;
     final onExit = this.onExit;
     final retry = FilledButton(
+      key: const ValueKey('catalog.errorRetry'),
       autofocus: true,
       onPressed: onRetry,
       child: const Text('Réessayer'),
@@ -53,6 +54,7 @@ class ErrorView extends StatelessWidget {
                 spacing: 12,
                 children: [
                   OutlinedButton(
+                    key: const ValueKey('catalog.errorExit'),
                     onPressed: onExit,
                     child: const Text('Retour'),
                   ),

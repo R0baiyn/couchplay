@@ -83,6 +83,7 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
           title: Text(selected.parsedName.display),
           actions: [
             FavoriteButton(
+              key: const ValueKey('catalog.favorite'),
               favoriteKey: selected.libraryKey,
               otherKeys: [
                 for (final v in versions)
@@ -125,6 +126,7 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
               Padding(padding: const EdgeInsets.all(24), child: picker),
             Expanded(
               child: ErrorView(
+                key: const ValueKey('catalog.error'),
                 error: error,
                 onRetry: () => ref.invalidate(provider),
               ),
@@ -159,6 +161,7 @@ class _VersionPicker extends StatelessWidget {
         children: [
           for (final (index, version) in versions.indexed)
             ChoiceChip(
+              key: ValueKey('catalog.versionChip.${version.id}'),
               label: FocusRing(child: Text(labels[index])),
               selected: version.id == selected.id,
               onSelected: (_) => onSelect(version.id),
@@ -200,6 +203,7 @@ class _Actions extends ConsumerWidget {
       crossAxisAlignment: WrapCrossAlignment.start,
       children: [
         FilledButton.icon(
+          key: const ValueKey('catalog.play'),
           autofocus: true,
           icon: const Icon(Icons.play_arrow),
           label: Text(
@@ -209,7 +213,7 @@ class _Actions extends ConsumerWidget {
               ? null
               : () => openPlayer(context, ref, movie),
         ),
-        DownloadButton(item: movie),
+        DownloadButton(key: const ValueKey('catalog.download'), item: movie),
       ],
     );
   }

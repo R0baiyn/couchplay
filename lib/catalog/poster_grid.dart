@@ -121,6 +121,7 @@ class _EntryTile extends ConsumerWidget {
       ),
     );
     return PosterTile(
+      key: ValueKey('catalog.poster.${entry.kind.name}-${entry.item.id}'),
       title: entry.title,
       imageUrl: entry.poster,
       favorite: favorite,
@@ -242,16 +243,24 @@ class PosterTile extends StatelessWidget {
                                   spacing: 4,
                                   children: [
                                     if (watched)
-                                      const _Badge(Icons.check, 'Déjà vu'),
+                                      const _Badge(
+                                        Icons.check,
+                                        'Déjà vu',
+                                        key: ValueKey('catalog.badgeWatched'),
+                                      ),
                                     if (favorite)
                                       const _Badge(
                                         Icons.favorite,
                                         'Dans ma liste',
+                                        key: ValueKey('catalog.badgeFavorite'),
                                       ),
                                     if (downloaded)
                                       const _Badge(
                                         Icons.download_done,
                                         'Téléchargé',
+                                        key: ValueKey(
+                                          'catalog.badgeDownloaded',
+                                        ),
                                       ),
                                   ],
                                 ),
@@ -358,7 +367,7 @@ class _RemoteKeysState extends State<_RemoteKeys> {
 
 /// Pastille ronde et sombre : lisible sur n'importe quelle affiche.
 class _Badge extends StatelessWidget {
-  const _Badge(this.icon, this.label);
+  const _Badge(this.icon, this.label, {super.key});
 
   final IconData icon;
   final String label;

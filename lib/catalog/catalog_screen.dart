@@ -107,6 +107,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             final category = categories[index];
             final current = category.id == selectedId;
             return ListTile(
+              key: ValueKey('catalog.categorySheetTile.${category.id}'),
               autofocus: current,
               selected: current,
               title: FocusRing(child: Text(category.name)),
@@ -122,6 +123,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   List<Widget> _actions(AsyncValue<Object?> categories) => [
     IconButton(
+      key: const ValueKey('catalog.refresh'),
       tooltip: 'Actualiser',
       icon: const Icon(Icons.refresh),
       onPressed: categories.isLoading || _refreshing ? null : _refresh,
@@ -160,6 +162,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       ),
       AsyncError(:final error) => plain(
         ErrorView(
+          key: const ValueKey('catalog.error'),
           error: error,
           onRetry: () => ref.invalidate(categoriesProvider(_kind)),
         ),
@@ -167,10 +170,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       AsyncData(:final value) when selected == null => plain(
         Column(
           children: [
-            if (value.offline) OfflineBanner(savedAt: value.savedAt),
+            if (value.offline)
+              OfflineBanner(
+                key: const ValueKey('catalog.offlineBanner'),
+                savedAt: value.savedAt,
+              ),
             const Expanded(
               child: Center(
                 child: Text(
+                  key: ValueKey('catalog.noCategory'),
                   'Aucune catégorie à afficher.\n'
                   'Les pays affichés se choisissent dans les réglages.',
                   textAlign: TextAlign.center,
@@ -239,6 +247,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: OutlinedButton.icon(
+                          key: const ValueKey('catalog.categoryPicker'),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size.fromHeight(48),
                             alignment: Alignment.centerLeft,
@@ -285,6 +294,7 @@ class _CategoryList extends StatelessWidget {
         itemBuilder: (context, index) {
           final category = categories[index];
           return ListTile(
+            key: ValueKey('catalog.categoryTile.${category.id}'),
             title: FocusRing(child: Text(category.name)),
             selected: category.id == selectedId,
             onTap: () => onSelect(category.id),
@@ -323,6 +333,7 @@ class _CategoryItems extends ConsumerWidget {
       child: RefreshIndicator(
         onRefresh: onRefresh,
         child: CustomScrollView(
+          key: const ValueKey('catalog.grid'),
           // Une catégorie courte ou vide se tire aussi.
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -348,18 +359,36 @@ class _CategoryItems extends ConsumerWidget {
     // (« Actualiser », filtre changé), elle reste affichée.
     return switch (loaded) {
       AsyncValue(value: final value?) when value.value.isEmpty => [
-        fill(const Center(child: Text('Cette catégorie est vide.'))),
+        fill(
+          const Center(
+            child: Text(
+              'Cette catégorie est vide.',
+              key: ValueKey('catalog.empty'),
+            ),
+          ),
+        ),
       ],
       AsyncValue(value: final value?) => [
         if (value.offline)
-          SliverToBoxAdapter(child: OfflineBanner(savedAt: value.savedAt)),
+          SliverToBoxAdapter(
+            child: OfflineBanner(
+              key: const ValueKey('catalog.offlineBanner'),
+              savedAt: value.savedAt,
+            ),
+          ),
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverPosterGrid(entries: value.value, onOpen: onOpen),
         ),
       ],
       AsyncError(:final error) when !loaded.isLoading => [
-        fill(ErrorView(error: error, onRetry: onRetry)),
+        fill(
+          ErrorView(
+            key: const ValueKey('catalog.error'),
+            error: error,
+            onRetry: onRetry,
+          ),
+        ),
       ],
       // Chargement, ou catégorie pas encore dans l'index (valeur `null`).
       _ => [fill(const Center(child: CircularProgressIndicator()))],

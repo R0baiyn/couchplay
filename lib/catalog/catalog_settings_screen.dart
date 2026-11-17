@@ -36,11 +36,13 @@ class CatalogSettingsScreen extends ConsumerWidget {
     final Widget body;
     if (movies case AsyncError(:final error)) {
       body = ErrorView(
+        key: const ValueKey('catalog.settingsError'),
         error: error,
         onRetry: () => ref.invalidate(categoriesProvider(ContentKind.movies)),
       );
     } else if (series case AsyncError(:final error)) {
       body = ErrorView(
+        key: const ValueKey('catalog.settingsError'),
         error: error,
         onRetry: () => ref.invalidate(categoriesProvider(ContentKind.series)),
       );
@@ -53,6 +55,7 @@ class CatalogSettingsScreen extends ConsumerWidget {
           SliverList.list(
             children: [
               SwitchListTile(
+                key: const ValueKey('catalog.adultSwitch'),
                 autofocus: true,
                 title: const FocusRing(
                   child: Text('Afficher le contenu adulte'),
@@ -71,6 +74,7 @@ class CatalogSettingsScreen extends ConsumerWidget {
               ),
               for (final tag in tags)
                 CheckboxListTile(
+                  key: ValueKey('catalog.tag.$tag'),
                   title: FocusRing(child: Text(_tagNames[tag] ?? tag)),
                   subtitle: _tagNames.containsKey(tag) ? Text(tag) : null,
                   value: filter.tags.contains(tag),
@@ -84,6 +88,7 @@ class CatalogSettingsScreen extends ConsumerWidget {
                 trailing: filter.overrides.isEmpty
                     ? null
                     : TextButton(
+                        key: const ValueKey('catalog.resetCategories'),
                         onPressed: notifier.resetCategories,
                         child: const Text('Rétablir'),
                       ),
@@ -150,6 +155,7 @@ class _CategoryChoicesState extends ConsumerState<_CategoryChoices> {
       slivers: [
         SliverToBoxAdapter(
           child: ExpansionTile(
+            key: ValueKey('catalog.kindTile.${kind.name}'),
             title: FocusRing(child: Text(widget.title)),
             subtitle: Text('$visible affichées sur ${categories.length}'),
             shape: Border(top: divider),
@@ -163,6 +169,9 @@ class _CategoryChoicesState extends ConsumerState<_CategoryChoices> {
             itemBuilder: (context, i) {
               final category = categories[i];
               final tile = CheckboxListTile(
+                key: ValueKey(
+                  'catalog.categoryCheck.${kind.name}.${category.id}',
+                ),
                 dense: true,
                 title: FocusRing(child: Text(category.name)),
                 value: filter.isVisible(kind, category),
