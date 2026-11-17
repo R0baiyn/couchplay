@@ -140,6 +140,7 @@ final downloadFilesProvider = Provider<AccountFiles?>((ref) => null);
 /// ([whileDownloadsReleased]). Tenus par la file des téléchargements, hors
 /// de ses providers (ils dépendent du compte actif) ; déclarés ici, sous
 /// elle, pour que la suppression d'un compte n'importe pas la file (D-051).
+/// Écrits seulement par `DownloadsNotifier` et [whileDownloadsReleased].
 abstract final class AccountDownloads {
   /// Comptes en cours de suppression : rien ne repart.
   static final released = <String>{};
