@@ -98,6 +98,35 @@ List<Arc> readArcs() {
   return arcs;
 }
 
+/// Premier cycle trouvé parmi [arcs] (« a -> b -> a »), ou null : parcours
+/// en profondeur, un nœud sur le chemin courant revu = cycle.
+String? findCycle(List<String> arcs) {
+  final next = <String, List<String>>{};
+  for (final arc in arcs) {
+    final [source, target] = arc.split(' -> ');
+    next.putIfAbsent(source, () => []).add(target);
+  }
+  final done = <String>{};
+  final path = <String>[];
+  String? visit(String node) {
+    if (path.contains(node)) {
+      return [...path.sublist(path.indexOf(node)), node].join(' -> ');
+    }
+    if (!done.add(node)) return null;
+    path.add(node);
+    for (final target in next[node] ?? const <String>[]) {
+      if (visit(target) case final cycle?) return cycle;
+    }
+    path.removeLast();
+    return null;
+  }
+
+  for (final node in next.keys) {
+    if (visit(node) case final cycle?) return cycle;
+  }
+  return null;
+}
+
 void main() {
   final arcs = readArcs();
   // Les arcs depuis `composition` sont tous permis ; ceux de la liste sont
@@ -124,6 +153,10 @@ void main() {
 
   test('la liste est triée et sans doublon', () {
     expect(allowedArcs, ([...allowedArcs]..sort()).toSet().toList());
+  });
+
+  test('les arcs listés ne forment aucun cycle', () {
+    expect(findCycle(allowedArcs), isNull);
   });
 
   test('racine et server n\'importent aucune fonctionnalité', () {
