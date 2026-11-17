@@ -98,8 +98,8 @@ void main() {
   });
 
   // Écran étroit : pas de rail, chaque onglet porte son bouton Réglages dans
-  // l'en-tête (passé par la coquille depuis S042).
-  testWidgets('barre du bas : Réglages s ouvre depuis chaque onglet', (
+  // l'en-tête, passé par la coquille.
+  testWidgets("barre du bas : Réglages s'ouvre depuis chaque onglet", (
     tester,
   ) async {
     await pumpApp(

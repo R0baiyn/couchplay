@@ -156,6 +156,8 @@ void main() {
   });
 
   test('les arcs listés ne forment aucun cycle', () {
+    expect(findCycle(['a -> b', 'b -> c', 'c -> a']), 'a -> b -> c -> a');
+    expect(findCycle(['a -> b', 'a -> c', 'b -> c']), isNull);
     expect(findCycle(allowedArcs), isNull);
   });
 
