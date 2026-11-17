@@ -70,7 +70,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         index.hasValue || (index.hasError && !index.isLoading);
     final theme = Theme.of(context);
 
-    Widget message(String text) => Center(
+    Widget message(Key key, String text) => Center(
+      key: key,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(text, textAlign: TextAlign.center),
@@ -79,13 +80,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     final Widget body;
     if (words.isEmpty) {
-      body = message('Tape quelques lettres d\'un film ou d\'une série.');
+      body = message(
+        const ValueKey('search.hint'),
+        'Tape quelques lettres d\'un film ou d\'une série.',
+      );
     } else if (settled(movies) && settled(series)) {
       // Un type en échec n'empêche pas de chercher dans l'autre.
       final moviesIndex = movies.value?.value;
       final seriesIndex = series.value?.value;
       if (moviesIndex == null && seriesIndex == null) {
         body = ErrorView(
+          key: const ValueKey('search.error'),
           error: movies.error ?? series.error!,
           onRetry: () {
             ref.invalidate(catalogIndexProvider(ContentKind.movies));
@@ -103,12 +108,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           _series = search(seriesIndex?.entries ?? const [], _query);
         }
         body = _movies.isEmpty && _series.isEmpty
-            ? message('Aucun résultat pour « ${_query.trim()} ».')
+            ? message(
+                const ValueKey('search.none'),
+                'Aucun résultat pour « ${_query.trim()} ».',
+              )
             // Clé par recherche : une nouvelle recherche repart en haut.
             : _Results(key: ValueKey(_query), movies: _movies, series: _series);
       }
     } else {
       body = Center(
+        key: const ValueKey('search.loading'),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           spacing: 16,
@@ -125,6 +134,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         title: ValueListenableBuilder(
           valueListenable: _controller,
           builder: (context, value, _) => TextEntry(
+            key: const ValueKey('search.field'),
             controller: _controller,
             focusNode: widget.focusNode,
             autofocus: true,
@@ -141,6 +151,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               suffixIcon: value.text.isEmpty
                   ? null
                   : IconButton(
+                      key: const ValueKey('search.clear'),
                       tooltip: 'Effacer',
                       icon: const Icon(Icons.clear),
                       onPressed: _clear,
@@ -176,13 +187,14 @@ class _Results extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     void open(CatalogEntry entry) => openDetails(context, entry);
-    Widget section(String title, List<CatalogEntry> entries) =>
+    Widget section(Key key, String title, List<CatalogEntry> entries) =>
         SliverMainAxisGroup(
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Text(
+                  key: key,
                   '$title (${entries.length})',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
@@ -196,9 +208,12 @@ class _Results extends StatelessWidget {
         );
     return SmoothFocusGroup(
       child: CustomScrollView(
+        key: const ValueKey('search.results'),
         slivers: [
-          if (movies.isNotEmpty) section('Films', movies),
-          if (series.isNotEmpty) section('Séries', series),
+          if (movies.isNotEmpty)
+            section(const ValueKey('search.sectionMovies'), 'Films', movies),
+          if (series.isNotEmpty)
+            section(const ValueKey('search.sectionSeries'), 'Séries', series),
         ],
       ),
     );
