@@ -34,8 +34,29 @@ Future<void> main() async {
     _installer(),
     isTelevision(),
   ).wait;
+  startApp(
+    accounts: accounts,
+    support: support,
+    downloads: await downloadsRoot(support),
+    version: package.version,
+    television: television,
+    installer: installer,
+  );
+}
+
+/// Câble l'app sur ces comptes et ces dossiers, puis l'affiche. Ne lit aucun
+/// dossier du système : les essais de bout en bout la lancent sur des
+/// dossiers temporaires et un coffre simulé.
+ProviderContainer startApp({
+  required AccountStore accounts,
+  required Directory support,
+  required Directory downloads,
+  required String version,
+  required bool television,
+  Installer? installer,
+}) {
   final files = AccountFiles(Directory('${support.path}/accounts'));
-  final videos = AccountFiles(await downloadsRoot(support));
+  final videos = AccountFiles(downloads);
   // En tâche de fond : ne retarde pas le premier rendu.
   unawaited(syncAccountFolders(accounts, files, videos));
   final container = ProviderContainer(
@@ -46,11 +67,11 @@ Future<void> main() async {
       appSettingsFileProvider.overrideWithValue(
         File('${support.path}${Platform.pathSeparator}settings.json'),
       ),
-      appVersionProvider.overrideWithValue(package.version),
+      appVersionProvider.overrideWithValue(version),
       televisionProvider.overrideWithValue(television),
       if (installer != null)
         updaterProvider.overrideWithValue(
-          Updater(version: package.version, installer: installer),
+          Updater(version: version, installer: installer),
         ),
     ],
   );
@@ -63,6 +84,7 @@ Future<void> main() async {
       child: const CouchPlayApp(home: HomeGate()),
     ),
   );
+  return container;
 }
 
 /// L'installation des mises à jour, pour une version release qui a un
