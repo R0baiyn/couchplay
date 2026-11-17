@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import '../catalog/status_views.dart';
+import '../server/status_views.dart';
 import '../library/library.dart';
 import 'next_episode_panel.dart';
 import 'playback.dart';

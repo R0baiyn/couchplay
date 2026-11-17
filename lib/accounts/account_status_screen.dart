@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/status_views.dart';
+import '../server/status_views.dart';
 import '../focus_ring.dart';
 import '../format.dart';
 import '../server/models.dart';

@@ -13,7 +13,7 @@ import 'catalog_index.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'details_view.dart';
-import 'status_views.dart';
+import '../server/status_views.dart';
 import 'versions.dart';
 
 /// Fiche d'un film : ses versions s'il en a plusieurs, et « Lecture ».

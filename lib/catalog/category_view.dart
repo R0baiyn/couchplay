@@ -8,7 +8,7 @@ import 'catalog_index.dart';
 import 'versions.dart';
 import 'catalog_repository.dart';
 import 'poster_grid.dart';
-import 'status_views.dart';
+import '../server/status_views.dart';
 
 class CategoryList extends StatelessWidget {
   const CategoryList({

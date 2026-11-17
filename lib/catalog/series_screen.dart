@@ -12,7 +12,7 @@ import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'details_view.dart';
 import 'series_view.dart';
-import 'status_views.dart';
+import '../server/status_views.dart';
 
 /// Fiche d'une série : en-tête, choix de la saison, liste des épisodes.
 class SeriesScreen extends ConsumerStatefulWidget {

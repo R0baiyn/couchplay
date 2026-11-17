@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../format.dart';
-import '../server/server_client.dart';
+import 'server_client.dart';
 
 /// Message d'erreur, bouton « Réessayer » et, avec [onExit], « Retour ».
 ///

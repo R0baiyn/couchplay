@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../catalog/catalog_screen.dart';
 import '../catalog/poster_grid.dart';
-import '../catalog/status_views.dart';
+import '../server/status_views.dart';
 import '../catalog/versions.dart';
 import '../server/models.dart';
 import '../settings/settings_screen.dart';

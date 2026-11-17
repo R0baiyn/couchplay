@@ -6,7 +6,7 @@ import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'catalog_settings.dart';
 import 'category_filter.dart';
-import 'status_views.dart';
+import '../server/status_views.dart';
 
 /// Réglages du catalogue du compte actif : pays affichés, contenu adulte, et
 /// catégories une par une. Appliqués tout de suite aux onglets.

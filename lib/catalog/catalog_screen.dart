@@ -11,7 +11,7 @@ import 'catalog_settings.dart';
 import 'movie_screen.dart';
 import 'category_view.dart';
 import 'series_screen.dart';
-import 'status_views.dart';
+import '../server/status_views.dart';
 import 'versions.dart';
 
 /// Ouvre la fiche d'un film ou d'une série. [episode] : pour une série, la
