@@ -100,14 +100,17 @@ Future<void> startIsolatedApp(WidgetTester tester) async {
   addTearDown(() async {
     // Démonter l'app, attendre la fin de l'arrêt du flux (il écrit encore
     // dans `downloadHoldsProvider`), puis seulement jeter les providers.
-    await tester.pumpWidget(const SizedBox.shrink());
-    await waitUntil(
-      tester,
-      () => !container.read(downloadHoldsProvider).streaming,
-      what: 'arrêt du flux du lecteur',
-    );
-    container.dispose();
-    await root.delete(recursive: true);
+    try {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await waitUntil(
+        tester,
+        () => !container.read(downloadHoldsProvider).streaming,
+        what: 'arrêt du flux du lecteur',
+      );
+    } finally {
+      container.dispose();
+      await root.delete(recursive: true);
+    }
   });
   await tester.pump();
 }
@@ -163,7 +166,8 @@ final class FakeServer {
         throw StateError('Le faux serveur s’est arrêté ($exited) : $output');
       }
       if (clock.elapsed > const Duration(seconds: 20)) {
-        await server.stop();
+        // L'arrêt qui échoue ne doit pas cacher la sortie du serveur.
+        await server.stop().catchError((_) {});
         throw StateError('Le faux serveur ne répond pas : $output');
       }
       await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -180,15 +184,20 @@ final class FakeServer {
   Future<bool> _answers() async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 2);
     try {
-      final request = await client.getUrl(
-        Uri.parse(
-          '$host/player_api.php?username=$benchUser&password=$benchPassword',
-        ),
-      );
-      final response = await request.close();
-      await response.drain<void>();
-      return response.statusCode == HttpStatus.ok;
+      // Borné en entier : un port qui accepte sans répondre ne bloque pas.
+      return await () async {
+        final request = await client.getUrl(
+          Uri.parse(
+            '$host/player_api.php?username=$benchUser&password=$benchPassword',
+          ),
+        );
+        final response = await request.close();
+        await response.drain<void>();
+        return response.statusCode == HttpStatus.ok;
+      }().timeout(const Duration(seconds: 2));
     } on IOException {
+      return false;
+    } on TimeoutException {
       return false;
     } finally {
       client.close(force: true);

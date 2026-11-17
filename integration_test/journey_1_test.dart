@@ -10,9 +10,10 @@ import 'bench.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  late FakeServer server;
+  // Nul si le démarrage a échoué : son erreur reste la seule affichée.
+  FakeServer? server;
   setUpAll(() async => server = await FakeServer.start());
-  tearDownAll(() => server.stop());
+  tearDownAll(() async => server?.stop());
 
   testWidgets('parcours 1 : compte, catalogue, fiche film, lecture, retour', (
     tester,
@@ -23,7 +24,7 @@ void main() {
     await waitFor(tester, byKey('accounts.name'));
     expect(find.text('Ajouter un compte'), findsOneWidget);
     await tester.enterText(byKey('accounts.name'), 'Salon');
-    await tester.enterText(byKey('accounts.host'), server.host);
+    await tester.enterText(byKey('accounts.host'), server!.host);
     await tester.enterText(byKey('accounts.username'), benchUser);
     await tester.enterText(byKey('accounts.password'), benchPassword);
     await tester.tap(byKey('accounts.submit'));
