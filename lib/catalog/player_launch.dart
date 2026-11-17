@@ -5,6 +5,7 @@ import '../format.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../player/player_screen.dart';
+import 'catalog_providers.dart';
 
 /// Ouvre le lecteur sur un film ou un épisode du compte actif. Un contenu
 /// commencé propose de reprendre ou de recommencer ; avec [resume], la
@@ -47,7 +48,11 @@ Future<void> openPlayer(
   await Navigator.push(
     context,
     MaterialPageRoute<void>(
-      builder: (_) => PlayerScreen(item: item, startAt: start),
+      builder: (_) => PlayerScreen(
+        item: item,
+        seriesDetails: seriesDetailsProvider.call,
+        startAt: start,
+      ),
     ),
   );
 }

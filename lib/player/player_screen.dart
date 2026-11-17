@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import '../catalog/catalog_providers.dart';
 import '../downloads/downloads.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
+import '../server/models.dart';
 import '../television.dart';
 import 'playback.dart';
 import 'player_next_up.dart';
@@ -22,9 +22,18 @@ export 'player_request.dart' show endedEarly, localRequest;
 /// Lecture plein cadre. La position est enregistrée toutes les 10 s, à la
 /// pause et à la sortie. Quitter l'écran arrête le flux.
 class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.item, this.startAt});
+  const PlayerScreen({
+    super.key,
+    required this.item,
+    required this.seriesDetails,
+    this.startAt,
+  });
 
   final PlayItem item;
+
+  /// Fiche d'une série, pour proposer l'épisode suivant : fournie par le
+  /// catalogue, qui la charge (le lecteur est sous lui, D-050).
+  final FutureProvider<SeriesDetails> Function(String seriesId) seriesDetails;
 
   /// Position où démarrer, sinon le début.
   final Duration? startAt;
@@ -129,7 +138,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// dernier de la série, le lecteur se ferme. Si la fiche de la série n'a
   /// pas pu être chargée, le lecteur reste simplement sur la fin.
   void _offerNext(String seriesId) {
-    final series = ref.read(seriesDetailsProvider(seriesId)).value;
+    final series = ref.read(widget.seriesDetails(seriesId)).value;
     if (series == null) return;
     final next = nextEpisode(series, _item);
     if (next == null) {
@@ -270,7 +279,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // Fiche de la série gardée chargée pendant un épisode, pour connaître le
     // suivant à la fin, même lancé depuis l'accueil.
     if (_item.seriesId case final seriesId?) {
-      ref.watch(seriesDetailsProvider(seriesId));
+      ref.watch(widget.seriesDetails(seriesId));
     }
     return PlayerView(
       playback: _playback,
