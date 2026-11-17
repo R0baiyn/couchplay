@@ -15,6 +15,9 @@ void _holdLock((String, SendPort) args) {
   final lock = File(path).openSync(mode: FileMode.append)
     ..lockSync(FileLock.exclusive);
   locked.send(null);
+  // Durée du verrou, pas une attente d'un résultat : load() est synchrone et
+  // bloque l'isolate principal, qui ne peut rien signaler ; seul le temps
+  // libère le fichier (moins que les 20 ms de la relecture).
   sleep(const Duration(milliseconds: 10));
   lock
     ..unlockSync()
