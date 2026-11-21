@@ -118,8 +118,12 @@ final class SerialFileWriter {
   }
 
   /// Attend toutes les écritures demandées jusqu'ici : avant de quitter
-  /// l'app sans passer par sa fermeture normale.
-  static Future<void> flushAll() => Future.wait(_inFlight.toList());
+  /// l'app sans passer par sa fermeture normale. Un vrai `Future<void>` (pas
+  /// le `Future<List<void>>` de `Future.wait`) : sinon `timeout` refuse un
+  /// `onTimeout` qui ne rend rien.
+  static Future<void> flushAll() async {
+    await Future.wait(_inFlight.toList());
+  }
 }
 
 // Fonction de premier niveau : l'isolate ne reçoit que ses paramètres.

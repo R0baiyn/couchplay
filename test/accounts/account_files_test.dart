@@ -46,6 +46,15 @@ void main() {
     expect(second.readAsStringSync(), 'b');
   });
 
+  test('flushAll accepte un onTimeout qui ne rend rien', () async {
+    // Régression : flushAll rendait le Future<List<void>> de Future.wait, et
+    // timeout levait une TypeError sur ce onTimeout avant tout délai.
+    await SerialFileWriter.flushAll().timeout(
+      const Duration(seconds: 1),
+      onTimeout: () {},
+    );
+  });
+
   test('path : un fichier dans le dossier du compte', () {
     final files = AccountFiles(root);
     expect(
