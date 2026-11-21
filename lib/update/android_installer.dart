@@ -15,13 +15,14 @@ String? androidAssetSuffix(Abi abi) => switch (abi) {
 };
 
 /// APK à installer d'après les architectures 64 bits de l'appareil
-/// (`Build.SUPPORTED_64_BIT_ABIS`) et celle du processus [current] : l'arm64
-/// dès que l'appareil le lit, même si l'app installée tourne en armv7 (code
-/// de version plus grand, Android accepte le passage). Sinon celui du
-/// processus ([androidAssetSuffix]) : armv7 d'une TV 32 bits (liste vide),
-/// rien pour un émulateur x86_64.
+/// (`Build.SUPPORTED_64_BIT_ABIS`) et celle du processus [current] : une app
+/// armv7 passe à l'arm64 dès que l'appareil le lit (code de version plus
+/// grand, Android accepte le passage). Sinon celui du processus
+/// ([androidAssetSuffix]) : armv7 d'une TV 32 bits (liste vide), rien pour
+/// un x86_64, même s'il traduit l'arm64 (émulateurs, Chromebooks :
+/// `x86_64,arm64-v8a`).
 String? androidAssetSuffixFor(List<String> supported64BitAbis, Abi current) =>
-    supported64BitAbis.contains('arm64-v8a')
+    current == Abi.androidArm && supported64BitAbis.contains('arm64-v8a')
     ? androidAssetSuffix(Abi.androidArm64)
     : androidAssetSuffix(current);
 
@@ -41,16 +42,17 @@ final class AndroidInstaller implements Installer {
 
   /// APK publié pour cet appareil ([androidAssetSuffixFor]). Canal sans
   /// réponse (ancienne activité, test) : l'architecture du processus seule.
-  static Future<String?> deviceAssetSuffix() async {
+  /// [current] : celle du processus, remplacée dans les tests.
+  static Future<String?> deviceAssetSuffix({Abi? current}) async {
     List<String>? abis;
     try {
       abis = await _channel.invokeListMethod<String>('supported64BitAbis');
     } on PlatformException {
-      abis = null;
+      // Liste inconnue : l'architecture du processus décide.
     } on MissingPluginException {
-      abis = null;
+      // Idem.
     }
-    return androidAssetSuffixFor(abis ?? const [], Abi.current());
+    return androidAssetSuffixFor(abis ?? const [], current ?? Abi.current());
   }
 
   @override

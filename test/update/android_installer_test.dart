@@ -21,6 +21,13 @@ void main() {
       expect(androidAssetSuffixFor(['x86_64'], Abi.androidX64), isNull);
     });
 
+    test('x86_64 qui traduit l\'arm64 (émulateur, Chromebook) : aucun', () {
+      expect(
+        androidAssetSuffixFor(['x86_64', 'arm64-v8a'], Abi.androidX64),
+        isNull,
+      );
+    });
+
     test('liste inconnue (canal muet) sur un processus arm64 : arm64', () {
       expect(androidAssetSuffixFor([], Abi.androidArm64), '-android-arm64.apk');
     });
@@ -39,7 +46,10 @@ void main() {
         calls.add(call.method);
         return ['arm64-v8a'];
       });
-      expect(await AndroidInstaller.deviceAssetSuffix(), '-android-arm64.apk');
+      expect(
+        await AndroidInstaller.deviceAssetSuffix(current: Abi.androidArm),
+        '-android-arm64.apk',
+      );
       expect(calls, ['supported64BitAbis']);
     });
 
@@ -49,15 +59,15 @@ void main() {
         (call) async => throw PlatformException(code: 'x'),
       );
       expect(
-        await AndroidInstaller.deviceAssetSuffix(),
-        androidAssetSuffix(Abi.current()),
+        await AndroidInstaller.deviceAssetSuffix(current: Abi.androidArm),
+        '-android-armv7.apk',
       );
     });
 
     test("canal absent : l'architecture du processus seule", () async {
       expect(
-        await AndroidInstaller.deviceAssetSuffix(),
-        androidAssetSuffix(Abi.current()),
+        await AndroidInstaller.deviceAssetSuffix(current: Abi.androidArm64),
+        '-android-arm64.apk',
       );
     });
   });
