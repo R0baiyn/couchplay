@@ -1,4 +1,5 @@
 import 'package:couchplay/accounts/app_settings.dart';
+import 'package:couchplay/settings/journal_screen.dart';
 import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/television.dart';
 import 'package:couchplay/update/updater.dart';
@@ -13,6 +14,9 @@ void main() {
           overrides: [
             appVersionProvider.overrideWithValue('0.1.0'),
             televisionProvider.overrideWithValue(tv),
+            journalLinesProvider.overrideWith(
+              (ref) async => ['ligne du journal'],
+            ),
           ],
           child: const MaterialApp(home: SettingsScreen()),
         ),
@@ -74,4 +78,18 @@ void main() {
     expect(find.byKey(const ValueKey('settings.deleteWatched')), findsNothing);
     expect(find.byKey(const ValueKey('settings.debug')), findsOneWidget);
   });
+
+  for (final tv in [false, true]) {
+    testWidgets('« Journal » ouvre le journal (TV : $tv)', (tester) async {
+      await pumpSettings(tester, tv: tv);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('settings.journal')),
+        100,
+      );
+      await tester.tap(find.byKey(const ValueKey('settings.journal')));
+      await tester.pumpAndSettle();
+      expect(find.byType(JournalScreen), findsOneWidget);
+      expect(find.text('ligne du journal'), findsOneWidget);
+    });
+  }
 }

@@ -6,9 +6,11 @@ import '../accounts/accounts_screen.dart';
 import '../accounts/app_settings.dart';
 import '../catalog/catalog_settings_screen.dart';
 import '../focus_ring.dart';
+import '../logging.dart';
 import '../television.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
+import 'journal_screen.dart';
 
 /// Roue des réglages : en haut à droite des onglets, ou en bas du rail, avec
 /// son libellé comme les onglets.
@@ -124,6 +126,19 @@ class SettingsScreen extends ConsumerWidget {
           ),
           if (!tv) ...const [_WifiOnlyTile(), _DeleteWatchedTile()],
           const _DebugTile(),
+          ListTile(
+            key: const ValueKey('settings.journal'),
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const FocusRing(child: Text('Journal')),
+            subtitle: const Text(
+              "Ce que l'app a noté, pour comprendre un problème",
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const JournalScreen()),
+            ),
+          ),
           const Divider(),
           const _VersionTile(),
         ],
@@ -207,7 +222,8 @@ class _VersionTileState extends ConsumerState<_VersionTile> {
       } else {
         await showUpdateDialog(context, updater, update);
       }
-    } on Exception {
+    } on Exception catch (e) {
+      log('Vérification des mises à jour', error: '${e.runtimeType}: $e');
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Impossible de vérifier les mises à jour.'),
