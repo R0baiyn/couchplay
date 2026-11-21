@@ -14,6 +14,17 @@ String? androidAssetSuffix(Abi abi) => switch (abi) {
   _ => null,
 };
 
+/// APK à installer d'après les architectures 64 bits de l'appareil
+/// (`Build.SUPPORTED_64_BIT_ABIS`) et celle du processus [current] : l'arm64
+/// dès que l'appareil le lit, même si l'app installée tourne en armv7 (code
+/// de version plus grand, Android accepte le passage). Sinon celui du
+/// processus ([androidAssetSuffix]) : armv7 d'une TV 32 bits (liste vide),
+/// rien pour un émulateur x86_64.
+String? androidAssetSuffixFor(List<String> supported64BitAbis, Abi current) =>
+    supported64BitAbis.contains('arm64-v8a')
+    ? androidAssetSuffix(Abi.androidArm64)
+    : androidAssetSuffix(current);
+
 /// Installation sous Android : l'installateur du système s'ouvre sur l'APK
 /// téléchargé, et Android demande une confirmation à chaque fois.
 ///
@@ -27,6 +38,20 @@ final class AndroidInstaller implements Installer {
   /// toujours `<cache>/update/couchplay.apk`, seul fichier que l'app expose
   /// à l'installateur.
   static const _channel = MethodChannel('couchplay/update');
+
+  /// APK publié pour cet appareil ([androidAssetSuffixFor]). Canal sans
+  /// réponse (ancienne activité, test) : l'architecture du processus seule.
+  static Future<String?> deviceAssetSuffix() async {
+    List<String>? abis;
+    try {
+      abis = await _channel.invokeListMethod<String>('supported64BitAbis');
+    } on PlatformException {
+      abis = null;
+    } on MissingPluginException {
+      abis = null;
+    }
+    return androidAssetSuffixFor(abis ?? const [], Abi.current());
+  }
 
   @override
   final String assetSuffix;

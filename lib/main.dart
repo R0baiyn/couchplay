@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -95,7 +94,7 @@ Future<Installer?> _installer() async {
     return WindowsInstaller.forApp(File(Platform.resolvedExecutable).parent);
   }
   if (Platform.isAndroid) {
-    final suffix = androidAssetSuffix(Abi.current());
+    final suffix = await AndroidInstaller.deviceAssetSuffix();
     if (suffix == null) return null;
     final cache = await getTemporaryDirectory();
     return AndroidInstaller(
