@@ -168,6 +168,11 @@ final class _Journal {
   var _broken = false;
   int? _size;
 
+  /// Échecs d'écriture de suite : un échec passager (fichier verrouillé,
+  /// disque plein un instant) perd seulement son lot ; le journal se coupe
+  /// au 3e de suite.
+  var _failures = 0;
+
   // Une erreur répétée à chaque image remplirait les deux fichiers en
   // quelques secondes : une entrée identique à la précédente est comptée.
   String? _last;
@@ -207,10 +212,14 @@ final class _Journal {
       }
       await file.writeAsBytes(bytes, mode: FileMode.append);
       _size = size + bytes.length;
+      _failures = 0;
     } catch (_) {
       // Toute erreur, pas seulement d'E/S : la file ne doit jamais rester en
       // erreur, sans quoi flushJournal lèverait avant une sortie de l'app.
-      _broken = true;
+      // Taille relue au prochain lot : l'écriture ratée a pu en laisser une
+      // partie.
+      _size = null;
+      _broken = ++_failures >= 3;
     }
   }
 }

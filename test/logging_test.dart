@@ -254,17 +254,37 @@ void main() {
       );
     });
 
-    test('un fichier impossible à écrire coupe le journal sans lever', () async {
-      openJournal(
-        File(
-          '${dir.path}${Platform.pathSeparator}absent${Platform.pathSeparator}couchplay.log',
-        ),
-      );
+    test('un échec passager ne coupe pas le journal', () async {
+      // Dossier absent le temps d'une écriture (disque plein un instant,
+      // fichier verrouillé par un antivirus) : la ligne est perdue, pas les
+      // suivantes.
+      final later = Directory('${dir.path}${Platform.pathSeparator}absent');
+      final journal = File('${later.path}${Platform.pathSeparator}x.log');
+      openJournal(journal);
       log('perdu');
       await flushJournal();
-      log('perdu aussi');
+      expect(journal.existsSync(), isFalse);
+
+      later.createSync();
+      log('arrive');
       await flushJournal();
-      expect(dir.listSync(), isEmpty);
+      final text = journal.readAsStringSync();
+      expect(text, contains(' arrive'));
+      expect(text, isNot(contains('perdu')));
+    });
+
+    test('3 échecs de suite coupent le journal, sans lever', () async {
+      final later = Directory('${dir.path}${Platform.pathSeparator}absent');
+      final journal = File('${later.path}${Platform.pathSeparator}x.log');
+      openJournal(journal);
+      for (var i = 0; i < 3; i++) {
+        log('perdu $i');
+        await flushJournal();
+      }
+      later.createSync();
+      log('coupé');
+      await flushJournal();
+      expect(journal.existsSync(), isFalse);
     });
   });
 }
