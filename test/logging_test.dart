@@ -47,6 +47,22 @@ void main() {
       );
     });
 
+    test(
+      "masque un chemin de flux dont l'identifiant porte une apostrophe",
+      () {
+        // `Uri.encodeComponent` laisse `'` dans un segment de chemin.
+        expect(
+          redact("$host/movie/u'x/p'y/42.mkv"),
+          '$host/movie/***/***/42.mkv',
+        );
+        expect(redact("$host/u'x/p'y/42.ts"), '$host/***/***/42.ts');
+        expect(
+          redact("lien '$host/movie/$user/$pass/42.mkv' refusé"),
+          "lien '$host/movie/***/***/42.mkv' refusé",
+        );
+      },
+    );
+
     test('masque la forme courte hôte/user/mot de passe/id du direct', () {
       expect(redact('$host/$user/$pass/42'), '$host/***/***/42');
       expect(redact('$host/$user/$pass/42.ts'), '$host/***/***/42.ts');

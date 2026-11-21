@@ -12,6 +12,9 @@ import 'package:flutter/foundation.dart';
 
 const _mask = '***';
 const _segment = r'''[^/\s?#"']+''';
+// Identifiant dans un chemin : `Uri.encodeComponent` y laisse `'` (et
+// `!*()`) ; la suite exigée après (`/…`) borne déjà la correspondance.
+const _credential = r'''[^/\s?#"]+''';
 
 final _queryCredentials = RegExp(
   r'''((?:[?&]|\\u0026)(?:username|password)=)[^&#\s"']*''',
@@ -22,7 +25,7 @@ final _userInfo = RegExp(
   caseSensitive: false,
 );
 final _streamPath = RegExp(
-  '(/(?:movie|series|live|timeshift)/)$_segment/$_segment(?=/)',
+  '(/(?:movie|series|live|timeshift)/)$_credential/$_credential(?=/)',
 );
 // Réponse JSON du serveur : "username":"…", valeur échappée, nombre ou
 // chaîne coupée par un aperçu tronqué.
@@ -32,7 +35,7 @@ final _jsonCredentials = RegExp(
 );
 // Direct sans préfixe : http://hôte:port/U/P/42 ou /42.ts
 final _shortLivePath = RegExp(
-  '(://$_segment/)$_segment/$_segment'
+  '(://$_segment/)$_credential/$_credential'
   r'''(?=/\d+(?:\.\w+)?(?:$|[\s?#"'/]))''',
 );
 
@@ -204,7 +207,9 @@ final class _Journal {
       }
       await file.writeAsBytes(bytes, mode: FileMode.append);
       _size = size + bytes.length;
-    } on FileSystemException {
+    } catch (_) {
+      // Toute erreur, pas seulement d'E/S : la file ne doit jamais rester en
+      // erreur, sans quoi flushJournal lèverait avant une sortie de l'app.
       _broken = true;
     }
   }
