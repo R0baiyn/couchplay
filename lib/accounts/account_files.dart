@@ -98,10 +98,15 @@ FileSystemException? writeAtomically(String path, String text) {
 /// thread de l'interface. Un échec est loggé sans lever : l'état reste en
 /// mémoire pour la session.
 final class SerialFileWriter {
-  SerialFileWriter({required this.failure});
+  SerialFileWriter({required this.failure, this._writeFile = _writeInIsolate});
 
   /// Message des logs en cas d'échec : « Bibliothèque non écrite »…
   final String failure;
+
+  /// Écriture d'un fichier : [writeAtomically] dans un isolate, remplacée
+  /// dans les tests.
+  final Future<FileSystemException?> Function(String path, String text)
+  _writeFile;
 
   Future<void> _pending = Future.value();
 
@@ -110,8 +115,14 @@ final class SerialFileWriter {
 
   Future<void> write(File file, String text) {
     final done = _pending = _pending.then((_) async {
-      final error = await _writeInIsolate(file.path, text);
-      if (error != null) log(failure, error: error.osError?.errorCode);
+      try {
+        final error = await _writeFile(file.path, text);
+        if (error != null) log(failure, error: error.osError?.errorCode);
+      } catch (e) {
+        // Jamais levée : la file continue, et flushAll (sortie de l'app pour
+        // une mise à jour) ne s'arrête pas sur une écriture ratée.
+        log(failure, error: e.runtimeType);
+      }
     });
     _inFlight.add(done);
     return done.whenComplete(() => _inFlight.remove(done));

@@ -55,6 +55,25 @@ void main() {
     );
   });
 
+  test('une écriture qui lève ne bloque ni la suivante ni flushAll', () async {
+    final file = File('${root.path}/library.json');
+    var calls = 0;
+    final writer = SerialFileWriter(
+      failure: 'non écrit',
+      writeFile: (path, text) async {
+        if (calls++ == 0) throw StateError('isolate');
+        return writeAtomically(path, text);
+      },
+    );
+
+    final first = writer.write(file, 'a');
+    final second = writer.write(file, 'b');
+    await SerialFileWriter.flushAll();
+    await first;
+    await second;
+    expect(file.readAsStringSync(), 'b');
+  });
+
   test('path : un fichier dans le dossier du compte', () {
     final files = AccountFiles(root);
     expect(

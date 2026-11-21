@@ -44,4 +44,25 @@ void main() {
     },
     skip: !Platform.isWindows,
   );
+
+  test('installNow quitte même si une écriture en file échoue', () async {
+    final codes = <int>[];
+    final installer = WindowsInstaller(
+      portable: false,
+      appDir: root,
+      workDir: root,
+      exit: codes.add,
+    );
+    // Une erreur autre qu'un FileSystemException (isolate impossible à
+    // lancer, par exemple).
+    final failing = SerialFileWriter(
+      failure: 'non écrit',
+      writeFile: (path, text) async => throw StateError('isolate'),
+    );
+    unawaited(failing.write(File('${root.path}\\library.json'), '{}'));
+
+    await installer.installNow();
+
+    expect(codes, [0]);
+  }, skip: !Platform.isWindows);
 }
