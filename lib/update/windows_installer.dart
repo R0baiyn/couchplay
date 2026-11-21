@@ -14,9 +14,13 @@ final class WindowsInstaller implements Installer {
     required this.portable,
     required this.appDir,
     Directory? workDir,
+    this._exit = exit,
   }) : workDir =
            workDir ??
            Directory('${Directory.systemTemp.path}\\couchplay-update');
+
+  /// Sortie du processus : `exit` de `dart:io`, remplacé dans les tests.
+  final void Function(int code) _exit;
 
   /// Pour l'app dont l'exe est dans [appDir], d'après ce qu'il y a à côté :
   /// le marqueur `portable` du zip, ou le désinstalleur d'Inno Setup de
@@ -89,7 +93,7 @@ final class WindowsInstaller implements Installer {
       const Duration(seconds: 5),
       onTimeout: () {},
     );
-    exit(0);
+    _exit(0);
   }
 
   /// Rien à faire : le script d'une session précédente a déjà installé la
