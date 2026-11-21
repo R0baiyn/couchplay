@@ -455,7 +455,7 @@ final startupUpdateProvider = FutureProvider<StartupOffer?>((ref) async {
   try {
     return await updater.startup();
   } on Exception catch (e) {
-    log('Vérification des mises à jour', error: e.runtimeType);
+    log('Vérification des mises à jour', error: '${e.runtimeType}: $e');
     return null;
   }
 });

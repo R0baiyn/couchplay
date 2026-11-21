@@ -79,8 +79,12 @@ Future<void> showUpdateDialog(
             ),
             // Réseau, GitHub ou signature refusée : rien ne s'installera,
             // l'utilisateur le sait (Q-29).
-            onError: (Object e) {
-              log('Préparation de la mise à jour', error: e.runtimeType);
+            onError: (Object e, StackTrace stack) {
+              log(
+                'Préparation de la mise à jour',
+                error: '${e.runtimeType}: $e',
+                stack: stack,
+              );
               messenger.showSnackBar(
                 const SnackBar(content: Text(_impossible)),
               );
@@ -128,10 +132,10 @@ Future<void> showUpdateDialog(
     // Windows ferme l'app ici ; Android ouvre son installateur par-dessus.
     await updater.installNow(update);
     navigator.pop();
-  } on Object catch (e) {
+  } on Object catch (e, stack) {
     // Toute erreur, pas seulement une Exception : la fenêtre de progression
     // ne se ferme pas seule, elle bloquerait l'app.
-    log('Mise à jour', error: e.runtimeType);
+    log('Mise à jour', error: '${e.runtimeType}: $e', stack: stack);
     navigator.pop();
     final cancelled = e is DioException && CancelToken.isCancel(e);
     messenger.showSnackBar(
@@ -183,9 +187,9 @@ Future<void> showHeldUpdateDialog(
   final messenger = ScaffoldMessenger.of(context);
   try {
     await updater.installer.installNow();
-  } on Object catch (e) {
+  } on Object catch (e, stack) {
     // Appareil sans installateur : l'app continue, l'utilisateur le sait.
-    log('Mise à jour en attente', error: e.runtimeType);
+    log('Mise à jour en attente', error: '${e.runtimeType}: $e', stack: stack);
     messenger.showSnackBar(const SnackBar(content: Text(_impossible)));
   }
 }
@@ -229,6 +233,6 @@ Future<void> _showPageDialog(
     await openPage(page);
   } on Exception catch (e) {
     // Sans xdg-open, l'app continue : la release reste sur GitHub.
-    log('Ouverture de la page de mise à jour', error: e.runtimeType);
+    log('Ouverture de la page de mise à jour', error: '${e.runtimeType}: $e');
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:couchplay/logging.dart';
 import 'package:couchplay/update/linux_installer.dart';
 import 'package:couchplay/update/update_dialog.dart';
 import 'package:couchplay/update/updater.dart';
@@ -162,6 +163,32 @@ void main() {
     await waitFor(tester, () => installer.installs > 0);
     expect(find.textContaining('Téléchargement'), findsNothing);
     expect(find.text(impossible), findsOneWidget);
+  });
+
+  testWidgets("« Mettre à jour » : le journal dit l'erreur, pas son type", (
+    tester,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('couchplay_journal_');
+    final journal = File('${dir.path}${Platform.pathSeparator}couchplay.log');
+    openJournal(journal);
+    addTearDown(
+      () => tester.runAsync(() async {
+        await closeJournal();
+        dir.deleteSync(recursive: true);
+      }),
+    );
+    final (_, installer) = await open(tester, fails: true);
+    await tester.tap(find.byKey(const ValueKey('update.install')));
+    await waitFor(tester, () => installer.installs > 0);
+
+    // Écrit en vraies E/S, hors du temps simulé : comme le téléchargement.
+    const line =
+        'Mise à jour : PlatformException: '
+        'PlatformException(install, null, null, null)';
+    await waitFor(
+      tester,
+      () => journal.existsSync() && journal.readAsStringSync().contains(line),
+    );
   });
 
   testWidgets('« Mettre à jour » : signature refusée, rien installé, dit', (

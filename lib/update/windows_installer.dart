@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../accounts/account_files.dart';
+import '../logging.dart';
 import 'updater.dart';
 import 'hidden_process.dart';
 
@@ -93,6 +94,9 @@ final class WindowsInstaller implements Installer {
       const Duration(seconds: 5),
       onTimeout: () {},
     );
+    // Le journal aussi, dernière ligne comprise (D-058).
+    log('Fermeture pour installer la mise à jour');
+    await flushJournal();
     _exit(0);
   }
 
