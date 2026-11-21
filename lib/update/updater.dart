@@ -8,10 +8,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../logging.dart';
 import 'release_signature.dart';
 
+/// Ce que l'accueil propose au démarrage, une fois devant : une mise à jour
+/// publiée ([Update]) ou une mise à jour en attente que la place retient
+/// ([ShortOfSpace]).
+sealed class StartupOffer {}
+
 /// Une version publiée plus récente que celle de l'app, et le fichier à
 /// télécharger pour cette variante (installée, portable, APK d'une
 /// architecture).
-final class Update {
+final class Update implements StartupOffer {
   const Update({
     required this.version,
     required this.notes,
@@ -108,6 +113,32 @@ Update? updateFrom(
   return null;
 }
 
+/// Trop peu de place pour installer : [free] octets libres, environ [needed]
+/// nécessaires.
+final class ShortOfSpace implements StartupOffer {
+  const ShortOfSpace({required this.free, required this.needed});
+  final int free;
+  final int needed;
+}
+
+/// Réserve qu'Android garde libre pendant une installation : le plafond de
+/// `StorageManager.getStorageLowBytes`, illisible par l'app (D-057).
+const _lowReserve = 500 * 1024 * 1024;
+
+/// Place manquante pour installer un APK de [apkSize] octets, `null` si
+/// [free] suffit ou est inconnue. Android 9 en garde trois copies : la nôtre
+/// (déjà là si [downloaded]), celle de son installateur et celle de la
+/// session d'installation, plus sa réserve (D-057).
+ShortOfSpace? spaceShortfall(
+  int? free,
+  int apkSize, {
+  required bool downloaded,
+}) {
+  if (free == null) return null;
+  final needed = (downloaded ? 2 : 3) * apkSize + _lowReserve;
+  return free < needed ? ShortOfSpace(free: free, needed: needed) : null;
+}
+
 /// Ce qui change d'une plateforme à l'autre : le fichier de la release à
 /// prendre, et son installation.
 abstract interface class Installer {
@@ -144,8 +175,16 @@ abstract interface class Installer {
 
   /// Au démarrage, installe une mise à jour préparée lors d'une session
   /// précédente, si elle est plus récente que [current] : `true` si
-  /// l'installation est lancée.
-  Future<bool> installPending(String current);
+  /// l'installation est lancée. [allow] reçoit la taille du fichier en
+  /// attente juste avant : `false` la retient, sans rien effacer.
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  });
+
+  /// Octets libres là où la mise à jour se télécharge et s'installe, `null`
+  /// quand la plateforme n'en dit rien.
+  Future<int?> freeSpace();
 }
 
 /// Le fichier téléchargé n'est pas dans la liste signée de sa release, ou
@@ -243,8 +282,34 @@ final class Updater {
     await installer.installNow();
   }
 
-  /// Au démarrage : voir [Installer.installPending].
-  Future<bool> installPending() => installer.installPending(version);
+  /// Place manquante pour télécharger puis installer [update], `null` si
+  /// elle suffit ou est inconnue.
+  Future<ShortOfSpace?> shortfall(Update update) async => spaceShortfall(
+    await installer.freeSpace(),
+    update.size,
+    downloaded: false,
+  );
+
+  /// Au démarrage : une mise à jour remise à plus tard s'installe d'abord
+  /// ([Installer.installPending]) et rien n'est proposé ; trop peu de place,
+  /// elle attend l'accord de l'utilisateur ([ShortOfSpace]), sans vérifier
+  /// s'il y en a une autre. Sinon, la mise à jour publiée ([check]).
+  Future<StartupOffer?> startup() async {
+    ShortOfSpace? held;
+    final started = await installer.installPending(
+      version,
+      allow: (size) async {
+        held = spaceShortfall(
+          await installer.freeSpace(),
+          size,
+          downloaded: true,
+        );
+        return held == null;
+      },
+    );
+    if (started) return null;
+    return held ?? await check();
+  }
 
   Future<void> _prepare(Update update) async {
     final workDir = installer.workDir;
@@ -382,15 +447,13 @@ final appVersionProvider = Provider<String>(
 /// Windows, émulateur Android) : `main()` le fournit sinon.
 final updaterProvider = Provider<Updater?>((ref) => null);
 
-/// Au démarrage : une mise à jour remise à plus tard s'installe d'abord,
-/// sinon on vérifie s'il y en a une. Une erreur réseau ou GitHub donne
+/// Au démarrage : voir [Updater.startup]. Une erreur réseau ou GitHub donne
 /// `null` : l'app continue sans mise à jour.
-final startupUpdateProvider = FutureProvider<Update?>((ref) async {
+final startupUpdateProvider = FutureProvider<StartupOffer?>((ref) async {
   final updater = ref.watch(updaterProvider);
   if (updater == null) return null;
   try {
-    if (await updater.installPending()) return null;
-    return await updater.check();
+    return await updater.startup();
   } on Exception catch (e) {
     log('Vérification des mises à jour', error: e.runtimeType);
     return null;

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../format.dart';
 import '../logging.dart';
 import 'updater.dart';
 
@@ -11,6 +12,8 @@ import 'updater.dart';
 /// « Plus tard » la télécharge en fond, et elle s'installe à la fermeture
 /// (Windows) ou au prochain démarrage (Android). Sous Linux, rien ne se
 /// télécharge : « Ouvrir la page » ouvre la release dans le navigateur.
+/// Trop peu de place (Android), [confirmSpace] prévient avant tout
+/// téléchargement.
 Future<void> showUpdateDialog(
   BuildContext context,
   Updater updater,
@@ -53,6 +56,10 @@ Future<void> showUpdateDialog(
       ],
     ),
   );
+  if (!context.mounted) return;
+  final short = await updater.shortfall(update);
+  if (!context.mounted) return;
+  if (short != null && !await confirmSpace(context, short)) return;
   if (!context.mounted) return;
   final messenger = ScaffoldMessenger.of(context);
   if (now != true) {
@@ -130,6 +137,56 @@ Future<void> showUpdateDialog(
     messenger.showSnackBar(
       SnackBar(content: Text(cancelled ? 'Mise à jour annulée.' : _impossible)),
     );
+  }
+}
+
+/// « Place insuffisante » : `true` pour « Continuer quand même ». Fermer la
+/// fenêtre vaut « Annuler ». Le focus va sur « Annuler » : le même appui sur
+/// OK qui a choisi « Mettre à jour » ne relance pas une installation vouée
+/// à l'échec sans que l'avertissement ait été lu.
+Future<bool> confirmSpace(BuildContext context, ShortOfSpace short) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Place insuffisante'),
+        content: Text(
+          '${formatSize(short.free)} libres, environ '
+          '${formatSize(short.needed)} nécessaires. Libérez de la place '
+          '(par exemple le cache d\'autres applis).',
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('update.spaceContinue'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continuer quand même'),
+          ),
+          FilledButton(
+            key: const ValueKey('update.spaceCancel'),
+            autofocus: true,
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+        ],
+      ),
+    ) ??
+    false;
+
+/// Au démarrage, une mise à jour en attente que la place retient
+/// ([Updater.startup]) : « Continuer quand même » ouvre l'installateur,
+/// « Annuler » la laisse pour le démarrage suivant.
+Future<void> showHeldUpdateDialog(
+  BuildContext context,
+  Updater updater,
+  ShortOfSpace short,
+) async {
+  if (!await confirmSpace(context, short) || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await updater.installer.installNow();
+  } on Object catch (e) {
+    // Appareil sans installateur : l'app continue, l'utilisateur le sait.
+    log('Mise à jour en attente', error: e.runtimeType);
+    messenger.showSnackBar(const SnackBar(content: Text(_impossible)));
   }
 }
 

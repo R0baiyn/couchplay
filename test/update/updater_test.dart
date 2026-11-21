@@ -23,6 +23,8 @@ final class _FakeInstaller implements Installer {
     this.workDir, {
     this.pending = false,
     this.pendingError,
+    this.pendingSize,
+    this.free,
     this.signed = false,
   });
 
@@ -34,6 +36,15 @@ final class _FakeInstaller implements Installer {
 
   /// Levée par [installPending] à la place de sa réponse.
   final Exception? pendingError;
+
+  /// Taille d'un fichier en attente soumis à `allow` avant l'installation.
+  final int? pendingSize;
+
+  /// Réponse de [freeSpace].
+  final int? free;
+
+  /// Nombre d'appels à [installNow].
+  var installs = 0;
 
   /// Contenu de chaque fichier préparé.
   final received = <String>[];
@@ -58,17 +69,76 @@ final class _FakeInstaller implements Installer {
       received.add(await package.readAsString());
 
   @override
-  Future<void> installNow() async {}
+  Future<void> installNow() async => installs++;
 
   @override
-  Future<bool> installPending(String current) async {
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  }) async {
     if (pendingError case final error?) throw error;
+    if (pendingSize case final size?) {
+      if (allow != null && !await allow(size)) return false;
+      await installNow();
+      return true;
+    }
     return pending;
   }
+
+  @override
+  Future<int?> freeSpace() async => free;
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('spaceShortfall', () {
+    // Fire TV du 2026-11-21 (D-057) : place libre et APK armv7 de la 1.3.0.
+    const fireTvFree = 572723200;
+    const apk = 29450459;
+
+    test('Fire TV, APK déjà téléchargé : avertissement', () {
+      final short = spaceShortfall(fireTvFree, apk, downloaded: true);
+      expect(short?.free, fireTvFree);
+      expect(short?.needed, 2 * apk + 500 * 1024 * 1024);
+    });
+
+    test('Fire TV, avant le téléchargement : avertissement', () {
+      final short = spaceShortfall(fireTvFree, apk, downloaded: false);
+      expect(short?.needed, 3 * apk + 500 * 1024 * 1024);
+    });
+
+    test('place suffisante : rien', () {
+      expect(
+        spaceShortfall(3 * apk + 500 * 1024 * 1024, apk, downloaded: false),
+        isNull,
+      );
+      expect(spaceShortfall(4000000000, apk, downloaded: true), isNull);
+    });
+
+    test('place inconnue : rien', () {
+      expect(spaceShortfall(null, apk, downloaded: false), isNull);
+    });
+
+    test('Updater.shortfall compte le téléchargement à venir', () async {
+      final update = Update(
+        version: '0.2.0',
+        notes: '',
+        asset: Uri(),
+        size: apk,
+      );
+      Updater with_(int? free) => Updater(
+        version: '0.1.0',
+        installer: _FakeInstaller(Directory.systemTemp, free: free),
+      );
+      expect(
+        (await with_(fireTvFree).shortfall(update))?.needed,
+        3 * apk + 500 * 1024 * 1024,
+      );
+      expect(await with_(null).shortfall(update), isNull);
+      expect(await with_(4000000000).shortfall(update), isNull);
+    });
+  });
 
   group('isNewer', () {
     test('compare chaque numéro, pas le texte', () {
@@ -264,14 +334,16 @@ void main() {
           workDir: work,
         );
         expect(await windows.installPending('0.1.0'), isFalse);
+        expect(await windows.freeSpace(), isNull, reason: 'rien à signaler');
         expect(work.listSync(), hasLength(1), reason: 'rien de lancé');
       },
     );
   });
 
-  test('seul Linux ouvre la page de la release au lieu d\'installer', () {
+  test('seul Linux ouvre la page de la release au lieu d\'installer', () async {
     final temp = Directory.systemTemp;
     expect(LinuxInstaller().openPage, isNotNull);
+    expect(await LinuxInstaller().freeSpace(), isNull);
     expect(WindowsInstaller(portable: true, appDir: temp).openPage, isNull);
     expect(
       AndroidInstaller(
@@ -591,7 +663,7 @@ void main() {
       calls = [];
       messenger.setMockMethodCallHandler(channel, (call) async {
         calls.add(call.method);
-        return null;
+        return call.method == 'freeSpace' ? 572723200 : null;
       });
     });
     tearDown(() {
@@ -619,6 +691,58 @@ void main() {
         expect(calls, ['install']);
       },
     );
+
+    test('retenue par allow : ni installateur ni effacement', () async {
+      await prepare();
+      final sizes = <int>[];
+      final started = await installer().installPending(
+        '0.2.0',
+        allow: (size) async {
+          sizes.add(size);
+          return false;
+        },
+      );
+      expect(started, isFalse);
+      expect(sizes, [3]);
+      expect(calls, isEmpty);
+      expect(File('${work.path}/couchplay.apk').existsSync(), isTrue);
+      expect(File('${work.path}/version').existsSync(), isTrue);
+    });
+
+    test('acceptée par allow : l\'installateur s\'ouvre', () async {
+      await prepare();
+      final started = await installer().installPending(
+        '0.2.0',
+        allow: (_) async => true,
+      );
+      expect(started, isTrue);
+      expect(calls, ['install']);
+    });
+
+    test('déjà installée : allow n\'est pas consulté', () async {
+      await prepare();
+      var asked = false;
+      await installer().installPending(
+        '0.2.1',
+        allow: (_) async => asked = true,
+      );
+      expect(asked, isFalse);
+    });
+
+    test('place libre lue par le canal', () async {
+      expect(await installer().freeSpace(), 572723200);
+      expect(calls, ['freeSpace']);
+    });
+
+    test('canal sans réponse : place inconnue', () async {
+      messenger.setMockMethodCallHandler(
+        channel,
+        (_) async => throw PlatformException(code: 'freeSpace'),
+      );
+      expect(await installer().freeSpace(), isNull);
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(await installer().freeSpace(), isNull);
+    });
 
     test('déjà installée : rien, et le dossier est vidé', () async {
       await prepare();
@@ -660,7 +784,7 @@ void main() {
   });
 
   group('au démarrage', () {
-    Future<Update?> startup(Updater updater) {
+    Future<StartupOffer?> startup(Updater updater) {
       final container = ProviderContainer(
         overrides: [updaterProvider.overrideWithValue(updater)],
       );
@@ -690,6 +814,43 @@ void main() {
         expect(adapter.calls, 0);
       },
     );
+
+    test(
+      'trop peu de place : l\'installateur attend l\'accord, sans vérifier',
+      () async {
+        final adapter = FakeAdapter.replying('{}');
+        final installer = _FakeInstaller(
+          Directory.systemTemp,
+          pendingSize: 29450459,
+          free: 572723200,
+        );
+        final updater = Updater(
+          version: '0.1.0',
+          installer: installer,
+          adapter: adapter,
+        );
+        final offer = await startup(updater);
+        expect(offer, isA<ShortOfSpace>());
+        expect((offer! as ShortOfSpace).free, 572723200);
+        expect(installer.installs, 0);
+        expect(adapter.calls, 0);
+      },
+    );
+
+    test('place suffisante : l\'installateur s\'ouvre seul', () async {
+      final installer = _FakeInstaller(
+        Directory.systemTemp,
+        pendingSize: 29450459,
+        free: 4000000000,
+      );
+      final updater = Updater(
+        version: '0.1.0',
+        installer: installer,
+        adapter: FakeAdapter.replying('{}'),
+      );
+      expect(await startup(updater), isNull);
+      expect(installer.installs, 1);
+    });
 
     test(
       'installateur introuvable : pas de mise à jour, sans erreur',

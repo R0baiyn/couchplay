@@ -81,7 +81,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   /// Mise à jour trouvée au démarrage, pas encore proposée : elle attend que
   /// l'accueil soit devant, jamais par-dessus le lecteur ou une fiche.
-  Update? _update;
+  StartupOffer? _update;
 
   void _offerUpdate() {
     final update = _update;
@@ -89,7 +89,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (update == null || updater == null) return;
     _update = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showUpdateDialog(context, updater, update);
+      if (!mounted) return;
+      switch (update) {
+        case final Update update:
+          showUpdateDialog(context, updater, update);
+        case final ShortOfSpace short:
+          showHeldUpdateDialog(context, updater, short);
+      }
     });
   }
 

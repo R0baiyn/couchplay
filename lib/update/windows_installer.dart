@@ -102,7 +102,13 @@ final class WindowsInstaller implements Installer {
   /// interrompu) n'est jamais lancé d'ici : la prochaine préparation vide le
   /// dossier, puis télécharge et vérifie de nouveau.
   @override
-  Future<bool> installPending(String current) async => false;
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  }) async => false;
+
+  @override
+  Future<int?> freeSpace() async => null;
 }
 
 /// Script d'installation, en `.cmd`, sans dépendre de la politique

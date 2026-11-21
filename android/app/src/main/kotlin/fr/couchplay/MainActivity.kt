@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
+import android.os.StatFs
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -30,11 +31,14 @@ class MainActivity : FlutterActivity() {
         //   fichier exposé (res/xml/update_paths.xml).
         // - supported64BitAbis : architectures 64 bits de l'appareil, pour
         //   choisir l'APK arm64 même quand l'app installée tourne en armv7.
+        // - freeSpace : octets libres du volume du cache (/data), où vont
+        //   l'APK et l'installation : StatFs marche sur toutes les ABI.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "couchplay/update")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "install" -> install(result)
                     "supported64BitAbis" -> result.success(Build.SUPPORTED_64_BIT_ABIS.toList())
+                    "freeSpace" -> result.success(StatFs(cacheDir.path).availableBytes)
                     else -> result.notImplemented()
                 }
             }

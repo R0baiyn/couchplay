@@ -72,7 +72,13 @@ final class _FakeInstaller implements Installer {
   Future<void> installNow() async => installs++;
 
   @override
-  Future<bool> installPending(String current) async => false;
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  }) async => false;
+
+  @override
+  Future<int?> freeSpace() async => null;
 }
 
 /// La fausse release : `releases/latest`, puis la liste, sa signature par

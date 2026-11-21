@@ -88,7 +88,21 @@ final class AndroidInstaller implements Installer {
   Future<void> installNow() => _channel.invokeMethod<void>('install');
 
   @override
-  Future<bool> installPending(String current) async {
+  Future<int?> freeSpace() async {
+    try {
+      return await _channel.invokeMethod<int>('freeSpace');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  }) async {
     final String version;
     try {
       version = await _version.readAsString();
@@ -100,6 +114,8 @@ final class AndroidInstaller implements Installer {
       await workDir.delete(recursive: true);
       return false;
     }
+    // Retenue (place insuffisante) : elle reste là pour plus tard.
+    if (allow != null && !await allow(await _apk.length())) return false;
     await installNow();
     return true;
   }

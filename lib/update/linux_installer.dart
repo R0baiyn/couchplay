@@ -42,5 +42,11 @@ final class LinuxInstaller implements Installer {
       throw UnsupportedError('Pas d\'installation sous Linux');
 
   @override
-  Future<bool> installPending(String current) async => false;
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  }) async => false;
+
+  @override
+  Future<int?> freeSpace() async => null;
 }

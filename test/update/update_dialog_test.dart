@@ -13,7 +13,15 @@ import '../support/fake_server.dart';
 
 /// Installation simulée : compte les installations, échoue sur demande.
 final class _FakeInstaller implements Installer {
-  _FakeInstaller(this.workDir, {this.fails = false, this.signed = false});
+  _FakeInstaller(
+    this.workDir, {
+    this.fails = false,
+    this.signed = false,
+    this.free,
+  });
+
+  /// Réponse de [freeSpace] : `null`, place inconnue.
+  final int? free;
 
   @override
   final Directory workDir;
@@ -49,7 +57,13 @@ final class _FakeInstaller implements Installer {
   }
 
   @override
-  Future<bool> installPending(String current) async => false;
+  Future<bool> installPending(
+    String current, {
+    Future<bool> Function(int size)? allow,
+  }) async => false;
+
+  @override
+  Future<int?> freeSpace() async => free;
 }
 
 /// Message de tout échec de la mise à jour (Q-29).
@@ -78,12 +92,14 @@ void main() {
     WidgetTester tester, {
     bool fails = false,
     bool signed = false,
+    int? free,
     FakeAdapter? adapter,
   }) async {
     final installer = _FakeInstaller(
       Directory('${work.path}${Platform.pathSeparator}update'),
       fails: fails,
       signed: signed,
+      free: free,
     );
     final updater = Updater(
       version: '0.1.0',
@@ -217,6 +233,107 @@ void main() {
     await waitFor(tester, () => find.byType(SnackBar).evaluate().isNotEmpty);
     expect(find.text(impossible), findsOneWidget);
     expect(installer.prepares, 0);
+  });
+
+  group('place insuffisante', () {
+    // Moins que 3 APK de 3 octets + 500 Mio de réserve (D-057).
+    const low = 1000;
+
+    for (final (button, label) in [
+      ('update.install', 'Mettre à jour'),
+      ('update.later', 'Plus tard'),
+    ]) {
+      testWidgets('« $label » : avertit, « Continuer quand même » télécharge', (
+        tester,
+      ) async {
+        final adapter = FakeAdapter.replying('abc');
+        final (_, installer) = await open(tester, free: low, adapter: adapter);
+        await tester.tap(find.byKey(ValueKey(button)));
+        await tester.pumpAndSettle();
+        expect(find.text('Place insuffisante'), findsOneWidget);
+        expect(find.textContaining('1 Ko libres'), findsOneWidget);
+        expect(adapter.calls, 0, reason: 'rien avant le choix');
+
+        await tester.tap(find.byKey(const ValueKey('update.spaceContinue')));
+        await waitFor(tester, () => installer.prepares > 0);
+        expect(find.text('Place insuffisante'), findsNothing);
+        expect(installer.installs, button == 'update.install' ? 1 : 0);
+      });
+
+      testWidgets('« $label » puis « Annuler » : rien téléchargé ni dit', (
+        tester,
+      ) async {
+        final adapter = FakeAdapter.replying('abc');
+        final (_, installer) = await open(tester, free: low, adapter: adapter);
+        await tester.tap(find.byKey(ValueKey(button)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('update.spaceCancel')));
+        await tester.pumpAndSettle();
+        expect(find.text('Place insuffisante'), findsNothing);
+        expect(find.textContaining('Téléchargement'), findsNothing);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(adapter.calls, 0);
+        expect(installer.prepares, 0);
+        expect(installer.installs, 0);
+      });
+    }
+
+    testWidgets('place suffisante : aucune boîte, téléchargé', (tester) async {
+      final (_, installer) = await open(tester, free: 10000000000);
+      await tester.tap(find.byKey(const ValueKey('update.install')));
+      await tester.pump();
+      expect(find.text('Place insuffisante'), findsNothing);
+      await waitFor(tester, () => installer.installs > 0);
+      expect(find.text('Place insuffisante'), findsNothing);
+    });
+
+    /// Au démarrage : la boîte d'une mise à jour en attente, ouverte.
+    Future<_FakeInstaller> openHeld(WidgetTester tester) async {
+      final installer = _FakeInstaller(work);
+      final updater = Updater(version: '0.1.0', installer: installer);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                key: const ValueKey('test.open'),
+                onPressed: () => showHeldUpdateDialog(
+                  context,
+                  updater,
+                  const ShortOfSpace(free: 572723200, needed: 583188918),
+                ),
+                child: const Text('Ouvrir'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('test.open')));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('573 Mo libres, environ 583 Mo'),
+        findsOneWidget,
+      );
+      return installer;
+    }
+
+    testWidgets('au démarrage, « Continuer quand même » installe', (
+      tester,
+    ) async {
+      final installer = await openHeld(tester);
+      expect(installer.installs, 0);
+      await tester.tap(find.byKey(const ValueKey('update.spaceContinue')));
+      await tester.pumpAndSettle();
+      expect(installer.installs, 1);
+    });
+
+    testWidgets('au démarrage, « Annuler » n\'installe rien', (tester) async {
+      final installer = await openHeld(tester);
+      await tester.tap(find.byKey(const ValueKey('update.spaceCancel')));
+      await tester.pumpAndSettle();
+      expect(installer.installs, 0);
+      expect(find.byType(SnackBar), findsNothing);
+    });
   });
 
   group('Linux', () {
