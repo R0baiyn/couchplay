@@ -263,7 +263,7 @@ void main() {
   });
 
   group('place insuffisante', () {
-    // Moins que 3 APK de 3 octets + 500 Mio de réserve (D-057).
+    // Moins que la réserve d'installd (1 Gio) + 2 APK de 3 octets (D-059).
     const low = 1000;
 
     for (final (button, label) in [

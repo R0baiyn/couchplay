@@ -93,27 +93,43 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('spaceShortfall', () {
-    // Fire TV du 2026-11-21 (D-057) : place libre et APK armv7 de la 1.3.0.
-    const fireTvFree = 572723200;
+    // Fire TV, essai du 2026-11-21 (D-059) : l'APK armv7 de la 1.3.0 et la
+    // place libre mesurée avant « Mettre à jour », puis au redémarrage, où
+    // l'installation a échoué (INSUFFICIENT_STORAGE).
     const apk = 29450459;
-
-    test('Fire TV, APK déjà téléchargé : avertissement', () {
-      final short = spaceShortfall(fireTvFree, apk, downloaded: true);
-      expect(short?.free, fireTvFree);
-      expect(short?.needed, 2 * apk + 500 * 1024 * 1024);
-    });
+    const freeBefore = 650940416;
+    const freeAtStartup = 601075712;
+    // Cible `freeCache` d'installd.
+    const target = 1048576000;
 
     test('Fire TV, avant le téléchargement : avertissement', () {
-      final short = spaceShortfall(fireTvFree, apk, downloaded: false);
-      expect(short?.needed, 3 * apk + 500 * 1024 * 1024);
+      final short = spaceShortfall(freeBefore, apk, downloaded: false);
+      expect(short?.free, freeBefore);
+      expect(short?.needed, target + 2 * apk);
+    });
+
+    test('Fire TV, APK déjà téléchargé : avertissement', () {
+      final short = spaceShortfall(freeAtStartup, apk, downloaded: true);
+      expect(short?.free, freeAtStartup);
+      expect(short?.needed, target + apk);
     });
 
     test('place suffisante : rien', () {
-      expect(
-        spaceShortfall(3 * apk + 500 * 1024 * 1024, apk, downloaded: false),
-        isNull,
-      );
+      expect(spaceShortfall(target + 2 * apk, apk, downloaded: false), isNull);
+      expect(spaceShortfall(target + apk, apk, downloaded: true), isNull);
+      expect(spaceShortfall(4000000000, apk, downloaded: false), isNull);
       expect(spaceShortfall(4000000000, apk, downloaded: true), isNull);
+    });
+
+    test('un octet de moins que le besoin : avertissement', () {
+      expect(
+        spaceShortfall(target + 2 * apk - 1, apk, downloaded: false),
+        isNotNull,
+      );
+      expect(
+        spaceShortfall(target + apk - 1, apk, downloaded: true),
+        isNotNull,
+      );
     });
 
     test('place inconnue : rien', () {
@@ -132,8 +148,8 @@ void main() {
         installer: _FakeInstaller(Directory.systemTemp, free: free),
       );
       expect(
-        (await with_(fireTvFree).shortfall(update))?.needed,
-        3 * apk + 500 * 1024 * 1024,
+        (await with_(freeBefore).shortfall(update))?.needed,
+        1048576000 + 2 * apk,
       );
       expect(await with_(null).shortfall(update), isNull);
       expect(await with_(4000000000).shortfall(update), isNull);

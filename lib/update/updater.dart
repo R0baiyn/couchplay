@@ -121,21 +121,23 @@ final class ShortOfSpace implements StartupOffer {
   final int needed;
 }
 
-/// Réserve qu'Android garde libre pendant une installation : le plafond de
-/// `StorageManager.getStorageLowBytes`, illisible par l'app (D-057).
-const _lowReserve = 500 * 1024 * 1024;
+/// Place qu'`installd` cherche à libérer sur `/data` avant d'installer
+/// (`Failed to free up 1048576000`, la cible `freeCache`) : en dessous,
+/// l'installation de Fire OS échoue en `INSUFFICIENT_STORAGE` (D-059, qui
+/// remplace la réserve de 500 Mio de D-057, démentie par l'essai).
+const _installReserve = 1048576000;
 
 /// Place manquante pour installer un APK de [apkSize] octets, `null` si
-/// [free] suffit ou est inconnue. Android 9 en garde trois copies : la nôtre
-/// (déjà là si [downloaded]), celle de son installateur et celle de la
-/// session d'installation, plus sa réserve (D-057).
+/// [free] suffit ou est inconnue : la réserve d'`installd` plus deux APK avant
+/// le téléchargement (le nôtre et la copie de l'installateur), un seul quand
+/// il est déjà sur le disque ([downloaded]) (D-059).
 ShortOfSpace? spaceShortfall(
   int? free,
   int apkSize, {
   required bool downloaded,
 }) {
   if (free == null) return null;
-  final needed = (downloaded ? 2 : 3) * apkSize + _lowReserve;
+  final needed = (downloaded ? 1 : 2) * apkSize + _installReserve;
   return free < needed ? ShortOfSpace(free: free, needed: needed) : null;
 }
 
