@@ -239,6 +239,10 @@ final class ServerClient {
   /// Libère les connexions. Le client n'est plus utilisable ensuite.
   void close() => _dio.close(force: true);
 
-  void _log(String message, Object error) =>
-      log(message, error: error, secrets: [username, password]);
+  /// Le nom d'hôte est masqué comme les identifiants : le journal se copie.
+  void _log(String message, Object error) => log(
+    message,
+    error: error,
+    secrets: [username, password, Uri.tryParse(host)?.host ?? ''],
+  );
 }

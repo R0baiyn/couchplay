@@ -69,7 +69,8 @@ final class CloudflareDns {
         );
         return address;
       } on Exception catch (e) {
-        log('DNS Cloudflare $server : $host', error: e.runtimeType);
+        // Sans le nom : un journal qu'on copie ne doit pas nommer le serveur.
+        log('DNS Cloudflare $server', error: e.runtimeType);
       }
     }
     _cache[host] = (address: null, until: _elapsed() + _failureDelay);

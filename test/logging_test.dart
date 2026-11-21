@@ -94,6 +94,17 @@ void main() {
       expect(message, 'mot de passe refusé : *** (***)');
     });
 
+    test('masque le nom de session dans un chemin de fichier', () {
+      expect(
+        redact(r'FileSystemException: C:\Users\jean\AppData\x.json'),
+        r'FileSystemException: C:\Users\***\AppData\x.json',
+      );
+      expect(
+        redact('Cannot open /home/jean/.local/x'),
+        'Cannot open /home/***/.local/x',
+      );
+    });
+
     test('masque les identifiants sous forme JSON, même tronqués', () {
       expect(
         redact('{"user_info":{"username":"$user","password" : "$pass"}}'),

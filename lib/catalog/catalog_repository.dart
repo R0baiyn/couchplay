@@ -163,6 +163,9 @@ Future<T?> _readCached<T>(String path, T Function(String) parse) async {
 /// URL masquées (une page d'erreur peut recopier l'adresse demandée).
 String _preview(String text) {
   final line = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-  final cut = line.length > 120 ? '${line.substring(0, 120)}…' : line;
-  return line.isEmpty ? '(réponse vide, ${text.length} octets)' : redact(cut);
+  // Masquer avant de couper : un chemin de flux coupé en route échapperait au
+  // masquage.
+  final masked = redact(line);
+  final cut = masked.length > 120 ? '${masked.substring(0, 120)}…' : masked;
+  return line.isEmpty ? '(réponse vide, ${text.length} octets)' : cut;
 }

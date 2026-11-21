@@ -187,7 +187,7 @@ void main() {
     );
   });
 
-  test('les logs d\'erreur ne contiennent pas les identifiants', () async {
+  test('les logs d\'erreur ne contiennent ni identifiants ni hôte', () async {
     final lines = <String>[];
     final original = debugPrint;
     debugPrint = (message, {wrapWidth}) => lines.add('$message');
@@ -206,6 +206,7 @@ void main() {
       for (final secret in [
         _user,
         _pass,
+        'example.com',
         Uri.encodeQueryComponent(_user),
         Uri.encodeQueryComponent(_pass),
       ]) {

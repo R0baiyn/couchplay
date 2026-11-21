@@ -33,6 +33,12 @@ final _jsonCredentials = RegExp(
   r'''("(?:username|password)"\s*:\s*)(?:"(?:[^"\\]|\\.)*"?|[^,}\]\s]+)''',
   caseSensitive: false,
 );
+// Nom de session dans un chemin (`C:\Users\<nom>`, `/home/<nom>`) : une
+// erreur de fichier le recopie, et le journal se copie.
+final _homePath = RegExp(
+  r'''((?:[a-z]:\\users\\|/home/))[^\\/\s"']+''',
+  caseSensitive: false,
+);
 // Direct sans préfixe : http://hôte:port/U/P/42 ou /42.ts
 final _shortLivePath = RegExp(
   '(://$_segment/)$_credential/$_credential'
@@ -50,7 +56,8 @@ String redact(String text, {Iterable<String> secrets = const []}) {
       .replaceAllMapped(_jsonCredentials, (m) => '${m[1]}"$_mask"')
       .replaceAllMapped(_userInfo, (m) => '${m[1]}$_mask:$_mask@')
       .replaceAllMapped(_streamPath, (m) => '${m[1]}$_mask/$_mask')
-      .replaceAllMapped(_shortLivePath, (m) => '${m[1]}$_mask/$_mask');
+      .replaceAllMapped(_shortLivePath, (m) => '${m[1]}$_mask/$_mask')
+      .replaceAllMapped(_homePath, (m) => '${m[1]}$_mask');
 
   final variants = <String>{
     for (final secret in secrets)
