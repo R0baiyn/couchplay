@@ -11,7 +11,7 @@ import '../downloads/download.dart';
 import '../downloads/downloads.dart';
 import 'downloads_active_view.dart';
 import 'downloads_ready_view.dart';
-import '../downloads/export.dart';
+import '../desktop_files.dart';
 import '../downloads/offline_list.dart';
 
 /// Onglet « Téléchargements » : ce qui est en cours ou en attente, puis les

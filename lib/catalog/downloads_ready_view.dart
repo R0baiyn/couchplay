@@ -11,6 +11,7 @@ import '../downloads/download.dart';
 import '../downloads/download_button.dart';
 import '../downloads/downloads.dart';
 import 'downloads_poster.dart';
+import '../desktop_files.dart';
 import '../downloads/export.dart';
 import '../downloads/offline_list.dart';
 

@@ -7,6 +7,7 @@ import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/catalog/downloads_screen.dart';
+import 'package:couchplay/desktop_files.dart';
 import 'package:couchplay/downloads/export.dart';
 import 'package:couchplay/focus_ring.dart';
 import 'package:couchplay/library/library.dart';
