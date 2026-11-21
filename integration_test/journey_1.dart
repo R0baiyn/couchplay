@@ -1,5 +1,7 @@
-// Parcours 1 de Docs/FEATURES.md : compte → catalogue → fiche film → lecture.
+// Parcours 1 de Docs/FEATURES.md : compte → catalogue → fiche film → lecture,
+// puis une requête refusée et le journal.
 // Lancé par app_test.dart : flutter test integration_test -d windows.
+import 'package:couchplay/logging.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -63,5 +65,50 @@ void main() {
       what: 'le lecteur est fermé',
     );
     await mouse.removePointer();
+
+    // 9. Requête refusée (le faux serveur répond 500 à l'utilisateur
+    // « 500 ») : un 2e compte qui ne s'ajoute pas, et une ligne au journal.
+    await tester.pageBack();
+    await waitFor(tester, byKey('settings.open'));
+    await tester.tap(byKey('settings.open'));
+    await waitFor(tester, byKey('settings.accounts'));
+    await tester.tap(byKey('settings.accounts'));
+    await waitFor(tester, byKey('accounts.add'));
+    await tester.tap(byKey('accounts.add'));
+    await waitFor(tester, byKey('accounts.name'));
+    await tester.enterText(byKey('accounts.name'), 'Refusé');
+    await tester.enterText(byKey('accounts.host'), server!.host);
+    await tester.enterText(byKey('accounts.username'), '500');
+    await tester.enterText(byKey('accounts.password'), benchPassword);
+    await tester.tap(byKey('accounts.submit'));
+    await waitFor(tester, byKey('accounts.formError'));
+
+    // 10. Journal du dossier temporaire (D-058) : écrit quel que soit le mode
+    // (debug ici, release chez l'utilisateur), en-tête et erreur, masqués.
+    await flushJournal();
+    final journal = journalFile!.readAsStringSync();
+    expect(journal, contains('Démarrage : CouchPlay $benchVersion'));
+    expect(journal, contains('player_api.php?username=***&password=*** : '));
+    expect(journal, isNot(contains('password=$benchPassword')));
+    expect(journal, isNot(contains(benchPassword)));
+
+    // 11. Réglages → « Journal » : l'écran montre le même fichier.
+    // Chaque retour attend la fin du précédent : pendant la transition, deux
+    // boutons Retour sont à l'écran.
+    await tester.pageBack();
+    await waitUntil(
+      tester,
+      () => byKey('accounts.submit').evaluate().isEmpty,
+      what: 'le formulaire est fermé',
+    );
+    await tester.pageBack();
+    await waitFor(tester, byKey('settings.journal'));
+    await tester.tap(byKey('settings.journal'));
+    await waitFor(
+      tester,
+      find.textContaining('Démarrage : CouchPlay $benchVersion'),
+    );
+    expect(byKey('settings.journalCopy'), findsOneWidget);
+    expect(byKey('settings.journalFolder'), findsOneWidget);
   }, timeout: const Timeout(Duration(minutes: 3)));
 }
