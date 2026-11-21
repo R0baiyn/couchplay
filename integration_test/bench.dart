@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/downloads/downloads.dart';
+import 'package:couchplay/logging.dart';
 import 'package:couchplay/main.dart';
 import 'package:couchplay/server/cloudflare_dns.dart';
 import 'package:couchplay/update/updater.dart';
@@ -157,7 +158,8 @@ Future<void> waitPlaying(WidgetTester tester) async {
 
 /// Lance l'app comme `main`, mais sur des dossiers temporaires et un coffre
 /// simulé vide (donc sans compte). Tout est démonté et effacé à la fin du
-/// test. Sans [updater], pas de mise à jour (comme un build local).
+/// test, journal compris ([journalFile] : `support/couchplay.log`). Sans
+/// [updater], pas de mise à jour (comme un build local).
 Future<void> startIsolatedApp(WidgetTester tester, {Updater? updater}) async {
   HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
@@ -189,6 +191,8 @@ Future<void> startIsolatedApp(WidgetTester tester, {Updater? updater}) async {
       // La sortie du lecteur enregistre la position dans un isolate : le
       // fichier encore ouvert empêcherait d'effacer le dossier (Windows).
       await SerialFileWriter.flushAll();
+      // Le journal de l'app est dans `support` : fermé avant l'effacement.
+      await closeJournal();
       await root.delete(recursive: true);
     }
   });
