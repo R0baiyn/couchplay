@@ -97,6 +97,46 @@ void main() {
     expect(offer, findsOneWidget);
   });
 
+  testWidgets(
+    "place insuffisante au démarrage : la boîte une fois l'accueil devant",
+    (tester) async {
+      final found = Completer<StartupOffer?>();
+      await pumpApp(
+        tester,
+        overrides: [
+          // Seul « Annuler » est touché : rien n'est installé.
+          updaterProvider.overrideWithValue(
+            Updater(
+              version: '0.1.0',
+              installer: WindowsInstaller(portable: false, appDir: root),
+              adapter: FakeAdapter.failing(DioExceptionType.connectionError),
+            ),
+          ),
+          startupUpdateProvider.overrideWith((ref) => found.future),
+        ],
+      );
+      final box = find.text('Place insuffisante');
+      await tester.tap(
+        find.byKey(const ValueKey('catalog.poster.movies-144016')),
+      );
+      await settle(tester);
+
+      // Retenue pendant qu'une fiche est ouverte : rien par-dessus.
+      found.complete(const ShortOfSpace(free: 572723200, needed: 583188918));
+      await settle(tester);
+      expect(find.byType(MovieScreen), findsOneWidget);
+      expect(box, findsNothing);
+
+      // De retour sur l'accueil : la boîte, puis « Annuler » la ferme.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(box, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('update.spaceCancel')));
+      await settle(tester);
+      expect(box, findsNothing);
+    },
+  );
+
   testWidgets('Séries : catégories, fiche, saisons et épisodes', (
     tester,
   ) async {

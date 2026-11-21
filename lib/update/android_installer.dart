@@ -30,7 +30,8 @@ String? androidAssetSuffixFor(List<String> supported64BitAbis, Abi current) =>
 /// téléchargé, et Android demande une confirmation à chaque fois.
 ///
 /// Remise à plus tard, la mise à jour reste dans [workDir] avec sa version :
-/// au démarrage suivant, l'installateur s'ouvre de lui-même. Refusée, elle
+/// au démarrage suivant, l'installateur s'ouvre de lui-même, sauf si la
+/// place manque : il attend alors l'accord de l'utilisateur. Refusée, elle
 /// revient au démarrage d'après. Une fois installée, le dossier est vidé.
 final class AndroidInstaller implements Installer {
   AndroidInstaller({required this.assetSuffix, required this.workDir});
