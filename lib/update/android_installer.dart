@@ -117,7 +117,15 @@ final class AndroidInstaller implements Installer {
     }
     // Retenue (place insuffisante) : elle reste là pour plus tard.
     if (allow != null && !await allow(await _apk.length())) return false;
-    await installNow();
+    try {
+      await installNow();
+    } on PlatformException {
+      // Installation impossible (APK refusé, aucun installateur) : place
+      // nette, sinon la même erreur reviendrait à chaque démarrage et
+      // masquerait les mises à jour suivantes.
+      await workDir.delete(recursive: true);
+      return false;
+    }
     return true;
   }
 }

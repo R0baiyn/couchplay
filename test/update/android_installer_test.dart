@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:couchplay/update/android_installer.dart';
 import 'package:flutter/services.dart';
@@ -69,6 +70,46 @@ void main() {
         await AndroidInstaller.deviceAssetSuffix(current: Abi.androidArm64),
         '-android-arm64.apk',
       );
+    });
+  });
+
+  group('installPending', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('couchplay/update');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    late Directory dir;
+
+    setUp(() {
+      dir = Directory.systemTemp.createTempSync('couchplay_apk_');
+      File('${dir.path}/version').writeAsStringSync('9.9.9');
+      File('${dir.path}/couchplay.apk').writeAsStringSync('apk');
+    });
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+
+    test(
+      'installation refusée par le canal : place nette, pas de levée',
+      () async {
+        messenger.setMockMethodCallHandler(
+          channel,
+          (call) async => throw PlatformException(code: 'no_installer'),
+        );
+        final installer = AndroidInstaller(assetSuffix: '', workDir: dir);
+
+        expect(await installer.installPending('1.0.0'), isFalse);
+        expect(dir.existsSync(), isFalse);
+      },
+    );
+
+    test('installation lancée : le dossier reste', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async => null);
+      final installer = AndroidInstaller(assetSuffix: '', workDir: dir);
+
+      expect(await installer.installPending('1.0.0'), isTrue);
+      expect(dir.existsSync(), isTrue);
     });
   });
 }

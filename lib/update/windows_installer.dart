@@ -87,7 +87,11 @@ final class WindowsInstaller implements Installer {
   /// commence aussitôt.
   @override
   Future<void> installNow() async {
-    await _file('relaunch').create();
+    try {
+      await _file('relaunch').create();
+    } on FileSystemException {
+      // Sans ce marqueur, l'app ne se relance pas : elle se ferme quand même.
+    }
     // Réglages et bibliothèque encore en file : écrits avant de quitter, sans
     // bloquer l'installation sur un disque qui ne répond plus.
     await SerialFileWriter.flushAll().timeout(

@@ -58,6 +58,25 @@ void main() {
     skip: !Platform.isWindows,
   );
 
+  test(
+    'installNow quitte même si le marqueur de relance est impossible',
+    () async {
+      final codes = <int>[];
+      final installer = WindowsInstaller(
+        portable: false,
+        appDir: root,
+        // Dossier absent : `create()` lève un FileSystemException.
+        workDir: Directory('${root.path}\\absent'),
+        exit: codes.add,
+      );
+
+      await installer.installNow();
+
+      expect(codes, [0]);
+    },
+    skip: !Platform.isWindows,
+  );
+
   test('installNow quitte même si une écriture en file échoue', () async {
     final codes = <int>[];
     final installer = WindowsInstaller(
