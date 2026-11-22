@@ -190,6 +190,9 @@ final class DownloadsStore {
   /// `downloads.json.bak`. Une entrée prête dont le fichier a disparu est
   /// retirée ; une entrée en cours repasse en attente.
   Map<String, Download> load() {
+    // Une copie illisible mise de côté liste peut-être des vidéos : pas de
+    // rangement tant qu'elle est là (effacée avec le compte).
+    _noTidy = File('${manifest.path}.bak').existsSync();
     if (_unwritten[manifest.path] case final pending?) {
       return {
         for (final MapEntry(:key, :value) in pending.entries)
@@ -245,7 +248,7 @@ final class DownloadsStore {
   /// Dernière liste confiée à la file et pas encore écrite : [load] la rend.
   static final _unwritten = <String, Map<String, Download>>{};
 
-  /// Manifeste mis de côté : les vidéos restent pour cette session.
+  /// Manifeste mis de côté (`downloads.json.bak`) : les vidéos restent.
   var _noTidy = false;
 
   Future<void> save(Map<String, Download> entries) {

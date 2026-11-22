@@ -124,6 +124,69 @@ void main() {
     );
   });
 
+  test('champs du mauvais type : rien ne lève, entrée ignorée', () {
+    const weird = <Object?>[
+      null,
+      true,
+      1.5,
+      'x',
+      [1],
+      {'a': 1},
+    ];
+    const fields = ['name', 'extension', 'status', 'size', 'received'];
+    for (final field in [...fields, 'error', 'addedAt', 'seriesId', 'season']) {
+      for (final value in weird) {
+        store.manifest.writeAsStringSync(
+          jsonEncode({
+            'version': 1,
+            'downloads': {
+              'episode:4': {
+                'name': 'A',
+                'extension': 'mkv',
+                'status': 'queued',
+                'seriesId': '3',
+                'season': 1,
+                'episode': 2,
+                field: value,
+              },
+              'movie:1': {'name': 'B', 'extension': 'mkv', 'status': 'queued'},
+            },
+          }),
+        );
+        expect(store.load().keys, contains('movie:1'), reason: '$field=$value');
+      }
+    }
+    for (final top in <Object?>[
+      [],
+      'x',
+      {'downloads': []},
+    ]) {
+      store.manifest.writeAsStringSync(jsonEncode(top));
+      expect(store.load(), isEmpty);
+    }
+  });
+
+  test('manifeste corrompu : vidéos gardées au lancement suivant', () async {
+    store.manifest.writeAsStringSync('{pas du json');
+    final video = File('${store.videos.path}/movie-12.mkv')
+      ..writeAsStringSync('vidéo');
+    expect(store.load(), isEmpty);
+    await store.tidy(const []);
+
+    // Lancement suivant : nouveau magasin, plus de manifeste, la copie
+    // illisible est toujours là.
+    final next = DownloadsStore(store.manifest, store.videos);
+    expect(next.load(), isEmpty);
+    await next.tidy(const []);
+    expect(video.existsSync(), isTrue);
+
+    // Une nouvelle liste écrite ensuite ne range pas non plus.
+    await next.save({_episode.key: Download(item: _episode, addedAt: date)});
+    final third = DownloadsStore(store.manifest, store.videos);
+    await third.tidy(third.load().values);
+    expect(video.existsSync(), isTrue);
+  });
+
   test('entrée prête dont le fichier a disparu : retirée', () async {
     final ready = Download(
       item: _movie,
