@@ -133,6 +133,31 @@ void main() {
     expect(await file.exists(), isFalse);
   });
 
+  for (final (kind, makeGit) in [
+    ('dossier', (String p) => Directory(p).createSync()),
+    (
+      'fichier de worktree',
+      (String p) => File(p).writeAsStringSync('gitdir: x'),
+    ),
+  ]) {
+    test('keygen refuse un sous-dossier d\'un dépôt (.git $kind)', () async {
+      final repo = Directory('${temp.path}/depot')..createSync();
+      makeGit('${repo.path}/.git');
+      final file = File('${repo.path}/tool/cle/release.key');
+      expect(await cli(['keygen', file.path]), 1);
+      expect(await file.exists(), isFalse);
+      // Hors du dépôt, par un `..` : accepté.
+      final outside = File('${repo.path}/tool/../../hors/release.key');
+      expect(await cli(['keygen', outside.path]), 0);
+    });
+  }
+
+  test('keygen : clé lisible par son seul propriétaire', () async {
+    final file = File('${temp.path}/cle/release.key');
+    expect(await cli(['keygen', file.path]), 0);
+    expect((await file.stat()).modeString(), 'rw-------');
+  }, skip: Platform.isWindows);
+
   test('arguments faux : code 64', () async {
     expect(await cli([]), 64);
     expect(await cli(['verify', dist.path, '--public-key']), 64);

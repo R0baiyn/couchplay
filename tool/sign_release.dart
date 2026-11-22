@@ -74,11 +74,12 @@ final class _Failure implements Exception {
 }
 
 Future<int> _keygen(File file, StringSink out) async {
-  final target = file.absolute.path;
-  final here = Directory.current.absolute.path;
-  if (_isWithin(target, here)) {
+  final target = _normalized(file.absolute.path);
+  final here = _normalized(Directory.current.absolute.path);
+  if (_isWithin(target, here) || _inGitRepository(target)) {
     throw const _Failure(
-      'La clé privée doit être écrite hors du dossier courant',
+      'La clé privée doit être écrite hors du dossier courant et de tout '
+      'dépôt git',
     );
   }
   if (await file.exists()) {
@@ -91,10 +92,37 @@ Future<int> _keygen(File file, StringSink out) async {
   await file.parent.create(recursive: true);
   // `exclusive` : un fichier créé entre-temps n'est pas écrasé non plus.
   await file.create(exclusive: true);
+  // Lisible par son seul propriétaire, avant d'y écrire la clé. Sous
+  // Windows, rien de simple : le fichier prend les droits de son dossier.
+  if (!Platform.isWindows) {
+    final chmod = await Process.run('chmod', ['600', target]);
+    if (chmod.exitCode != 0) {
+      await file.delete();
+      throw _Failure('Droits de $target non restreints : ${chmod.stderr}');
+    }
+  }
   await file.writeAsString('${base64.encode(seed)}\n', flush: true);
   out.writeln('Clé privée écrite dans $target');
   out.writeln('Clé publique : ${base64.encode(await publicKeyOf(seed))}');
   return 0;
+}
+
+/// [path] sans `.` ni `..`.
+String _normalized(String path) => Uri.file(path).normalizePath().toFilePath();
+
+/// Un dossier au-dessus de [path] contient `.git` (dossier, ou fichier d'un
+/// worktree) : la clé finirait dans un dépôt, peut-être poussée.
+bool _inGitRepository(String path) {
+  var dir = File(path).parent;
+  while (true) {
+    final git = '${dir.path}${Platform.pathSeparator}.git';
+    if (FileSystemEntity.typeSync(git) != FileSystemEntityType.notFound) {
+      return true;
+    }
+    final up = dir.parent;
+    if (up.path == dir.path) return false;
+    dir = up;
+  }
 }
 
 bool _isWithin(String path, String dir) {
