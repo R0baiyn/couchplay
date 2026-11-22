@@ -17,7 +17,7 @@ import '../support/fake_downloads.dart';
 import '../support/real_font.dart';
 import '../support/settle.dart';
 
-// Titres inventés, aux longueurs relevées dans les vraies données (S051).
+// Titres inventés, aux longueurs relevées dans les vraies données.
 const _movieName =
     'Les Gardiens du Phare : Chronique de la Terrible Tempête - Le Voyage '
     'des Trois Sœurs et La Promesse Retrouvée (FHD VOSTFR)';
@@ -323,9 +323,7 @@ void main() {
       );
     });
 
-    testWidgets("échec (S056) : la raison reste sous l'épisode", (
-      tester,
-    ) async {
+    testWidgets("échec : la raison reste sous l'épisode", (tester) async {
       await _openSeries(tester, _phone, {
         _episode.key: download(
           _episode,
