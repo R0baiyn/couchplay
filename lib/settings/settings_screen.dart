@@ -125,6 +125,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           if (!tv) ...const [_WifiOnlyTile(), _DeleteWatchedTile()],
+          if (tv) const _DirectVideoTile(),
           const _DebugTile(),
           ListTile(
             key: const ValueKey('settings.journal'),
@@ -177,6 +178,26 @@ class _DeleteWatchedTile extends ConsumerWidget {
       subtitle: const Text('Supprime la vidéo téléchargée après la lecture'),
       value: ref.watch(appSettingsProvider.select((s) => s.deleteWatched)),
       onChanged: ref.read(appSettingsProvider.notifier).setDeleteWatched,
+    );
+  }
+}
+
+/// D-068 : lecture directe sur TV, pour un appareil dont l'image saccade.
+class _DirectVideoTile extends ConsumerWidget {
+  const _DirectVideoTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SwitchListTile(
+      key: const ValueKey('settings.directVideo'),
+      secondary: const Icon(Icons.speed),
+      title: const FocusRing(child: Text('Lecture directe')),
+      subtitle: const Text(
+        "Si l'image saccade. Sur certains appareils, l'avance peut bloquer "
+        "la lecture. Prend effet au prochain lancement de l'app.",
+      ),
+      value: ref.watch(appSettingsProvider.select((s) => s.directVideo)),
+      onChanged: ref.read(appSettingsProvider.notifier).setDirectVideo,
     );
   }
 }

@@ -79,6 +79,29 @@ void main() {
     expect(find.byKey(const ValueKey('settings.debug')), findsOneWidget);
   });
 
+  testWidgets('TV : « Lecture directe » éteinte, bascule le réglage', (
+    tester,
+  ) async {
+    await pumpSettings(tester, tv: true);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsScreen)),
+    );
+    final tile = find.byKey(const ValueKey('settings.directVideo'));
+    await tester.scrollUntilVisible(tile, 100);
+    expect(tester.widget<SwitchListTile>(tile).value, isFalse);
+    expect(find.textContaining('prochain lancement'), findsOneWidget);
+
+    await tester.tap(tile);
+    await tester.pump();
+    expect(container.read(appSettingsProvider).directVideo, isTrue);
+    expect(tester.widget<SwitchListTile>(tile).value, isTrue);
+  });
+
+  testWidgets('hors TV : pas de « Lecture directe »', (tester) async {
+    await pumpSettings(tester);
+    expect(find.byKey(const ValueKey('settings.directVideo')), findsNothing);
+  });
+
   for (final tv in [false, true]) {
     testWidgets('« Journal » ouvre le journal (TV : $tv)', (tester) async {
       await pumpSettings(tester, tv: tv);
