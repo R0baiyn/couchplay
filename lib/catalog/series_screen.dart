@@ -11,6 +11,8 @@ import 'player_launch.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'details_view.dart';
+import '../television.dart';
+import 'episode_tile.dart';
 import 'series_view.dart';
 import '../server/status_views.dart';
 
@@ -70,7 +72,11 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
       appBar: DetailsAppBar(
         scroll: _scroll,
         child: AppBar(
-          title: Text(widget.item.parsedName.display),
+          // Téléphone : coupé sur une ligne, il ne dirait rien ; il est en
+          // entier dans la fiche.
+          title: MediaQuery.sizeOf(context).width < railMinWidth
+              ? null
+              : Text(widget.item.parsedName.display),
           actions: [
             FavoriteButton(
               key: const ValueKey('catalog.favorite'),

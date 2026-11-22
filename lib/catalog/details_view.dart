@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../format.dart';
 import '../server/models.dart';
+import '../television.dart';
 import 'poster_grid.dart';
 
 /// En-tête des fiches film et série : un bandeau, l'image de fond derrière
 /// (si elle existe), l'affiche à gauche, titre, informations et résumé sur
-/// toute la largeur restante. Les champs absents ne sont pas affichés.
+/// toute la largeur restante (sur téléphone, seuls titre et informations ;
+/// le reste dessous, sur toute la largeur). Les champs absents ne sont pas affichés.
 class DetailsHeader extends StatelessWidget {
   const DetailsHeader({super.key, required this.details, this.action});
 
@@ -25,48 +27,55 @@ class DetailsHeader extends StatelessWidget {
       if (d.rating case final rating?) '★ ${rating.toStringAsFixed(1)}',
     ].join('  ·  ');
 
-    final text = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
-      children: [
-        Text(d.name, style: theme.textTheme.headlineSmall),
-        if (facts.isNotEmpty) Text(facts, style: theme.textTheme.titleSmall),
-        if (d.genre case final genre?)
-          Text(genre, style: theme.textTheme.bodyMedium),
-        if (action case final action?)
-          Padding(padding: const EdgeInsets.only(top: 8), child: action),
-        if (d.plot case final plot?)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(plot, style: theme.textTheme.bodyLarge),
-          ),
-        if (d.director case final director?) _Labeled('Réalisation', director),
-        if (d.cast case final cast?) _Labeled('Avec', cast),
-      ],
-    );
+    final heading = [
+      Text(d.name, style: theme.textTheme.headlineSmall),
+      if (facts.isNotEmpty) Text(facts, style: theme.textTheme.titleSmall),
+      if (d.genre case final genre?)
+        Text(genre, style: theme.textTheme.bodyMedium),
+    ];
+    final body = [
+      if (action case final action?)
+        Padding(padding: const EdgeInsets.only(top: 8), child: action),
+      if (d.plot case final plot?)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(plot, style: theme.textTheme.bodyLarge),
+        ),
+      if (d.director case final director?) _Labeled('Réalisation', director),
+      if (d.cast case final cast?) _Labeled('Avec', cast),
+    ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 720;
-        final content = Padding(
-          padding: EdgeInsets.all(wide ? 24 : 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: wide ? 24 : 16,
-            children: [
-              SizedBox(
-                width: wide ? 160 : 100,
-                child: AspectRatio(
-                  aspectRatio: 2 / 3,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: PosterImage(url: d.poster),
-                  ),
+        // Téléphone : seuls le titre et les infos à côté de l'affiche, le
+        // reste dessous sur toute la largeur (sinon une colonne de 4 mots).
+        final phone = constraints.maxWidth < railMinWidth;
+        Widget column(List<Widget> children) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 8,
+          children: children,
+        );
+        final row = Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: wide ? 24 : 16,
+          children: [
+            SizedBox(
+              width: wide ? 160 : 100,
+              child: AspectRatio(
+                aspectRatio: 2 / 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: PosterImage(url: d.poster),
                 ),
               ),
-              Expanded(child: text),
-            ],
-          ),
+            ),
+            Expanded(child: column(phone ? heading : [...heading, ...body])),
+          ],
+        );
+        final content = Padding(
+          padding: EdgeInsets.all(wide ? 24 : 16),
+          child: phone ? column([row, ...body]) : row,
         );
         final backdrop = d.backdrop;
         if (backdrop == null) return content;

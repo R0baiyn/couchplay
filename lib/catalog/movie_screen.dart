@@ -13,6 +13,7 @@ import 'catalog_index.dart';
 import '../server/models.dart';
 import 'catalog_providers.dart';
 import 'details_view.dart';
+import '../television.dart';
 import '../server/status_views.dart';
 import 'versions.dart';
 
@@ -80,7 +81,11 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
       appBar: DetailsAppBar(
         scroll: _scroll,
         child: AppBar(
-          title: Text(selected.parsedName.display),
+          // Téléphone : coupé sur une ligne, il ne dirait rien ; il est en
+          // entier dans la fiche.
+          title: MediaQuery.sizeOf(context).width < railMinWidth
+              ? null
+              : Text(selected.parsedName.display),
           actions: [
             FavoriteButton(
               key: const ValueKey('catalog.favorite'),
