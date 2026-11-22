@@ -138,7 +138,9 @@ void main() {
       }
     });
 
-    test('JSON valide mais pas un objet : liste vide, fichier laissé', () {
+    // D-063 : laissé tel quel, il donnait une liste vide et le rangement
+    // effaçait toutes les vidéos.
+    test('JSON valide mais pas un manifeste : liste vide, mis de côté', () {
       for (final content in [
         '[]',
         '"texte"',
@@ -147,9 +149,12 @@ void main() {
         '{"downloads": 5}',
       ]) {
         manifest.writeAsStringSync(content);
-        expect(store.load(), isEmpty, reason: content);
-        expect(manifest.readAsStringSync(), content);
-        expect(bak().existsSync(), isFalse);
+        if (bak().existsSync()) bak().deleteSync();
+        final reader = DownloadsStore(manifest, store.videos);
+        expect(reader.load(), isEmpty, reason: content);
+        expect(manifest.existsSync(), isFalse, reason: content);
+        expect(bak().readAsStringSync(), content);
+        expect(reader.unreadable, isFalse);
       }
     });
 

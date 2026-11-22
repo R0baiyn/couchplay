@@ -166,6 +166,24 @@ void main() {
     }
   });
 
+  test('manifeste de forme inattendue : mis de côté, vidéos gardées', () async {
+    final video = File('${store.videos.path}/movie-12.mkv')
+      ..writeAsStringSync('vidéo');
+    for (final top in <Object?>[
+      [],
+      'x',
+      {'version': 1},
+      {'downloads': []},
+    ]) {
+      store.manifest.writeAsStringSync(jsonEncode(top));
+      final fresh = DownloadsStore(store.manifest, store.videos);
+      expect(fresh.load(), isEmpty);
+      await fresh.tidy(const []);
+      expect(video.existsSync(), isTrue, reason: '$top');
+      File('${store.manifest.path}.bak').deleteSync();
+    }
+  });
+
   test('manifeste corrompu : vidéos gardées au lancement suivant', () async {
     store.manifest.writeAsStringSync('{pas du json');
     final video = File('${store.videos.path}/movie-12.mkv')

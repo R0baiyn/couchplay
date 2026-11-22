@@ -214,6 +214,11 @@ final class DownloadsStore {
     try {
       // Lecture synchrone : quelques Ko, lus au changement de compte.
       json = jsonDecode(manifest.readAsStringSync());
+      // JSON valide mais pas un manifeste : traité comme corrompu (une liste
+      // vide ferait effacer toutes les vidéos au rangement).
+      if (json is! Map || json['downloads'] is! Map) {
+        throw const FormatException('forme inattendue');
+      }
     } on PathNotFoundException {
       return const {};
     } on FileSystemException catch (e) {
