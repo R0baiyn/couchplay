@@ -92,7 +92,7 @@ void main() {
     expect(journal, isNot(contains('password=$benchPassword')));
     expect(journal, isNot(contains(benchPassword)));
 
-    // 11. Réglages → « Journal » : l'écran montre le même fichier.
+    // 11. Réglages → « Réglages avancés » → « Journal » : l'écran montre le même fichier.
     // Chaque retour attend la fin du précédent : pendant la transition, deux
     // boutons Retour sont à l'écran.
     await tester.pageBack();
@@ -102,6 +102,8 @@ void main() {
       what: 'le formulaire est fermé',
     );
     await tester.pageBack();
+    await waitFor(tester, byKey('settings.advanced'));
+    await tester.tap(byKey('settings.advanced'));
     await waitFor(tester, byKey('settings.journal'));
     await tester.tap(byKey('settings.journal'));
     await waitFor(

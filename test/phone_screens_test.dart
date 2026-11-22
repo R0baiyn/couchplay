@@ -137,7 +137,7 @@ void main() {
     await tap(tester, 'settings.open');
     clean(tester, 'Réglages');
     for (final key in [
-      'settings.journal',
+      'settings.advanced',
       'settings.accounts',
       'settings.status',
       'settings.catalog',
@@ -145,6 +145,11 @@ void main() {
       await tester.scrollUntilVisible(find.byKey(ValueKey(key)), 100);
       await tap(tester, key);
       clean(tester, key);
+      if (key == 'settings.advanced') {
+        await tap(tester, 'settings.journal');
+        clean(tester, 'settings.journal');
+        await back(tester);
+      }
       if (key == 'settings.accounts') {
         await tap(tester, 'accounts.add');
         clean(tester, 'formulaire de compte');

@@ -10,7 +10,7 @@ import '../logging.dart';
 import '../television.dart';
 import '../update/update_dialog.dart';
 import '../update/updater.dart';
-import 'journal_screen.dart';
+import 'advanced_settings_screen.dart';
 
 /// Roue des réglages : en haut à droite des onglets, ou en bas du rail, avec
 /// son libellé comme les onglets.
@@ -125,19 +125,21 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           if (!tv) ...const [_WifiOnlyTile(), _DeleteWatchedTile()],
-          if (tv) const _DirectVideoTile(),
-          const _DebugTile(),
           ListTile(
-            key: const ValueKey('settings.journal'),
-            leading: const Icon(Icons.receipt_long_outlined),
-            title: const FocusRing(child: Text('Journal')),
-            subtitle: const Text(
-              "Ce que l'app a noté, pour comprendre un problème",
+            key: const ValueKey('settings.advanced'),
+            leading: const Icon(Icons.tune),
+            title: const FocusRing(child: Text('Réglages avancés')),
+            subtitle: Text(
+              tv
+                  ? 'Journal, mode debug, lecture directe'
+                  : 'Journal, mode debug',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute<void>(builder: (_) => const JournalScreen()),
+              MaterialPageRoute<void>(
+                builder: (_) => const AdvancedSettingsScreen(),
+              ),
             ),
           ),
           const Divider(),
@@ -178,43 +180,6 @@ class _DeleteWatchedTile extends ConsumerWidget {
       subtitle: const Text('Supprime la vidéo téléchargée après la lecture'),
       value: ref.watch(appSettingsProvider.select((s) => s.deleteWatched)),
       onChanged: ref.read(appSettingsProvider.notifier).setDeleteWatched,
-    );
-  }
-}
-
-/// D-068 : lecture directe sur TV, pour un appareil dont l'image saccade.
-class _DirectVideoTile extends ConsumerWidget {
-  const _DirectVideoTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SwitchListTile(
-      key: const ValueKey('settings.directVideo'),
-      secondary: const Icon(Icons.speed),
-      title: const FocusRing(child: Text('Lecture directe')),
-      subtitle: const Text(
-        "Si l'image saccade. Sur certains appareils, l'avance peut bloquer "
-        "la lecture. Prend effet au prochain lancement de l'app.",
-      ),
-      value: ref.watch(appSettingsProvider.select((s) => s.directVideo)),
-      onChanged: ref.read(appSettingsProvider.notifier).setDirectVideo,
-    );
-  }
-}
-
-/// Interrupteur du mode debug : infos techniques dans le lecteur.
-class _DebugTile extends ConsumerWidget {
-  const _DebugTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SwitchListTile(
-      key: const ValueKey('settings.debug'),
-      secondary: const Icon(Icons.bug_report_outlined),
-      title: const FocusRing(child: Text('Mode debug')),
-      subtitle: const Text('Infos techniques dans le lecteur'),
-      value: ref.watch(appSettingsProvider.select((s) => s.debug)),
-      onChanged: ref.read(appSettingsProvider.notifier).setDebug,
     );
   }
 }

@@ -1,5 +1,5 @@
 import 'package:couchplay/accounts/app_settings.dart';
-import 'package:couchplay/settings/journal_screen.dart';
+import 'package:couchplay/settings/advanced_settings_screen.dart';
 import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/television.dart';
 import 'package:couchplay/update/updater.dart';
@@ -14,9 +14,6 @@ void main() {
           overrides: [
             appVersionProvider.overrideWithValue('0.1.0'),
             televisionProvider.overrideWithValue(tv),
-            journalLinesProvider.overrideWith(
-              (ref) async => ['ligne du journal'],
-            ),
           ],
           child: const MaterialApp(home: SettingsScreen()),
         ),
@@ -26,29 +23,6 @@ void main() {
     await pumpSettings(tester);
     await tester.scrollUntilVisible(find.text('Version 0.1.0'), 100);
     expect(find.text('Version 0.1.0'), findsOneWidget);
-  });
-
-  testWidgets('l\'interrupteur « Mode debug » bascule le réglage', (
-    tester,
-  ) async {
-    await pumpSettings(tester);
-    final context = tester.element(find.byType(SettingsScreen));
-    final container = ProviderScope.containerOf(context);
-    expect(container.read(appSettingsProvider).debug, isFalse);
-
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('settings.debug')),
-      100,
-    );
-    await tester.tap(find.byKey(const ValueKey('settings.debug')));
-    await tester.pump();
-    expect(container.read(appSettingsProvider).debug, isTrue);
-    expect(
-      tester
-          .widget<SwitchListTile>(find.byKey(const ValueKey('settings.debug')))
-          .value,
-      true,
-    );
   });
 
   testWidgets('les interrupteurs de téléchargement changent les réglages', (
@@ -76,43 +50,55 @@ void main() {
     await pumpSettings(tester, tv: true);
     expect(find.byKey(const ValueKey('settings.wifiOnly')), findsNothing);
     expect(find.byKey(const ValueKey('settings.deleteWatched')), findsNothing);
-    expect(find.byKey(const ValueKey('settings.debug')), findsOneWidget);
+    expect(find.byKey(const ValueKey('settings.advanced')), findsOneWidget);
   });
 
-  testWidgets('TV : « Lecture directe » éteinte, bascule le réglage', (
-    tester,
-  ) async {
-    await pumpSettings(tester, tv: true);
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(SettingsScreen)),
-    );
-    final tile = find.byKey(const ValueKey('settings.directVideo'));
-    await tester.scrollUntilVisible(tile, 100);
-    expect(tester.widget<SwitchListTile>(tile).value, isFalse);
-    expect(find.textContaining('prochain lancement'), findsOneWidget);
-
-    await tester.tap(tile);
-    await tester.pump();
-    expect(container.read(appSettingsProvider).directVideo, isTrue);
-    expect(tester.widget<SwitchListTile>(tile).value, isTrue);
-  });
-
-  testWidgets('hors TV : pas de « Lecture directe »', (tester) async {
-    await pumpSettings(tester);
-    expect(find.byKey(const ValueKey('settings.directVideo')), findsNothing);
-  });
-
+  // D-069 : les outils d'essai et de dépannage sont dans « Réglages avancés ».
   for (final tv in [false, true]) {
-    testWidgets('« Journal » ouvre le journal (TV : $tv)', (tester) async {
+    testWidgets('« Réglages avancés » ouvre leur écran (TV : $tv)', (
+      tester,
+    ) async {
       await pumpSettings(tester, tv: tv);
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('settings.journal')),
-        100,
+      for (final key in [
+        'settings.directVideo',
+        'settings.debug',
+        'settings.journal',
+      ]) {
+        expect(find.byKey(ValueKey(key)), findsNothing, reason: key);
+      }
+      final advanced = find.byKey(const ValueKey('settings.advanced'));
+      await tester.scrollUntilVisible(advanced, 100);
+      expect(
+        find.text(
+          tv ? 'Journal, mode debug, lecture directe' : 'Journal, mode debug',
+        ),
+        findsOneWidget,
       );
-      await tester.tap(find.byKey(const ValueKey('settings.journal')));
+
+      await tester.tap(advanced);
       await tester.pumpAndSettle();
-      expect(find.byType(JournalScreen), findsOneWidget);
-      expect(find.text('ligne du journal'), findsOneWidget);
+      expect(find.byType(AdvancedSettingsScreen), findsOneWidget);
+      expect(find.text('Réglages avancés'), findsWidgets);
     });
   }
+
+  testWidgets('« Réglages avancés » est juste avant « Version »', (
+    tester,
+  ) async {
+    await pumpSettings(tester);
+    final advanced = find.byKey(const ValueKey('settings.advanced'));
+    await tester.scrollUntilVisible(advanced, 100);
+    final version = find.byKey(const ValueKey('settings.version'));
+    await tester.scrollUntilVisible(version, 100);
+    expect(
+      tester.getTopLeft(advanced).dy,
+      lessThan(tester.getTopLeft(version).dy),
+    );
+    expect(
+      tester
+          .getTopLeft(find.byKey(const ValueKey('settings.deleteWatched')))
+          .dy,
+      lessThan(tester.getTopLeft(advanced).dy),
+    );
+  });
 }
