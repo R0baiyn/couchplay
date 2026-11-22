@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../support/real_font.dart';
+
 /// Lecteur sans libmpv : en lecture, aucun flux, chaque appel compté.
 class _FakePlayer implements Player {
   final calls = <Symbol>[];
@@ -290,5 +292,37 @@ void main() {
     expect(find.byKey(const ValueKey('player.volume')), findsNothing);
     expect(find.byKey(const ValueKey('player.progress')), findsOneWidget);
     expect(find.byType(Slider), findsOneWidget, reason: 'la progression seule');
+  });
+
+  testWidgets('téléphone en paysage (800 × 360) : titre sur 2 lignes, rien '
+      'ne déborde', (tester) async {
+    await tester.runAsync(loadRoboto);
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: CouchPlayApp(
+          home: Scaffold(
+            body: PlayerControls(
+              player: player,
+              title:
+                  'LIGHT OF THE NORTH: I Will Guard the Quiet Valley Forever '
+                  'with My Friend and Map!',
+              subtitle: 'S4E14 · À cette heure incertaine avant le matin',
+              fill: false,
+              onToggleFill: () {},
+              fullscreen: null,
+              onToggleFullscreen: () {},
+              onExit: () {},
+              volume: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('player.subtitle')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
