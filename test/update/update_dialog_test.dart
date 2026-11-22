@@ -267,10 +267,8 @@ void main() {
     // Moins que la réserve d'installd (1 Gio) + 2 APK de 3 octets (D-059).
     const low = 1000;
 
-    for (final (button, label) in [
-      ('update.install', 'Mettre à jour'),
-      ('update.later', 'Plus tard'),
-    ]) {
+    // D-068 : seul « Mettre à jour » avertit ; « Plus tard » abandonne.
+    for (final (button, label) in [('update.install', 'Mettre à jour')]) {
       testWidgets('« $label » : avertit, « Continuer quand même » télécharge', (
         tester,
       ) async {
@@ -299,6 +297,35 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Place insuffisante'), findsNothing);
         expect(find.textContaining('Téléchargement'), findsNothing);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(adapter.calls, 0);
+        expect(installer.prepares, 0);
+        expect(installer.installs, 0);
+      });
+    }
+
+    for (final (label, choose)
+        in <(String, Future<void> Function(WidgetTester))>[
+          (
+            'Plus tard',
+            (tester) => tester.tap(find.byKey(const ValueKey('update.later'))),
+          ),
+          ('Retour', (tester) => tester.binding.handlePopRoute()),
+        ]) {
+      testWidgets('« $label » : abandonnée, sans boîte ni téléchargement', (
+        tester,
+      ) async {
+        final adapter = FakeAdapter.replying('abc');
+        final (_, installer) = await open(tester, free: low, adapter: adapter);
+        await choose(tester);
+        await tester.pumpAndSettle();
+        expect(find.text('Version 0.1.1 disponible'), findsNothing);
+        expect(find.text('Place insuffisante'), findsNothing);
+        // Un téléchargement en fond aurait le temps d'avancer ici.
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pumpAndSettle();
         expect(find.byType(SnackBar), findsNothing);
         expect(adapter.calls, 0);
         expect(installer.prepares, 0);

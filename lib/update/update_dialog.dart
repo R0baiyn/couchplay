@@ -12,8 +12,9 @@ import 'updater.dart';
 /// « Plus tard » la télécharge en fond, et elle s'installe à la fermeture
 /// (Windows) ou au prochain démarrage (Android). Sous Linux, rien ne se
 /// télécharge : « Ouvrir la page » ouvre la release dans le navigateur.
-/// Trop peu de place (Android), [confirmSpace] prévient avant tout
-/// téléchargement.
+/// Trop peu de place (Android) : « Mettre à jour » prévient par
+/// [confirmSpace] avant tout téléchargement ; « Plus tard » ou fermer la
+/// fenêtre abandonne la mise à jour, sans rien télécharger (D-068).
 Future<void> showUpdateDialog(
   BuildContext context,
   Updater updater,
@@ -59,7 +60,9 @@ Future<void> showUpdateDialog(
   if (!context.mounted) return;
   final short = await updater.shortfall(update);
   if (!context.mounted) return;
-  if (short != null && !await confirmSpace(context, short)) return;
+  if (short != null && (now != true || !await confirmSpace(context, short))) {
+    return;
+  }
   if (!context.mounted) return;
   final messenger = ScaffoldMessenger.of(context);
   if (now != true) {
