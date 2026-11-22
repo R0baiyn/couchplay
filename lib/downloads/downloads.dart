@@ -48,7 +48,7 @@ final class DownloadHolds {
   bool get waitingForWifi => reasons.contains(DownloadHold.mobileNetwork);
 }
 
-/// Pauses de toute la file. API du lecteur (S024) :
+/// Pauses de toute la file. API du lecteur :
 /// - `streaming = true` à l'ouverture d'une lecture en flux, `false` à la
 ///   sortie du lecteur (lève aussi [DownloadHold.playback]) ;
 /// - `pauseAll(DownloadHold.playback)` si le serveur refuse la lecture

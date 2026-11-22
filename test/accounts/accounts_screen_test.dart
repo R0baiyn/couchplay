@@ -145,8 +145,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('accounts.delete.a')));
     await tester.pumpAndSettle();
     expect(find.text('Supprimer « Compte a » ?'), findsOneWidget);
-    // Bouton de confirm.dart : Key à venir (S037).
-    final confirmDelete = find.widgetWithText(FilledButton, 'Supprimer');
+    final confirmDelete = find.byKey(const ValueKey('confirm.action'));
     await tester.tap(confirmDelete);
     await settle(tester);
 
@@ -160,8 +159,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('accounts.delete.a')));
     await tester.pumpAndSettle();
-    // Bouton de confirm.dart : Key à venir (S037), finder par texte en attendant.
-    final cancel = find.text('Annuler');
+    final cancel = find.byKey(const ValueKey('confirm.cancel'));
     await tester.tap(cancel);
     await settle(tester);
 
@@ -175,8 +173,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('accounts.delete.a')));
     await tester.pumpAndSettle();
-    // Bouton de confirm.dart : Key à venir (S037).
-    final confirmDelete = find.widgetWithText(FilledButton, 'Supprimer');
+    final confirmDelete = find.byKey(const ValueKey('confirm.action'));
     await tester.tap(confirmDelete);
     await settle(tester);
 
