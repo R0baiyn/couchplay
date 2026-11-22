@@ -71,9 +71,15 @@ String? resolve(String from, String uri) {
 }
 
 final _directive = RegExp(
-  r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''',
+  r'''^[ \t]*(?:import|export)\s+['"]([^'"]+)['"]''',
   multiLine: true,
 );
+
+/// Directives d'un fichier : (URI, numéro de ligne à partir de 1).
+List<(String, int)> readDirectives(String text) => [
+  for (final m in _directive.allMatches(text))
+    (m.group(1)!, '\n'.allMatches(text.substring(0, m.start)).length + 1),
+];
 
 /// Tous les arcs entre nœuds différents de `lib/`, hors arcs vers `racine`.
 List<Arc> readArcs() {
@@ -85,13 +91,12 @@ List<Arc> readArcs() {
         .replaceAll('\\', '/')
         .substring(root.length + 1);
     final text = entity.readAsStringSync();
-    for (final m in _directive.allMatches(text)) {
-      final target = resolve(path, m.group(1)!);
+    for (final (uri, line) in readDirectives(text)) {
+      final target = resolve(path, uri);
       if (target == null) continue;
       final source = nodeOf(path);
       final dest = nodeOf(target);
       if (source == dest || dest == shared) continue;
-      final line = '\n'.allMatches(text.substring(0, m.start)).length + 1;
       arcs.add(Arc(source, dest, 'lib/$path:$line'));
     }
   }
@@ -159,6 +164,15 @@ void main() {
     expect(findCycle(['a -> b', 'b -> c', 'c -> a']), 'a -> b -> c -> a');
     expect(findCycle(['a -> b', 'a -> c', 'b -> c']), isNull);
     expect(findCycle(allowedArcs), isNull);
+  });
+
+  test('le numéro de ligne d\'une directive est celui de sa ligne', () {
+    const text = "import 'dart:io';\n\nimport 'a.dart';\n  export 'b.dart';\n";
+    expect(readDirectives(text), [
+      ('dart:io', 1),
+      ('a.dart', 3),
+      ('b.dart', 4),
+    ]);
   });
 
   test('racine et server n\'importent aucune fonctionnalité', () {
