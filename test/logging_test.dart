@@ -284,6 +284,93 @@ void main() {
       expect(text, isNot(contains('perdu')));
     });
 
+    test('une ligne de continuation ne peut pas imiter une entrée', () async {
+      openJournal(file);
+      const forged = '2026-01-01T00:00:00.000 Démarrage : faux';
+      log('a\n$forged\r$forged\r\n$forged');
+      // Masqué avant le préfixe : un secret coupé par un saut de ligne.
+      log('clé ab\ncd fin', secrets: ['ab\ncd']);
+      await flushJournal();
+      final text = file.readAsStringSync();
+      final lines = text.split(RegExp(r'\r\n?|\n'))..removeLast();
+      final entry = RegExp(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3} ');
+      expect(lines.where(entry.hasMatch), hasLength(2));
+      expect(lines.where((l) => l.startsWith(forged)), isEmpty);
+      expect(lines.where((l) => l == '  | $forged'), hasLength(3));
+      expect(text, contains(' clé *** fin'));
+      expect(text, isNot(contains('cd')));
+      final tail = await readJournalTail();
+      expect(tail.where(entry.hasMatch), hasLength(2));
+    });
+
+    test('flushJournal écrit le compte d\'une entrée répétée', () async {
+      openJournal(file);
+      for (var i = 0; i < 3; i++) {
+        log('même erreur');
+      }
+      await flushJournal();
+      final lines = file.readAsLinesSync();
+      expect(lines, hasLength(2));
+      expect(lines[1], endsWith(' (entrée précédente répétée 2 fois)'));
+    });
+
+    test('un lot trop gros perd ses entrées les plus anciennes', () async {
+      openJournal(file, maxBatch: 300);
+      // Écrites d'un trait : toutes dans le même lot.
+      for (var i = 0; i < 20; i++) {
+        log('entrée $i ${'-' * 20}');
+      }
+      await flushJournal();
+      final text = file.readAsStringSync();
+      expect(text.length, lessThan(400));
+      expect(text, contains(' entrée 19 '));
+      expect(text, isNot(contains(' entrée 0 ')));
+      final lost = RegExp(r' \((\d+) entrées perdues\)').firstMatch(text);
+      expect(lost, isNotNull);
+      final kept = RegExp(r' entrée \d+ ').allMatches(text).length;
+      expect(int.parse(lost![1]!) + kept, 20);
+    });
+
+    test('les entrées d\'avant l\'ouverture suivent l\'en-tête', () async {
+      holdLogUntilJournal(maxChars: 300);
+      for (var i = 0; i < 20; i++) {
+        log('Comptes illisibles $i');
+      }
+      openJournal(file, header: startLine(version: '9.9.9', television: false));
+      await flushJournal();
+      final lines = file.readAsLinesSync();
+      expect(lines.first, contains('Démarrage : CouchPlay 9.9.9'));
+      expect(lines[1], matches(RegExp(r' \(\d+ entrées perdues\)$')));
+      expect(lines.last, endsWith(' Comptes illisibles 19'));
+      expect(file.readAsStringSync(), isNot(contains(' illisibles 0\n')));
+    });
+
+    test('closeJournal oublie les entrées gardées', () async {
+      holdLogUntilJournal();
+      log('jamais écrite');
+      await closeJournal();
+      openJournal(file);
+      log('après');
+      await flushJournal();
+      expect(file.readAsStringSync(), isNot(contains('jamais')));
+    });
+
+    test(
+      'Linux : fichier et copie lisibles par le seul propriétaire',
+      () async {
+        openJournal(file, maxBytes: 200);
+        for (var i = 0; i < 6; i++) {
+          log('ligne $i ${'-' * 40}');
+          await flushJournal();
+        }
+        for (final f in [file, File('${file.path}.1')]) {
+          final mode = (await f.stat()).mode & 0x1FF;
+          expect(mode.toRadixString(8), '600', reason: f.path);
+        }
+      },
+      skip: !Platform.isLinux,
+    );
+
     test('3 échecs de suite coupent le journal, sans lever', () async {
       final later = Directory('${dir.path}${Platform.pathSeparator}absent');
       final journal = File('${later.path}${Platform.pathSeparator}x.log');

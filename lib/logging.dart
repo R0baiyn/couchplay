@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:ffi' show Abi;
 import 'dart:io';
@@ -96,8 +97,24 @@ void log(
   text = redact(text, secrets: secrets);
   if (text.length > _maxEntry) text = '${text.substring(0, _maxEntry)}…';
   if (kDebugMode) debugPrint('[CouchPlay] $text');
-  _journal?.add(text);
+  final journal = _journal;
+  if (journal != null) {
+    journal.add(text);
+  } else {
+    _early?.add(_entry(text));
+  }
 }
+
+// Chaque saut de ligne d'une entrée (message, erreur, pile) devient une ligne
+// de continuation préfixée : aucune ligne du fichier ne commence par un
+// horodatage qui ne vient pas de [_now] (`\r` seul compte : un éditeur y
+// coupe aussi la ligne).
+final _lineBreak = RegExp(r'\r\n?|\n');
+
+String _entry(String text) =>
+    '${_now()} ${text.replaceAll(_lineBreak, '\n  | ')}';
+
+String _now() => DateTime.now().toIso8601String().substring(0, 23);
 
 const _stackLines = 12;
 const _maxEntry = 4000;
@@ -110,15 +127,42 @@ String startLine({required String version, required bool television}) =>
 
 _Journal? _journal;
 
+/// Entrées gardées en attendant [openJournal], depuis [holdLogUntilJournal].
+_Lines? _early;
+
+/// Plafond d'un lot et des entrées gardées, en caractères : 256 Ki, soit
+/// ~64 entrées pleines (4 000 caractères) et la taille que lit
+/// [readJournalTail] ; au plus ~768 Kio en UTF-8, sous le plafond d'un fichier
+/// (1 Mio) : un lot plein ne fait jamais déborder le fichier à lui seul.
+const _maxBatch = 256 * 1024;
+
 /// Fichier du journal ouvert, `null` sans journal (tests, outils).
 File? get journalFile => _journal?.file;
 
+/// Garde en mémoire, [maxChars] au plus, ce que [log] reçoit avant
+/// [openJournal] : les erreurs du démarrage (ouverture des comptes). Rien
+/// n'est écrit si le journal ne s'ouvre jamais.
+void holdLogUntilJournal({int maxChars = _maxBatch}) {
+  _early ??= _Lines(maxChars);
+}
+
 /// Ouvre le journal [file] : [log] y écrit désormais, en tâche de fond. Au
 /// delà de [maxBytes], le fichier devient `<file>.1` (l'ancien est écrasé).
-/// Ne touche pas au disque tout de suite : un fichier impossible à écrire
-/// coupe seulement le journal.
-void openJournal(File file, {int maxBytes = 1 << 20}) {
-  _journal = _Journal(file, maxBytes);
+/// [header] est écrit en premier, puis les entrées gardées par
+/// [holdLogUntilJournal]. Un lot qui dépasse [maxBatch] caractères perd ses
+/// entrées les plus anciennes. Ne touche pas au disque tout de suite : un
+/// fichier impossible à écrire coupe seulement le journal.
+void openJournal(
+  File file, {
+  int maxBytes = 1 << 20,
+  String? header,
+  int maxBatch = _maxBatch,
+}) {
+  final journal = _journal = _Journal(file, maxBytes, maxBatch);
+  if (header != null) log(header);
+  final early = _early;
+  _early = null;
+  if (early != null) journal._takeFrom(early);
 }
 
 /// Attend que les lignes déjà journalisées soient écrites, [timeout] au plus :
@@ -126,13 +170,18 @@ void openJournal(File file, {int maxBytes = 1 << 20}) {
 Future<void> flushJournal({
   Duration timeout = const Duration(seconds: 2),
 }) async {
-  await _journal?._pending.timeout(timeout, onTimeout: () {});
+  final journal = _journal;
+  if (journal == null) return;
+  journal._countRepeats();
+  await journal._pending.timeout(timeout, onTimeout: () {});
 }
 
-/// Vide puis ferme le journal : [log] n'écrit plus dans aucun fichier.
+/// Vide puis ferme le journal : [log] n'écrit plus dans aucun fichier, et les
+/// entrées gardées par [holdLogUntilJournal] sont oubliées.
 Future<void> closeJournal() async {
   await flushJournal();
   _journal = null;
+  _early = null;
 }
 
 /// La fin du journal (copie `.1` puis fichier courant), [maxBytes] au plus et
@@ -164,12 +213,14 @@ Future<List<String>> readJournalTail({int maxBytes = 256 * 1024}) async {
 /// l'autre et sans fichier tenu ouvert. Ne lève jamais et n'appelle jamais
 /// [log] : un échec d'écriture coupe le journal en silence.
 final class _Journal {
-  _Journal(this.file, this.maxBytes);
+  _Journal(this.file, this.maxBytes, int maxBatch) : _batch = _Lines(maxBatch);
 
   final File file;
   final int maxBytes;
 
-  final _buffer = StringBuffer();
+  /// Lot en attente d'écriture, borné : si l'écriture traîne, les entrées
+  /// les plus anciennes sont abandonnées et comptées.
+  final _Lines _batch;
   Future<void> _pending = Future.value();
   var _queued = false;
   var _broken = false;
@@ -191,24 +242,40 @@ final class _Journal {
       _repeats++;
       return;
     }
-    if (_repeats > 0) {
-      _buffer.writeln('${_now()} (entrée précédente répétée $_repeats fois)');
-      _repeats = 0;
-    }
+    _countRepeats();
     _last = text;
-    _buffer.writeln('${_now()} $text');
-    if (_queued) return;
+    _queue(_entry(text));
+  }
+
+  /// Écrit le compte de l'entrée répétée : à l'entrée suivante, ou avant
+  /// d'attendre le lot ([flushJournal]), sans quoi une sortie le perdrait.
+  /// [_last] est gardé : la même entrée encore reste comptée.
+  void _countRepeats() {
+    if (_repeats == 0) return;
+    _queue('${_now()} (entrée précédente répétée $_repeats fois)');
+    _repeats = 0;
+  }
+
+  void _takeFrom(_Lines early) {
+    early.moveTo(_batch);
+    _schedule();
+  }
+
+  void _queue(String line) {
+    _batch.add(line);
+    _schedule();
+  }
+
+  void _schedule() {
+    if (_queued || _broken) return;
     _queued = true;
     _pending = _pending.then((_) => _write());
   }
 
-  static String _now() => DateTime.now().toIso8601String().substring(0, 23);
-
   Future<void> _write() async {
     _queued = false;
-    final bytes = utf8.encode(_buffer.toString());
-    _buffer.clear();
-    if (_broken) return;
+    List<int> bytes = utf8.encode(_batch.take());
+    if (_broken || bytes.isEmpty) return;
     try {
       var size = _size ??= await file.exists() ? await file.length() : 0;
       if (size > 0 && size + bytes.length > maxBytes) {
@@ -216,6 +283,10 @@ final class _Journal {
         if (await old.exists()) await old.delete();
         await file.rename(old.path);
         size = 0;
+      }
+      if (size == 0 && Platform.isLinux) {
+        final failure = await _restrict();
+        if (failure != null) bytes = utf8.encode('$failure\n') + bytes;
       }
       await file.writeAsBytes(bytes, mode: FileMode.append);
       _size = size + bytes.length;
@@ -228,5 +299,59 @@ final class _Journal {
       _size = null;
       _broken = ++_failures >= 3;
     }
+  }
+
+  /// Linux : le fichier, créé vide s'il manque, devient lisible par son seul
+  /// propriétaire (`chmod 600`), à chaque création, rotation comprise. Rend
+  /// la ligne qui dit l'échec, `null` si c'est fait.
+  Future<String?> _restrict() async {
+    try {
+      await file.create();
+      final result = await Process.run('chmod', ['600', file.path]);
+      if (result.exitCode == 0) return null;
+      return '${_now()} Journal : droits non restreints '
+          '(chmod ${result.exitCode})';
+    } on Exception catch (e) {
+      return '${_now()} Journal : droits non restreints (${e.runtimeType})';
+    }
+  }
+}
+
+/// Lignes du journal en file, [max] caractères au plus : au-delà, les plus
+/// anciennes sont abandonnées (la plus récente est toujours gardée) et
+/// comptées, puis dites par une ligne en tête du texte rendu.
+final class _Lines {
+  _Lines(this.max);
+
+  final int max;
+  final _lines = Queue<String>();
+  var _length = 0;
+  var _lost = 0;
+
+  void add(String line) {
+    _lines.add(line);
+    _length += line.length + 1;
+    while (_length > max && _lines.length > 1) {
+      _length -= _lines.removeFirst().length + 1;
+      _lost++;
+    }
+  }
+
+  /// Ajoute ces lignes à [other], pertes dites en tête, puis se vide.
+  void moveTo(_Lines other) {
+    if (_lost > 0) other.add('${_now()} ($_lost entrées perdues)');
+    _lines.forEach(other.add);
+    _lines.clear();
+    _length = _lost = 0;
+  }
+
+  /// Le texte en attente, une ligne par entrée, puis se vide.
+  String take() {
+    final text = StringBuffer();
+    if (_lost > 0) text.writeln('${_now()} ($_lost entrées perdues)');
+    _lines.forEach(text.writeln);
+    _lines.clear();
+    _length = _lost = 0;
+    return text.toString();
   }
 }

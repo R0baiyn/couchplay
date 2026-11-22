@@ -24,6 +24,9 @@ import 'update/windows_installer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Le journal s'ouvre dans `startApp` : ce qui est loggé avant (ouverture
+  // des comptes) y est écrit après l'en-tête.
+  holdLogUntilJournal();
   // Erreurs non rattrapées vers le journal (D-058) ; l'affichage de Flutter
   // et le traitement par défaut du moteur restent inchangés. Ici et non dans
   // `startApp` : les essais de bout en bout gardent les leurs.
@@ -73,8 +76,10 @@ ProviderContainer startApp({
   required bool television,
   Updater? updater,
 }) {
-  openJournal(File('${support.path}${Platform.pathSeparator}couchplay.log'));
-  log(startLine(version: version, television: television));
+  openJournal(
+    File('${support.path}${Platform.pathSeparator}couchplay.log'),
+    header: startLine(version: version, television: television),
+  );
   final files = AccountFiles(Directory('${support.path}/accounts'));
   final videos = AccountFiles(downloads);
   // En tâche de fond : ne retarde pas le premier rendu.
