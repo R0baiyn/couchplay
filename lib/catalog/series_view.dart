@@ -87,6 +87,17 @@ class EpisodeTile extends ConsumerWidget {
     final progress = key == null
         ? null
         : ref.watch(libraryProvider.select((l) => l.progress[key]));
+    // Raison d'un échec, en texte : l'infobulle du bouton ne s'atteint ni
+    // au doigt ni à la télécommande.
+    final failure = key == null
+        ? null
+        : ref.watch(
+            downloadsProvider.select(
+              (s) => s.entries[key]?.status == DownloadStatus.failed
+                  ? s.entries[key]?.error
+                  : null,
+            ),
+          );
     final theme = Theme.of(context);
     final e = episode;
     final minutes = e.duration?.inMinutes;
@@ -172,6 +183,14 @@ class EpisodeTile extends ConsumerWidget {
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodyMedium,
+                              ),
+                            if (failure != null)
+                              Text(
+                                failure,
+                                key: ValueKey('catalog.episodeError.${e.id}'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.error,
+                                ),
                               ),
                           ],
                         ),

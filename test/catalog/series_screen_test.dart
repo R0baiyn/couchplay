@@ -14,6 +14,7 @@ import '../support/settle.dart';
 
 void main() {
   setUpCatalogApp();
+  _failureReason();
 
   testWidgets('progression enregistrée (toutes les 10 s sous le lecteur) : '
       "seul l'épisode se refait, pas la fiche", (tester) async {
@@ -176,5 +177,44 @@ void main() {
       ),
     );
     expect(button.onPressed, isNull);
+  });
+}
+
+void _failureReason() {
+  testWidgets("épisode en échec : la raison s'affiche sous l'épisode, sans "
+      'survol', (tester) async {
+    const item = PlayItem.episode(
+      id: '6912',
+      extension: 'mkv',
+      name: 'Les Veilleurs',
+      seriesId: '17',
+      season: 1,
+      episode: 1,
+    );
+    final fake = FakeDownloads({
+      item.key: download(
+        item,
+        DownloadStatus.failed,
+        error: 'Espace disque insuffisant',
+      ),
+    });
+    await pumpApp(
+      tester,
+      openMovies: false,
+      overrides: [downloadsProvider.overrideWith(() => fake)],
+    );
+    await tester.tap(find.byKey(const ValueKey('shell.tabSeries')));
+    await settle(tester);
+    await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
+    await settle(tester);
+
+    final reason = find.byKey(const ValueKey('catalog.episodeError.6912'));
+    expect(reason, findsOneWidget);
+    expect(tester.widget<Text>(reason).data, 'Espace disque insuffisant');
+    // Les autres épisodes n'en ont pas.
+    expect(
+      find.byKey(const ValueKey('catalog.episodeError.6913')),
+      findsNothing,
+    );
   });
 }
