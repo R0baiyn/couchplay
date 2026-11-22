@@ -35,6 +35,7 @@ class PlayerControls extends StatefulWidget {
     super.key,
     required this.player,
     required this.title,
+    this.subtitle,
     required this.fill,
     required this.onToggleFill,
     required this.fullscreen,
@@ -45,6 +46,9 @@ class PlayerControls extends StatefulWidget {
 
   final Player player;
   final String title;
+
+  /// Seconde partie du titre (`playerTitle`).
+  final String? subtitle;
 
   /// `true` : l'image remplit l'écran, quitte à être rognée.
   final bool fill;
@@ -255,6 +259,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   Widget _bars() => PlayerBars(
     player: _player,
     title: widget.title,
+    subtitle: widget.subtitle,
     onExit: widget.onExit,
     onOver: (over) => _overBars = over,
     bottom: Column(

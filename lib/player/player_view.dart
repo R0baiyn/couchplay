@@ -16,6 +16,7 @@ class PlayerView extends StatelessWidget {
     super.key,
     required this.playback,
     required this.title,
+    this.subtitle,
     required this.fill,
     required this.fullscreen,
     required this.volume,
@@ -35,6 +36,9 @@ class PlayerView extends StatelessWidget {
 
   final Playback playback;
   final String title;
+
+  /// Seconde partie du titre (`playerTitle`).
+  final String? subtitle;
   final bool fill;
 
   /// `null` : pas de bouton plein écran (mobile).
@@ -92,6 +96,7 @@ class PlayerView extends StatelessWidget {
             PlayerControls(
               player: playback.player,
               title: title,
+              subtitle: subtitle,
               fill: fill,
               onToggleFill: onToggleFill,
               fullscreen: fullscreen,

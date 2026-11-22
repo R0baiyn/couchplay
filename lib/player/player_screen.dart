@@ -12,6 +12,7 @@ import '../orientation.dart';
 import '../server/models.dart';
 import '../television.dart';
 import 'playback.dart';
+import 'player_bars.dart';
 import 'player_next_up.dart';
 import 'player_request.dart';
 import 'player_session.dart';
@@ -283,9 +284,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       ref.watch(widget.seriesDetails(seriesId));
     }
     final phone = ref.watch(phoneProvider);
+    final (title, subtitle) = playerTitle(_item, phone: phone);
     final view = PlayerView(
       playback: _playback,
-      title: _item.title,
+      title: title,
+      subtitle: subtitle,
       fill: _fill,
       // Sur mobile, toujours en plein écran : pas de bouton.
       fullscreen: _mobile ? null : _fullscreen,
