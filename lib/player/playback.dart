@@ -47,15 +47,30 @@ final class PlayRequest {
 
 /// Le flux n'a pas pu démarrer, nouvelles tentatives comprises.
 final class PlaybackFailed implements Exception {
-  const PlaybackFailed({this.unreadable = false, this.network = false});
+  const PlaybackFailed({
+    this.unreadable = false,
+    this.network = false,
+    this.decoderRefused = false,
+  });
 
   /// D'après une erreur de mpv : fichier reçu mais illisible (format ou
   /// codec non pris en charge), connexion coupée ou sans réponse, sinon
   /// refus du serveur.
-  factory PlaybackFailed.fromMpv(String reason) => PlaybackFailed(
-    unreadable: _unreadable.hasMatch(reason),
-    network: _network.hasMatch(reason),
-  );
+  factory PlaybackFailed.fromMpv(String reason) {
+    // Une ligne du journal arrive ici sous la forme « préfixe: texte ».
+    final colon = reason.indexOf(': ');
+    final refused =
+        colon > 0 &&
+        isDecoderRefusal(
+          reason.substring(0, colon),
+          reason.substring(colon + 2),
+        );
+    return PlaybackFailed(
+      unreadable: refused || _unreadable.hasMatch(reason),
+      network: _network.hasMatch(reason),
+      decoderRefused: refused,
+    );
+  }
 
   static final _unreadable = RegExp(
     r'codec|decoder|unsupported|unrecognized|recognize file format|'
@@ -81,7 +96,14 @@ final class PlaybackFailed implements Exception {
   /// refusé.
   final bool network;
 
-  String get message => unreadable
+  /// Le décodeur matériel refuse la vidéo ([isDecoderRefusal]) : une autre
+  /// version (moins lourde) peut passer.
+  final bool decoderRefused;
+
+  String get message => decoderRefused
+      ? 'Vidéo trop lourde pour cet appareil : son décodeur ne la lit pas. '
+            'Essayez une autre version du film ou de la série.'
+      : unreadable
       ? 'Cette vidéo ne peut pas être lue sur cet appareil : son format '
             'n\'est pas pris en charge.'
       : network
@@ -197,6 +219,12 @@ Map<String, String> trackProperties(PlayRequest request) {
 bool isStreamFailure(String level, String prefix) =>
     level == 'error' &&
     (prefix == 'stream' || prefix == 'ffmpeg' || prefix == 'demux');
+
+/// Ligne du journal de mpv où le décodeur matériel d'Android refuse la
+/// vidéo (souvent trop lourde pour lui : 4K sur un appareil qui ne la lit
+/// pas). Limite de l'appareil : seul le message change.
+bool isDecoderRefusal(String prefix, String text) =>
+    prefix == 'ffmpeg' && text.startsWith('amediacodec:');
 
 /// Rendu vidéo : sur TV avec la lecture directe, MediaCodec affiche
 /// directement sur la surface, sans copie ni rendu OpenGL (trop lourds pour

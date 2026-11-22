@@ -94,6 +94,29 @@ void main() {
     expect(refused.message, contains('abonnement'));
   });
 
+  test(
+    'décodeur matériel qui refuse la vidéo : trop lourde, autre version',
+    () {
+      // Ligne réelle d'une TV dont le décodeur HEVC refuse une vidéo 4K.
+      const line = 'amediacodec: java.lang.IllegalArgumentException occured';
+      expect(isDecoderRefusal('ffmpeg', line), isTrue);
+      expect(isDecoderRefusal('ffmpeg', 'Could not open codec.'), isFalse);
+      expect(isDecoderRefusal('stream', line), isFalse);
+
+      final refused = PlaybackFailed.fromMpv('ffmpeg: $line');
+      expect(refused.unreadable, isTrue, reason: 'pas de nouvel essai');
+      expect(
+        refused.message,
+        'Vidéo trop lourde pour cet appareil : son décodeur ne la lit pas. '
+        'Essayez une autre version du film ou de la série.',
+      );
+      expect(
+        PlaybackFailed.fromMpv('Could not open codec.').message,
+        isNot(refused.message),
+      );
+    },
+  );
+
   test('vidéo illisible : autre message, pas de nouvel essai', () async {
     // Message réel de mpv sur Android pour une vidéo en 4:4:4.
     final unreadable = PlaybackFailed.fromMpv('Could not open codec.');
