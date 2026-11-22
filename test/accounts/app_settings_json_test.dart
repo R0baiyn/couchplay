@@ -31,11 +31,12 @@ void main() {
     test(
       'toutes les combinaisons : relues, puis réencodées à l\'identique',
       () {
-        for (var bits = 0; bits < 8; bits++) {
+        for (var bits = 0; bits < 16; bits++) {
           final settings = AppSettings(
             debug: bits & 1 != 0,
             wifiOnly: bits & 2 != 0,
             deleteWatched: bits & 4 != 0,
+            directVideo: bits & 8 != 0,
           );
           final first = encode(settings);
           expect(encode(AppSettings.fromJson(jsonDecode(first))), first);
@@ -54,15 +55,23 @@ void main() {
         final notifier = c.read(appSettingsProvider.notifier);
         for (var i = 0; i < 200; i++) {
           final value = gen.chance();
-          await switch (gen.between(0, 2)) {
+          await switch (gen.between(0, 3)) {
             0 => notifier.setDebug(value),
             1 => notifier.setWifiOnly(value),
-            _ => notifier.setDeleteWatched(value),
+            2 => notifier.setDeleteWatched(value),
+            _ => notifier.setDirectVideo(value),
           };
           expect(encode(read()), encode(c.read(appSettingsProvider)));
         }
       },
     );
+  });
+
+  test("lecture directe absente (fichier d'avant) : éteinte", () {
+    file.writeAsStringSync(jsonEncode({'debug': true, 'wifiOnly': false}));
+    expect(read().directVideo, isFalse);
+    file.writeAsStringSync(jsonEncode({'directVideo': true}));
+    expect(read().directVideo, isTrue);
   });
 
   group('fichier abîmé', () {

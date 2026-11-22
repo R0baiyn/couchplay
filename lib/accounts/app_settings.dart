@@ -14,6 +14,7 @@ final class AppSettings {
     this.debug = false,
     this.wifiOnly = true,
     this.deleteWatched = false,
+    this.directVideo = false,
   });
 
   /// Mode debug : le lecteur affiche les infos techniques du flux.
@@ -29,12 +30,19 @@ final class AppSettings {
   /// défaut.
   final bool deleteWatched;
 
+  /// Lecture directe (D-068), sur TV seulement : MediaCodec affiche sur la
+  /// surface, pour un appareil dont l'image saccade. Désactivée par défaut :
+  /// elle bloque certains décodeurs après une avance. Lue à la création du
+  /// lecteur, donc au prochain lancement de l'app.
+  final bool directVideo;
+
   factory AppSettings.fromJson(Object? json) {
     final map = asMap(json);
     return AppSettings(
       debug: asBool(map['debug']) ?? false,
       wifiOnly: asBool(map['wifiOnly']) ?? true,
       deleteWatched: asBool(map['deleteWatched']) ?? false,
+      directVideo: asBool(map['directVideo']) ?? false,
     );
   }
 
@@ -42,14 +50,20 @@ final class AppSettings {
     'debug': debug,
     'wifiOnly': wifiOnly,
     'deleteWatched': deleteWatched,
+    'directVideo': directVideo,
   };
 
-  AppSettings copyWith({bool? debug, bool? wifiOnly, bool? deleteWatched}) =>
-      AppSettings(
-        debug: debug ?? this.debug,
-        wifiOnly: wifiOnly ?? this.wifiOnly,
-        deleteWatched: deleteWatched ?? this.deleteWatched,
-      );
+  AppSettings copyWith({
+    bool? debug,
+    bool? wifiOnly,
+    bool? deleteWatched,
+    bool? directVideo,
+  }) => AppSettings(
+    debug: debug ?? this.debug,
+    wifiOnly: wifiOnly ?? this.wifiOnly,
+    deleteWatched: deleteWatched ?? this.deleteWatched,
+    directVideo: directVideo ?? this.directVideo,
+  );
 }
 
 /// Le fichier des réglages, injecté par `main()`. `null` (tests) : réglages
@@ -84,6 +98,9 @@ final class AppSettingsNotifier extends Notifier<AppSettings> {
 
   Future<void> setDeleteWatched(bool deleteWatched) =>
       _set(state.copyWith(deleteWatched: deleteWatched));
+
+  Future<void> setDirectVideo(bool directVideo) =>
+      _set(state.copyWith(directVideo: directVideo));
 
   Future<void> _set(AppSettings settings) {
     state = settings;

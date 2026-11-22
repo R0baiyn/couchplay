@@ -200,29 +200,41 @@ void main() {
   });
 
   group('videoConfiguration', () {
-    test('TV : MediaCodec affiche directement sur la surface', () {
-      final tv = videoConfiguration(television: true);
+    test('TV + lecture directe : MediaCodec affiche sur la surface', () {
+      final tv = videoConfiguration(television: true, direct: true);
       expect(tv.vo, 'mediacodec_embed');
       expect(tv.hwdec, 'mediacodec');
       expect(tv.enableHardwareAcceleration, isTrue);
     });
 
-    test('hors TV : défauts de media_kit', () {
-      final other = videoConfiguration(television: false);
-      const defaults = VideoControllerConfiguration();
-      expect(other.vo, defaults.vo);
-      expect(other.hwdec, defaults.hwdec);
-      expect(other.scale, defaults.scale);
-      expect(other.width, defaults.width);
-      expect(other.height, defaults.height);
-      expect(
-        other.enableHardwareAcceleration,
-        defaults.enableHardwareAcceleration,
+    for (final (television, direct) in [
+      (true, false),
+      (false, true),
+      (false, false),
+    ]) {
+      test(
+        'TV : $television, lecture directe : $direct : défauts de media_kit (1.3.1)',
+        () {
+          final other = videoConfiguration(
+            television: television,
+            direct: direct,
+          );
+          const defaults = VideoControllerConfiguration();
+          expect(other.vo, defaults.vo);
+          expect(other.hwdec, defaults.hwdec);
+          expect(other.scale, defaults.scale);
+          expect(other.width, defaults.width);
+          expect(other.height, defaults.height);
+          expect(
+            other.enableHardwareAcceleration,
+            defaults.enableHardwareAcceleration,
+          );
+          expect(
+            other.androidAttachSurfaceAfterVideoParameters,
+            defaults.androidAttachSurfaceAfterVideoParameters,
+          );
+        },
       );
-      expect(
-        other.androidAttachSurfaceAfterVideoParameters,
-        defaults.androidAttachSurfaceAfterVideoParameters,
-      );
-    });
+    }
   });
 }
