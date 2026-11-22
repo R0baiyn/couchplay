@@ -4,6 +4,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:couchplay/logging.dart';
 import 'package:couchplay/update/android_installer.dart';
 import 'package:couchplay/update/linux_installer.dart';
 import 'package:couchplay/update/release_signature.dart';
@@ -754,6 +755,27 @@ void main() {
       );
       expect(asked, isFalse);
     });
+
+    for (final (explicit, logged) in [(true, false), (false, true)]) {
+      test(
+        'installateur du système trouvé : $explicit, journal : $logged',
+        () async {
+          final journal = File('${work.path}/couchplay.log');
+          openJournal(journal);
+          addTearDown(closeJournal);
+          messenger.setMockMethodCallHandler(channel, (_) async => explicit);
+
+          await installer().installNow();
+          await flushJournal();
+
+          expect(
+            journal.existsSync() &&
+                journal.readAsStringSync().contains('installateur du système'),
+            logged,
+          );
+        },
+      );
+    }
 
     test('place libre lue par le canal', () async {
       expect(await installer().freeSpace(), 572723200);

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import '../logging.dart';
 import 'updater.dart';
 
 /// Fin du nom de l'APK publié pour l'architecture [abi], `null` si aucun ne
@@ -86,7 +87,16 @@ final class AndroidInstaller implements Installer {
       _version.writeAsString(update.version);
 
   @override
-  Future<void> installNow() => _channel.invokeMethod<void>('install');
+  Future<void> installNow() async {
+    // `false` : aucun installateur du système trouvé, Android a choisi
+    // l'app qui ouvre l'APK (D-060).
+    if (await _channel.invokeMethod<bool>('install') == false) {
+      log(
+        'Mise à jour : installateur du système introuvable, choix laissé '
+        'à Android',
+      );
+    }
+  }
 
   @override
   Future<int?> freeSpace() async {

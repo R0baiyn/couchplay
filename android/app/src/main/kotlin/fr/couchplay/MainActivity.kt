@@ -3,6 +3,8 @@ package fr.couchplay
 import android.app.UiModeManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.StatFs
@@ -56,13 +58,24 @@ class MainActivity : FlutterActivity() {
             return
         }
         val uri = FileProvider.getUriForFile(this, "$packageName.update", apk)
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/vnd.android.package-archive")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // L'installateur du système seulement : une autre app qui déclare ce
+        // filtre ne reçoit pas l'APK. Son paquet change selon l'appareil
+        // (Google, AOSP, Fire OS) : cherché ici, jamais écrit en dur. Visible
+        // grâce au <queries> du manifeste.
+        @Suppress("DEPRECATION")
+        val system = packageManager
+            .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            .firstOrNull { (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 }
+            ?.activityInfo
+        if (system != null) intent.setClassName(system.packageName, system.name)
         try {
-            startActivity(
-                Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-            )
-            result.success(null)
+            startActivity(intent)
+            // false : aucun installateur du système trouvé, Android choisit
+            // (intent implicite, écrit au journal par l'app).
+            result.success(system != null)
         } catch (e: ActivityNotFoundException) {
             // Appareil sans installateur d'applications.
             result.error("install", e.message, null)
