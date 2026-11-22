@@ -756,25 +756,21 @@ void main() {
       expect(asked, isFalse);
     });
 
-    for (final (explicit, logged) in [(true, false), (false, true)]) {
-      test(
-        'installateur du système trouvé : $explicit, journal : $logged',
-        () async {
-          final journal = File('${work.path}/couchplay.log');
-          openJournal(journal);
-          addTearDown(closeJournal);
-          messenger.setMockMethodCallHandler(channel, (_) async => explicit);
+    for (final (answer, logged) in [
+      ('com.exemple.installateur', 'installateur com.exemple.installateur'),
+      ('', 'installateur du système introuvable'),
+    ]) {
+      test('installateur « $answer » écrit au journal', () async {
+        final journal = File('${work.path}/couchplay.log');
+        openJournal(journal);
+        addTearDown(closeJournal);
+        messenger.setMockMethodCallHandler(channel, (_) async => answer);
 
-          await installer().installNow();
-          await flushJournal();
+        await installer().installNow();
+        await flushJournal();
 
-          expect(
-            journal.existsSync() &&
-                journal.readAsStringSync().contains('installateur du système'),
-            logged,
-          );
-        },
-      );
+        expect(journal.readAsStringSync(), contains(logged));
+      });
     }
 
     test('place libre lue par le canal', () async {

@@ -88,14 +88,16 @@ final class AndroidInstaller implements Installer {
 
   @override
   Future<void> installNow() async {
-    // `false` : aucun installateur du système trouvé, Android a choisi
-    // l'app qui ouvre l'APK (D-060).
-    if (await _channel.invokeMethod<bool>('install') == false) {
-      log(
-        'Mise à jour : installateur du système introuvable, choix laissé '
-        'à Android',
-      );
-    }
+    // Le paquet de l'installateur du système qui ouvre l'APK ; vide : aucun
+    // trouvé, Android a choisi l'app (D-060).
+    final installer = await _channel.invokeMethod<String>('install');
+    if (installer == null) return;
+    log(
+      installer.isEmpty
+          ? 'Mise à jour : installateur du système introuvable, choix laissé '
+                'à Android'
+          : 'Mise à jour : installateur $installer',
+    );
   }
 
   @override

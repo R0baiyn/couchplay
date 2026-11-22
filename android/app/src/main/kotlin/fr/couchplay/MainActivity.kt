@@ -73,9 +73,10 @@ class MainActivity : FlutterActivity() {
         if (system != null) intent.setClassName(system.packageName, system.name)
         try {
             startActivity(intent)
-            // false : aucun installateur du système trouvé, Android choisit
-            // (intent implicite, écrit au journal par l'app).
-            result.success(system != null)
+            // Paquet de l'installateur, pour le journal de l'app ; "" : aucun
+            // installateur du système trouvé, Android choisit (intent
+            // implicite).
+            result.success(system?.packageName ?: "")
         } catch (e: ActivityNotFoundException) {
             // Appareil sans installateur d'applications.
             result.error("install", e.message, null)
