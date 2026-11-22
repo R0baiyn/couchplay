@@ -23,6 +23,7 @@ Download _download(Gen gen, {bool running = false}) {
         ? gen.text()
         : null,
     addedAt: gen.date(),
+    deletePending: status == DownloadStatus.ready && gen.chance(0.2),
   );
 }
 

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../downloads/downloads.dart';
-import '../downloads/offline_list.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../server/models.dart';
@@ -142,15 +141,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// lecteur reste simplement sur la fin.
   void _offerNext(String seriesId) {
     final series = ref.read(widget.seriesDetails(seriesId)).value;
-    final next = series != null
-        ? nextEpisode(series, _item)
-        : switch (nextDownloadedEpisode(
-            ref.read(downloadsProvider).entries.values,
-            _item,
-          )) {
-            final item? => (item: item, image: null),
-            null => null,
-          };
+    final next = nextUpFor(
+      series,
+      ref.read(downloadsProvider).entries.values,
+      _item,
+    );
     if (next == null) {
       if (series != null) _exit();
       return;
