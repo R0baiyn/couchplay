@@ -131,6 +131,25 @@ void main() {
     }
   });
 
+  testWidgets('au doigt : « Désactivés » coché au départ, une piste choisie', (
+    tester,
+  ) async {
+    await pumpMenu(tester);
+    await tester.tap(find.byIcon(Icons.subtitles));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('player.subtitleOff')),
+        matching: find.byIcon(Icons.done),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('player.subtitleTrack.4')));
+    await tester.pumpAndSettle();
+    final chosen = call(#setSubtitleTrack);
+    expect((chosen!.positionalArguments.first as SubtitleTrack).id, '4');
+  });
+
   testWidgets('télécommande : OK sur une piste audio la choisit', (
     tester,
   ) async {
