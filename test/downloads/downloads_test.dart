@@ -53,17 +53,21 @@ final class _Harness {
     bool mobileOnly = false,
     Stream<bool> Function()? network,
     void Function(Directory root)? before,
+    Directory? reuse,
   }) async {
-    final root = Directory.systemTemp.createTempSync('couchplay_queue_');
-    addTearDown(() async {
-      // Écritures du manifeste encore en file : on les laisse finir.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      try {
-        root.deleteSync(recursive: true);
-      } on FileSystemException {
-        // Sans effet sur les tests suivants.
-      }
-    });
+    final root =
+        reuse ?? Directory.systemTemp.createTempSync('couchplay_queue_');
+    if (reuse == null) {
+      addTearDown(() async {
+        // Écritures du manifeste encore en file : on les laisse finir.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        try {
+          root.deleteSync(recursive: true);
+        } on FileSystemException {
+          // Sans effet sur les tests suivants.
+        }
+      });
+    }
     FlutterSecureStorage.setMockInitialValues({});
     final accounts = await AccountStore.open();
     await accounts.save(
@@ -749,6 +753,26 @@ void main() {
       await h.until(() => h.status('1') == null);
       await h.until(() => !h.video('a', 'movie-1.mkv').existsSync());
     });
+
+    test(
+      'vu pendant la lecture, app tuée : effacée au lancement suivant',
+      () async {
+        final h = await ready();
+        h.notifier.playerOpened();
+        await library(h).setWatched(_movie('1'), watched: true);
+        // Écritures du manifeste et de la bibliothèque finies, puis l'app est
+        // tuée : le lecteur ne s'est jamais fermé.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(h.status('1'), DownloadStatus.ready, reason: 'fichier ouvert');
+        h.container.dispose();
+
+        final next = await _Harness.start(reuse: h.root);
+        await next.until(() => next.entries.isNotEmpty);
+        await next.until(() => next.status('1') == null);
+        await next.until(() => !next.video('a', 'movie-1.mkv').existsSync());
+        expect(next.status('2'), DownloadStatus.ready);
+      },
+    );
 
     test('changement de compte : la vidéo vue sur b reste', () async {
       final h = await _Harness.start();

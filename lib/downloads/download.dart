@@ -36,6 +36,7 @@ final class Download {
     this.status = DownloadStatus.queued,
     this.error,
     required this.addedAt,
+    this.deletePending = false,
   });
 
   final PlayItem item;
@@ -52,6 +53,10 @@ final class Download {
   /// Raison de l'échec, prête à afficher ([DownloadStatus.failed]).
   final String? error;
   final DateTime addedAt;
+
+  /// Vue avec « Effacer une fois vu » pendant une lecture : à effacer une
+  /// fois le lecteur fermé, ou au lancement suivant si l'app a été tuée.
+  final bool deletePending;
 
   String get key => item.key;
 
@@ -75,6 +80,7 @@ final class Download {
     int? received,
     DownloadStatus? status,
     String? error,
+    bool? deletePending,
   }) => Download(
     item: item,
     size: size ?? this.size,
@@ -83,6 +89,7 @@ final class Download {
     // L'erreur ne survit pas à un changement d'état.
     error: error ?? (status == null ? this.error : null),
     addedAt: addedAt,
+    deletePending: deletePending ?? this.deletePending,
   );
 
   static Download? fromJson(String key, Object? json) {
@@ -101,6 +108,7 @@ final class Download {
       addedAt:
           asDate(map['addedAt']) ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      deletePending: asBool(map['deletePending']) ?? false,
     );
   }
 
@@ -111,6 +119,7 @@ final class Download {
     'status': status.name,
     'error': ?error,
     'addedAt': addedAt.toUtc().toIso8601String(),
+    if (deletePending) 'deletePending': true,
   };
 }
 

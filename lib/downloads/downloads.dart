@@ -301,7 +301,6 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
       session.posterCancel.cancel();
       dio.close(force: true);
     });
-    _watched.clear();
     ref.listen(libraryProvider, (previous, library) {
       _onLibrary(id, previous, library);
     });
@@ -316,6 +315,8 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     session.tidied = store.tidy(entries.values);
     Future.microtask(() {
       unawaited(_pump(session));
+      // App tuée pendant la lecture d'une vidéo vue : effacée maintenant.
+      _deleteWatched();
       // Rattrapage : une affiche manquée (réseau coupé, app fermée trop
       // tôt) est redemandée à chaque lancement.
       for (final download in entries.values) {
@@ -333,10 +334,6 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
   /// Lecteurs ouverts (deux un instant, pendant la fermeture du premier).
   var _players = 0;
 
-  /// Vidéos prêtes passées à « vu » avec « Effacer une fois vu » : effacées
-  /// une fois le lecteur fermé, jamais pendant (fichier ouvert).
-  final _watched = <String>{};
-
   void playerOpened() => _players++;
 
   /// À appeler une fois le lecteur arrêté (fichier fermé).
@@ -352,22 +349,35 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
     if (previous == null || ref.read(activeAccountProvider)?.id != accountId) {
       return;
     }
+    final session = _session;
+    if (session == null || session.disposed) return;
     if (!ref.read(appSettingsProvider).deleteWatched) return;
+    final entries = {...state.entries};
+    var changed = false;
     for (final MapEntry(:key, value: progress) in library.progress.entries) {
+      final download = entries[key];
       if (progress.watched &&
           !(previous.progress[key]?.watched ?? false) &&
-          state.entries[key]?.status == DownloadStatus.ready) {
-        _watched.add(key);
+          download?.status == DownloadStatus.ready) {
+        // Noté dans le manifeste : effacée même si l'app est tuée avant la
+        // sortie du lecteur (au lancement suivant).
+        entries[key] = download!.copyWith(deletePending: true);
+        changed = true;
       }
     }
+    if (changed) unawaited(_save(session, entries));
     _deleteWatched();
   }
 
+  /// Efface les vidéos vues ([Download.deletePending]) une fois le lecteur
+  /// fermé, jamais pendant (fichier ouvert).
   void _deleteWatched() {
     final session = _session;
     if (_players > 0 || session == null || session.disposed) return;
-    final keys = [..._watched];
-    _watched.clear();
+    final keys = [
+      for (final d in state.entries.values)
+        if (d.deletePending) d.key,
+    ];
     for (final key in keys) {
       log('Vidéo vue effacée');
       unawaited(remove(key));
