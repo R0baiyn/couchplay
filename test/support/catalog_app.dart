@@ -58,6 +58,7 @@ Future<void> pumpApp(
   WidgetTester tester, {
   Size size = const Size(1280, 800),
   bool openMovies = true,
+  bool waitForIndex = true,
   List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = size;
@@ -115,7 +116,7 @@ Future<void> pumpApp(
   bool loading() => ContentKind.values.any(
     (kind) => container.read(catalogIndexProvider(kind)).isLoading,
   );
-  for (var i = 0; loading(); i++) {
+  for (var i = 0; waitForIndex && loading(); i++) {
     if (i == 100) fail('le catalogue ne se charge pas');
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 30)),

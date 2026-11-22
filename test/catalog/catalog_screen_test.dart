@@ -380,7 +380,7 @@ void main() {
     await settle(tester);
     expect(find.byType(SearchScreen), findsOneWidget);
     final field = find.descendant(
-      of: find.byType(SearchScreen),
+      of: find.byKey(const ValueKey('search.field')),
       matching: find.byType(EditableText),
     );
     expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
@@ -465,7 +465,7 @@ void main() {
     await settle(tester);
     expect(find.byType(SearchScreen), findsOneWidget);
     final field = find.descendant(
-      of: find.byType(SearchScreen),
+      of: find.byKey(const ValueKey('search.field')),
       matching: find.byType(EditableText),
     );
     expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
@@ -537,7 +537,7 @@ void main() {
     await settle(tester);
     await tester.enterText(
       find.descendant(
-        of: find.byType(SearchScreen),
+        of: find.byKey(const ValueKey('search.field')),
         matching: find.byType(EditableText),
       ),
       'nouveaute',
