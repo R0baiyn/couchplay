@@ -49,6 +49,10 @@ final class _FakeInstaller implements Installer {
   final preparedSums = <String>[];
   var installs = 0;
 
+  /// Versions reçues par [installPending], et installations qu'il a lancées.
+  final pendingChecks = <String>[];
+  var pendingInstalls = 0;
+
   @override
   String get assetSuffix => '-windows-setup.exe';
 
@@ -76,7 +80,13 @@ final class _FakeInstaller implements Installer {
   Future<bool> installPending(
     String current, {
     Future<bool> Function(int size)? allow,
-  }) async => false;
+  }) async {
+    // Une mise à jour préparée lors d'une session précédente est en attente.
+    pendingChecks.add(current);
+    if (preparedSums.isEmpty) return false;
+    pendingInstalls++;
+    return true;
+  }
 
   @override
   Future<int?> freeSpace() async => null;
@@ -84,12 +94,14 @@ final class _FakeInstaller implements Installer {
 
 /// La fausse release : `releases/latest`, puis la liste, sa signature par
 /// [signer] et le paquet, dont la 2e moitié attend [rest] ; [served] est
-/// complété une fois le paquet servi en entier. Toute autre adresse est
-/// notée dans [unexpected] et reçoit un 404.
+/// complété une fois le paquet servi en entier. Chaque demande de
+/// `releases/latest` est notée dans [checks] ; toute autre adresse est notée
+/// dans [unexpected] et reçoit un 404.
 Future<FakeAdapter> _release({
   required List<int> signer,
   required Future<void> rest,
   required Completer<void> served,
+  required List<Uri> checks,
   required List<Uri> unexpected,
 }) async {
   final sums = formatSums({
@@ -120,6 +132,7 @@ Future<FakeAdapter> _release({
   return FakeAdapter((options) async {
     final url = options.uri;
     if (url.host == Updater.latest.host && url.path == Updater.latest.path) {
+      checks.add(url);
       return ResponseBody.fromString(
         latest,
         200,
@@ -147,6 +160,18 @@ Future<FakeAdapter> _release({
 double? _progress(WidgetTester tester) =>
     tester.widget<LinearProgressIndicator>(byKey('update.progress')).value;
 
+/// Une app lancée sur la fausse release : la fin du paquet attend [rest],
+/// [served] dit qu'il est servi en entier ; [checks] et [unexpected] : voir
+/// [_release].
+typedef _Started = ({
+  IsolatedApp app,
+  _FakeInstaller installer,
+  Completer<void> rest,
+  Completer<void> served,
+  List<Uri> checks,
+  List<Uri> unexpected,
+});
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -155,47 +180,71 @@ void main() {
   setUpAll(() async => server = await FakeServer.start());
   tearDownAll(() async => server?.stop());
 
-  /// Démarre l'app avec une release signée par [signer], ajoute le compte,
-  /// accepte la mise à jour et attend la moitié du téléchargement.
-  /// Rend l'installateur factice, ce qui libère la fin du paquet, ce qui dit
-  /// qu'il est servi en entier, et les adresses hors de la release.
-  Future<(_FakeInstaller, Completer<void>, Completer<void>, List<Uri>)>
-  acceptUpdate(WidgetTester tester, List<int> signer) async {
-    final root = await Directory.systemTemp.createTemp('couchplay_maj_');
-    addTearDown(() async {
-      if (await root.exists()) await root.delete(recursive: true);
-    });
-    final installer = _FakeInstaller(
-      Directory('${root.path}${Platform.pathSeparator}update'),
-    );
+  /// Démarre l'app, version [installed], avec une release signée par
+  /// [signer], puis ajoute le compte. Sans [installer], un installateur
+  /// factice neuf ; le même, pour un 2e démarrage dans le même test.
+  Future<_Started> startWithRelease(
+    WidgetTester tester, {
+    List<int>? signer,
+    String installed = benchVersion,
+    _FakeInstaller? installer,
+  }) async {
+    if (installer == null) {
+      final root = await Directory.systemTemp.createTemp('couchplay_maj_');
+      addTearDown(() async {
+        if (await root.exists()) await root.delete(recursive: true);
+      });
+      installer = _FakeInstaller(
+        Directory('${root.path}${Platform.pathSeparator}update'),
+      );
+    }
     final rest = Completer<void>();
     // La fin du paquet ne reste jamais suspendue après le test.
     addTearDown(() {
       if (!rest.isCompleted) rest.complete();
     });
     final served = Completer<void>();
+    final checks = <Uri>[];
     final unexpected = <Uri>[];
-    await startIsolatedApp(
+    final app = await startIsolatedApp(
       tester,
       updater: Updater(
-        version: benchVersion,
+        version: installed,
         installer: installer,
         publicKey: await publicKeyOf(_testSeed),
         adapter: await _release(
-          signer: signer,
+          signer: signer ?? _testSeed,
           rest: rest.future,
           served: served,
+          checks: checks,
           unexpected: unexpected,
         ),
       ),
     );
     await addBenchAccount(tester, server!);
+    return (
+      app: app,
+      installer: installer,
+      rest: rest,
+      served: served,
+      checks: checks,
+      unexpected: unexpected,
+    );
+  }
 
-    // 1. La boîte s'ouvre devant l'Accueil : version, notes, deux choix.
+  /// 1. La boîte s'ouvre devant l'Accueil : version, notes, deux choix.
+  Future<void> waitOffer(WidgetTester tester) async {
     await waitFor(tester, byKey('update.install'));
     expect(find.text('Version $_version disponible'), findsOneWidget);
     expect(tester.widget<Text>(byKey('update.notes')).data, _notes);
     expect(byKey('update.later'), findsOneWidget);
+  }
+
+  /// Démarre l'app avec une release signée par [signer], accepte la mise à
+  /// jour et attend la moitié du téléchargement.
+  Future<_Started> acceptUpdate(WidgetTester tester, List<int> signer) async {
+    final started = await startWithRelease(tester, signer: signer);
+    await waitOffer(tester);
 
     // 2. Accepter : la boîte « Mise à jour » montre l'avancement, à mi-course
     // tant que la fin du paquet n'est pas servie.
@@ -209,16 +258,14 @@ void main() {
     );
     expect(_progress(tester), lessThan(1));
     expect(find.textContaining('Téléchargement : '), findsOneWidget);
-    return (installer, rest, served, unexpected);
+    return started;
   }
 
   testWidgets('parcours 4 : mise à jour signée, jusqu’avant l’installation', (
     tester,
   ) async {
-    final (installer, rest, _, unexpected) = await acceptUpdate(
-      tester,
-      _testSeed,
-    );
+    final (:installer, :rest, :unexpected, app: _, served: _, checks: _) =
+        await acceptUpdate(tester, _testSeed);
 
     // 3. Fin du paquet : vérifié puis confié une fois à l'installateur, avec
     // la somme de la release ; la boîte de progression se ferme.
@@ -240,10 +287,8 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 2)));
 
   testWidgets('parcours 4 : signature d’une autre clé refusée', (tester) async {
-    final (installer, rest, served, unexpected) = await acceptUpdate(
-      tester,
-      _otherSeed,
-    );
+    final (:installer, :rest, :served, :unexpected, app: _, checks: _) =
+        await acceptUpdate(tester, _otherSeed);
 
     // 4. Liste signée par une autre clé : refus dit à l'utilisateur, rien
     // confié à l'installateur, aucun fichier non vérifié ne reste.
@@ -261,5 +306,83 @@ void main() {
     expect(installer.installs, 0);
     expect(installer.workDir.existsSync(), isFalse, reason: 'fichier effacé');
     expect(unexpected, isEmpty, reason: 'requête hors de la release');
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  testWidgets('parcours 4 : « Plus tard », installée au démarrage suivant', (
+    tester,
+  ) async {
+    final first = await startWithRelease(tester);
+    final installer = first.installer;
+    await waitOffer(tester);
+
+    // 5. « Plus tard » : téléchargée et préparée en fond, sans installation ;
+    // le message dit quand elle s'installera.
+    await tester.tap(byKey('update.later'));
+    first.rest.complete();
+    await waitFor(
+      tester,
+      find.text(
+        'Mise à jour prête : elle s\'installera à la fermeture de l’app.',
+      ),
+    );
+    expect(byKey('update.progress'), findsNothing);
+    expect(installer.preparedSums, ['$_packageSum $_packageSum']);
+    expect(installer.installs, 0);
+    expect(first.unexpected, isEmpty, reason: 'requête hors de la release');
+
+    // Démarrage suivant, même installateur : la mise à jour en attente
+    // s'installe d'abord, et rien n'est proposé (GitHub n'est pas consulté).
+    await first.app.stop();
+    final next = await startWithRelease(tester, installer: installer);
+    final offer = await next.app.container.read(startupUpdateProvider.future);
+    expect(offer, isNull);
+    expect(installer.pendingChecks, [benchVersion, benchVersion]);
+    expect(installer.pendingInstalls, 1);
+    expect(next.checks, isEmpty, reason: 'mise à jour proposée');
+    expect(byKey('update.install'), findsNothing);
+    expect(installer.installs, 0);
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  testWidgets('parcours 4 : téléchargement annulé', (tester) async {
+    final (:installer, :served, :unexpected, app: _, rest: _, checks: _) =
+        await acceptUpdate(tester, _testSeed);
+
+    // 6. « Annuler » à mi-course : la boîte se ferme, le message le dit, rien
+    // n'est confié à l'installateur ni laissé sur le disque.
+    await tester.tap(byKey('update.cancel'));
+    await waitFor(tester, find.text('Mise à jour annulée.'));
+    await waitUntil(
+      tester,
+      () => byKey('update.progress').evaluate().isEmpty,
+      what: 'la boîte « Mise à jour » se ferme',
+    );
+    expect(served.isCompleted, isFalse, reason: 'paquet servi en entier');
+    expect(installer.preparedSums, isEmpty);
+    expect(installer.installs, 0);
+    expect(installer.workDir.existsSync(), isFalse, reason: 'fichier laissé');
+    expect(unexpected, isEmpty, reason: 'requête hors de la release');
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  testWidgets('parcours 4 : réglages, l’app est à jour', (tester) async {
+    // L'app installée a la version de la release publiée : rien au
+    // démarrage, et la recherche des Réglages le dit.
+    final started = await startWithRelease(tester, installed: _version);
+    final offer = await started.app.container.read(
+      startupUpdateProvider.future,
+    );
+    expect(offer, isNull);
+    expect(started.checks, hasLength(1), reason: 'GitHub consulté au début');
+
+    // 7. Réglages → Version : « CouchPlay est à jour. », aucune boîte.
+    await waitFor(tester, byKey('settings.open'));
+    await tester.tap(byKey('settings.open'));
+    await waitFor(tester, byKey('settings.version'));
+    await tester.ensureVisible(byKey('settings.version'));
+    await tester.tap(byKey('settings.version'));
+    await waitFor(tester, find.text('CouchPlay est à jour.'));
+    expect(started.checks, hasLength(2), reason: 'GitHub consulté de nouveau');
+    expect(byKey('update.install'), findsNothing);
+    expect(started.installer.preparedSums, isEmpty);
+    expect(started.unexpected, isEmpty, reason: 'requête hors de la release');
   }, timeout: const Timeout(Duration(minutes: 2)));
 }

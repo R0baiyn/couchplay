@@ -14,6 +14,7 @@ import 'package:couchplay/server/cloudflare_dns.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
@@ -159,8 +160,13 @@ Future<void> waitPlaying(WidgetTester tester) async {
 /// Lance l'app comme `main`, mais sur des dossiers temporaires et un coffre
 /// simulé vide (donc sans compte). Tout est démonté et effacé à la fin du
 /// test, journal compris ([journalFile] : `support/couchplay.log`). Sans
-/// [updater], pas de mise à jour (comme un build local).
-Future<void> startIsolatedApp(WidgetTester tester, {Updater? updater}) async {
+/// [updater], pas de mise à jour (comme un build local). Rend l'app lancée :
+/// son conteneur, et son arrêt, qui permet un 2e démarrage dans le même test
+/// (sinon fait à la fin du test).
+Future<IsolatedApp> startIsolatedApp(
+  WidgetTester tester, {
+  Updater? updater,
+}) async {
   HttpOverrides.global = CloudflareHttpOverrides();
   MediaKit.ensureInitialized();
   FlutterSecureStorage.setMockInitialValues({});
@@ -176,7 +182,10 @@ Future<void> startIsolatedApp(WidgetTester tester, {Updater? updater}) async {
     television: false,
     updater: updater,
   );
-  addTearDown(() async {
+  var stopped = false;
+  Future<void> stop() async {
+    if (stopped) return;
+    stopped = true;
     // Démonter l'app, attendre la fin de l'arrêt du flux (il écrit encore
     // dans `downloadHoldsProvider`), puis seulement jeter les providers.
     try {
@@ -195,9 +204,18 @@ Future<void> startIsolatedApp(WidgetTester tester, {Updater? updater}) async {
       await closeJournal();
       await root.delete(recursive: true);
     }
-  });
+  }
+
+  addTearDown(stop);
   await tester.pump();
+  return (container: container, stop: stop);
 }
+
+/// L'app lancée par [startIsolatedApp].
+typedef IsolatedApp = ({
+  ProviderContainer container,
+  Future<void> Function() stop,
+});
 
 /// Le faux serveur Python (`tools/faux-serveur.py`), lancé pour le banc.
 final class FakeServer {
