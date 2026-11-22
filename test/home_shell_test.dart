@@ -97,6 +97,47 @@ void main() {
     expect(find.byKey(const ValueKey('shell.tabDownloads')), findsNothing);
   });
 
+  // Chaque onglet garde sa Key, choisi ou non : une seule par onglet.
+  for (final (name, size) in [
+    ('rail', const Size(1280, 800)),
+    ('barre du bas', const Size(360, 740)),
+  ]) {
+    testWidgets('$name : la Key de chaque onglet reste, choisi ou non', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        size: size,
+        openMovies: false,
+        overrides: [downloadsProvider.overrideWith(FakeDownloads.new)],
+      );
+      const tabs = [
+        'shell.tabHome',
+        'shell.tabMovies',
+        'shell.tabSeries',
+        'shell.tabSearch',
+        'shell.tabDownloads',
+      ];
+      void expectEachKeyOnce(String selected) {
+        for (final tab in tabs) {
+          expect(
+            find.byKey(ValueKey(tab)),
+            findsOneWidget,
+            reason: '$tab, $selected choisi',
+          );
+        }
+      }
+
+      // L'app s'ouvre sur l'accueil.
+      expectEachKeyOnce('shell.tabHome');
+      for (final tab in tabs.skip(1)) {
+        await tester.tap(find.byKey(ValueKey(tab)));
+        await settle(tester);
+        expectEachKeyOnce(tab);
+      }
+    });
+  }
+
   // Écran étroit : pas de rail, chaque onglet porte son bouton Réglages dans
   // l'en-tête, passé par la coquille.
   testWidgets("barre du bas : Réglages s'ouvre depuis chaque onglet", (
@@ -108,7 +149,7 @@ void main() {
       openMovies: false,
       overrides: [downloadsProvider.overrideWith(FakeDownloads.new)],
     );
-    // L'app s'ouvre sur l'accueil : son onglet choisi n'a pas de Key.
+    // L'app s'ouvre sur l'accueil.
     for (final tab in [
       null,
       'shell.tabMovies',

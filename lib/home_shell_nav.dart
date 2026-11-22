@@ -4,7 +4,8 @@ import 'focus_ring.dart';
 import 'settings/settings_screen.dart';
 import 'television.dart';
 
-/// Onglets de l'accueil : icône, icône choisie, libellé, Key.
+/// Onglets de l'accueil : icône, icône choisie, libellé, Key (posée sur
+/// l'icône, ou sur l'icône choisie quand l'onglet l'est : une seule à la fois).
 typedef ShellTab = (IconData, IconData, String, Key);
 
 /// L'icône d'un onglet, à la taille de sa pastille ([width] × 32) : comme
@@ -67,10 +68,14 @@ class ShellRail extends StatelessWidget {
                 child: SettingsButton(inRail: true),
               ),
               destinations: [
-                for (final (icon, selected, label, key) in tabs)
+                for (final (i, (icon, selected, label, key)) in tabs.indexed)
                   NavigationRailDestination(
-                    icon: _tabIcon(icon, 56, key),
-                    selectedIcon: _tabIcon(selected, 56),
+                    icon: _tabIcon(icon, 56, i == selectedIndex ? null : key),
+                    selectedIcon: _tabIcon(
+                      selected,
+                      56,
+                      i == selectedIndex ? key : null,
+                    ),
                     label: Text(label),
                   ),
               ],
@@ -101,10 +106,14 @@ class ShellBottomBar extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onSelect,
       destinations: [
-        for (final (icon, selected, label, key) in tabs)
+        for (final (i, (icon, selected, label, key)) in tabs.indexed)
           NavigationDestination(
-            icon: _tabIcon(icon, 64, key),
-            selectedIcon: _tabIcon(selected, 64),
+            icon: _tabIcon(icon, 64, i == selectedIndex ? null : key),
+            selectedIcon: _tabIcon(
+              selected,
+              64,
+              i == selectedIndex ? key : null,
+            ),
             label: label,
           ),
       ],
