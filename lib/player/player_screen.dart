@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../downloads/downloads.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
+import '../orientation.dart';
 import '../server/models.dart';
 import '../television.dart';
 import 'playback.dart';
@@ -15,6 +16,7 @@ import 'player_next_up.dart';
 import 'player_request.dart';
 import 'player_session.dart';
 import 'player_track_memory.dart';
+import 'mobile_fullscreen.dart';
 import 'player_view.dart';
 
 export 'player_request.dart' show endedEarly, localRequest;
@@ -62,7 +64,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Position où reprendre après une coupure.
   Duration? _resumeAt;
 
-  // Sur mobile, le lecteur est toujours en plein écran paysage.
+  // Sur mobile, le lecteur est toujours en plein écran paysage
+  // (`MobileFullscreen`).
   static final _mobile = Platform.isAndroid || Platform.isIOS;
 
   /// Ticket de notre ouverture : l'arrêt de cet écran ne coupe que notre flux.
@@ -78,7 +81,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _downloads = ref.read(downloadsProvider.notifier);
     _holds = ref.read(downloadHoldsProvider.notifier);
     _downloads.playerOpened();
-    if (_mobile) _setFullscreen(true);
     _lifecycle = AppLifecycleListener(onHide: _onHide);
     _completed = _playback.player.stream.completed.listen(_onCompleted);
     _session = PlayerSession(
@@ -251,8 +253,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _exit() => Navigator.maybePop(context);
 
   /// Échap hors des contrôles : quitte d'abord le plein écran sur
-  /// ordinateur, comme dans les contrôles, puis le lecteur.
-  void _back() => _fullscreen && !_mobile ? _setFullscreen(false) : _exit();
+  /// ordinateur (sur mobile, `_fullscreen` reste faux), comme dans les
+  /// contrôles, puis le lecteur.
+  void _back() => _fullscreen ? _setFullscreen(false) : _exit();
 
   @override
   void dispose() {
@@ -279,7 +282,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (_item.seriesId case final seriesId?) {
       ref.watch(widget.seriesDetails(seriesId));
     }
-    return PlayerView(
+    final phone = ref.watch(phoneProvider);
+    final view = PlayerView(
       playback: _playback,
       title: _item.title,
       fill: _fill,
@@ -301,5 +305,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       onPlayNext: _playNext,
       onCancelNext: _cancelNext,
     );
+    return _mobile ? MobileFullscreen(phone: phone, child: view) : view;
   }
 }

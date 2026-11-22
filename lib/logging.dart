@@ -119,11 +119,16 @@ String _now() => DateTime.now().toIso8601String().substring(0, 23);
 const _stackLines = 12;
 const _maxEntry = 4000;
 
-/// Ligne d'en-tête du journal, écrite à chaque démarrage.
-String startLine({required String version, required bool television}) =>
+/// Ligne d'en-tête du journal, écrite à chaque démarrage. [phone] : écran
+/// bloqué en portrait hors du lecteur (`isPhone`).
+String startLine({
+  required String version,
+  required bool television,
+  bool phone = false,
+}) =>
     'Démarrage : CouchPlay $version, ${Platform.operatingSystem} '
     '${Platform.operatingSystemVersion}, ${Abi.current()}'
-    '${television ? ', TV' : ''}';
+    '${television ? ', TV' : ''}${phone ? ', téléphone' : ''}';
 
 _Journal? _journal;
 

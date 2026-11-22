@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -15,6 +16,7 @@ import 'app.dart';
 import 'downloads/downloads.dart';
 import 'downloads/downloads_folder.dart';
 import 'logging.dart';
+import 'orientation.dart';
 import 'server/cloudflare_dns.dart';
 import 'television.dart';
 import 'update/android_installer.dart';
@@ -53,12 +55,30 @@ Future<void> main() async {
     _installer(),
     isTelevision(),
   ).wait;
+  final display =
+      WidgetsBinding.instance.platformDispatcher.displays.firstOrNull;
+  final phone =
+      display != null &&
+      isPhone(
+        display.size / display.devicePixelRatio,
+        android: Platform.isAndroid,
+        television: television,
+      );
+  // Hors du lecteur, un téléphone reste en portrait (D-060).
+  if (phone) {
+    unawaited(
+      SystemChrome.setPreferredOrientations(
+        allowedOrientations(phone: true, player: false),
+      ),
+    );
+  }
   startApp(
     accounts: accounts,
     support: support,
     downloads: await downloadsRoot(support),
     version: package.version,
     television: television,
+    phone: phone,
     updater: installer == null
         ? null
         : Updater(version: package.version, installer: installer),
@@ -74,11 +94,12 @@ ProviderContainer startApp({
   required Directory downloads,
   required String version,
   required bool television,
+  bool phone = false,
   Updater? updater,
 }) {
   openJournal(
     File('${support.path}${Platform.pathSeparator}couchplay.log'),
-    header: startLine(version: version, television: television),
+    header: startLine(version: version, television: television, phone: phone),
   );
   final files = AccountFiles(Directory('${support.path}/accounts'));
   final videos = AccountFiles(downloads);
@@ -94,6 +115,7 @@ ProviderContainer startApp({
       ),
       appVersionProvider.overrideWithValue(version),
       televisionProvider.overrideWithValue(television),
+      phoneProvider.overrideWithValue(phone),
       if (updater != null) updaterProvider.overrideWithValue(updater),
     ],
   );

@@ -190,6 +190,17 @@ void main() {
       expect(line, endsWith(', TV'));
     });
 
+    test('en-tête : téléphone', () {
+      expect(
+        startLine(version: '9.9.9', television: false, phone: true),
+        endsWith(', téléphone'),
+      );
+      expect(
+        startLine(version: '9.9.9', television: false),
+        isNot(contains('téléphone')),
+      );
+    });
+
     test('pile tronquée et masquée', () async {
       openJournal(file);
       final stack = StackTrace.fromString(
