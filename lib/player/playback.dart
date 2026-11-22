@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../logging.dart';
+import '../television.dart';
 
 /// Ce que le lecteur doit ouvrir.
 final class PlayRequest {
@@ -196,10 +197,21 @@ bool isStreamFailure(String level, String prefix) =>
     level == 'error' &&
     (prefix == 'stream' || prefix == 'ffmpeg' || prefix == 'demux');
 
+/// Rendu vidéo : sur TV, MediaCodec affiche directement sur la surface,
+/// sans copie ni rendu OpenGL (trop lourds pour les SoC faibles : saccades
+/// sur un projecteur, D-065) ; ailleurs, les défauts de media_kit.
+VideoControllerConfiguration videoConfiguration({required bool television}) =>
+    television
+    ? const VideoControllerConfiguration(
+        vo: 'mediacodec_embed',
+        hwdec: 'mediacodec',
+      )
+    : const VideoControllerConfiguration();
+
 /// Seul propriétaire du lecteur de l'app (règle 3) : un seul flux à la fois.
 /// Ouvrir un flux remplace le précédent, qui est fermé d'abord.
 final class Playback {
-  Playback()
+  Playback({bool television = false})
     : player = Player(
         configuration: const PlayerConfiguration(
           title: 'CouchPlay',
@@ -226,7 +238,10 @@ final class Playback {
         ),
       );
     }
-    controller = VideoController(player);
+    controller = VideoController(
+      player,
+      configuration: videoConfiguration(television: television),
+    );
   }
 
   final Player player;
@@ -362,7 +377,7 @@ final class Playback {
 
 /// Créé à la première lecture, gardé ensuite : un seul lecteur pour l'app.
 final playbackProvider = Provider<Playback>((ref) {
-  final playback = Playback();
+  final playback = Playback(television: ref.read(televisionProvider));
   ref.onDispose(playback.dispose);
   return playback;
 });

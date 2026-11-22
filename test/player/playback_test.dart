@@ -2,6 +2,7 @@ import 'package:couchplay/player/player_screen.dart';
 import 'package:couchplay/player/player_tracks.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 void main() {
   group('withRetries', () {
@@ -196,5 +197,32 @@ void main() {
     expect(endedEarly(const Duration(seconds: 30), minute), isFalse);
     expect(endedEarly(minute, minute), isFalse);
     expect(endedEarly(const Duration(seconds: 10), Duration.zero), isFalse);
+  });
+
+  group('videoConfiguration', () {
+    test('TV : MediaCodec affiche directement sur la surface', () {
+      final tv = videoConfiguration(television: true);
+      expect(tv.vo, 'mediacodec_embed');
+      expect(tv.hwdec, 'mediacodec');
+      expect(tv.enableHardwareAcceleration, isTrue);
+    });
+
+    test('hors TV : défauts de media_kit', () {
+      final other = videoConfiguration(television: false);
+      const defaults = VideoControllerConfiguration();
+      expect(other.vo, defaults.vo);
+      expect(other.hwdec, defaults.hwdec);
+      expect(other.scale, defaults.scale);
+      expect(other.width, defaults.width);
+      expect(other.height, defaults.height);
+      expect(
+        other.enableHardwareAcceleration,
+        defaults.enableHardwareAcceleration,
+      );
+      expect(
+        other.androidAttachSurfaceAfterVideoParameters,
+        defaults.androidAttachSurfaceAfterVideoParameters,
+      );
+    });
   });
 }
