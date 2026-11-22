@@ -153,7 +153,7 @@ void main() {
     expect(find.byType(SeriesScreen), findsOneWidget);
     expect(find.text('Saison 1'), findsOneWidget);
     expect(find.text('Saison 2'), findsOneWidget);
-    final firstEpisode = find.textContaining('1. Les Veilleurs - S01E01');
+    final firstEpisode = find.textContaining('1. Épisode 1');
     await tester.scrollUntilVisible(firstEpisode, 300);
     expect(firstEpisode, findsOneWidget);
 
@@ -164,8 +164,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('catalog.seasonChip.2')));
     await tester.pump();
     expect(firstEpisode, findsNothing);
-    await tester.scrollUntilVisible(find.textContaining('S02E01'), 300);
-    expect(find.textContaining('S02E01'), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining('1. Épisode 4'), 300);
+    expect(find.textContaining('1. Épisode 4'), findsOneWidget);
   });
 
   testWidgets('écran étroit : catégorie en panneau, en-tête repliable', (

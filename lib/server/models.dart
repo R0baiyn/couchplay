@@ -246,6 +246,17 @@ SeriesDetails parseSeriesDetails(String text) {
   );
 }
 
+/// « série - S04E14 - » en tête d'un titre d'épisode, suivi d'un titre.
+final _episodePrefix = RegExp(
+  r'^.+? - S\d+ ?E\d+ - (?=\S)',
+  caseSensitive: false,
+);
+
+/// [title] sans le préfixe « série - S04E14 - » que certains fournisseurs
+/// ajoutent (D-061) ; inchangé sans lui, ou s'il ne reste rien après.
+String withoutEpisodePrefix(String title) =>
+    title.replaceFirst(_episodePrefix, '');
+
 Episode? _episode(Map<String, Object?> map) {
   final id = asId(map['id']);
   final number = asInt(map['episode_num']);
@@ -254,7 +265,9 @@ Episode? _episode(Map<String, Object?> map) {
   return Episode(
     id: id,
     number: number,
-    title: asString(map['title'])?.trim() ?? 'Épisode $number',
+    title: withoutEpisodePrefix(
+      asString(map['title'])?.trim() ?? 'Épisode $number',
+    ),
     extension: asString(map['container_extension'])?.trim(),
     plot: asString(info['plot'])?.trim(),
     duration: _duration(info),

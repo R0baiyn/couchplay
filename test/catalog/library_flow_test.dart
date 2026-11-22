@@ -124,7 +124,7 @@ void main() {
     await settle(tester);
     await tester.tap(find.byKey(const ValueKey('catalog.poster.series-17')));
     await settle(tester);
-    final firstEpisode = find.textContaining('1. Les Veilleurs - S01E01');
+    final firstEpisode = find.textContaining('1. Épisode 1');
     await tester.scrollUntilVisible(firstEpisode, 300);
 
     Focus.of(tester.element(firstEpisode)).requestFocus();
@@ -150,7 +150,7 @@ void main() {
       await settle(tester);
     }
 
-    final firstEpisode = find.textContaining('1. Les Veilleurs - S01E01');
+    final firstEpisode = find.textContaining('1. Épisode 1');
     final seen = find.byIcon(Icons.check_circle);
 
     await pumpApp(tester);

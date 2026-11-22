@@ -89,7 +89,11 @@ final class PlayItem {
       seriesId: seriesId,
       season: season,
       episode: episode,
-      episodeTitle: asString(map['title']),
+      // Enregistrés avant D-061 : avec le préfixe du fournisseur.
+      episodeTitle: switch (asString(map['title'])) {
+        final title? => withoutEpisodePrefix(title),
+        null => null,
+      },
       poster: asString(map['poster']),
     );
   }

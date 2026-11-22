@@ -141,6 +141,28 @@ void main() {
     });
   });
 
+  group("préfixe des titres d'épisode (D-061)", () {
+    test('« <série> - SxxEyy - » retiré, le reste inchangé', () {
+      expect(
+        withoutEpisodePrefix('Les Navigateurs - S04E14 - À cette heure'),
+        'À cette heure',
+      );
+      expect(withoutEpisodePrefix('Un - Deux - s1e2 - Fin'), 'Fin');
+      expect(withoutEpisodePrefix('Le Retour'), 'Le Retour');
+      expect(withoutEpisodePrefix('Pilote - partie 1'), 'Pilote - partie 1');
+      // Rien après le préfixe : le titre reste tel quel, jamais vide.
+      expect(
+        withoutEpisodePrefix('Les Navigateurs - S04E14 - '),
+        'Les Navigateurs - S04E14 - ',
+      );
+    });
+
+    test('appliqué aux épisodes de la fiche série', () {
+      final series = parseSeriesDetails(_fixture('series_info'));
+      expect(series.seasons.first.episodes.first.title, 'Épisode 1');
+    });
+  });
+
   test('entrée faite à la main : nom décomposé une seule fois', () {
     const item = CatalogItem(
       kind: ContentKind.movies,

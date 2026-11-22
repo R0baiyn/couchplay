@@ -194,4 +194,17 @@ void main() {
       }
     });
   });
+
+  test("titre d'épisode enregistré avec le préfixe du fournisseur : relu "
+      'sans lui (D-061)', () {
+    final item = PlayItem.fromJson('episode:7', {
+      'seriesId': '4',
+      'season': 1,
+      'episode': 2,
+      'title': 'Les Navigateurs - S01E02 - Le Retour',
+      'name': 'Les Navigateurs',
+      'extension': 'mkv',
+    });
+    expect(item?.episodeTitle, 'Le Retour');
+  });
 }
