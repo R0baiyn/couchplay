@@ -1,31 +1,54 @@
+import 'dart:io';
+
 import 'package:couchplay/update/hidden_process.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const root = r'C:\Windows';
-
-  test('chaque argument entre guillemets, espaces et & compris', () {
+  test('la ligne ne porte que les variables, chacune entre guillemets', () {
     expect(
-      hiddenCommandLine(root, r'C:\Mes jeux\install.cmd', [
-        '42',
-        r'C:\A & B\app.zip',
-      ]),
-      r'"C:\Windows\System32\cmd.exe" /d /s /c '
-      r'""C:\Mes jeux\install.cmd" "42" "C:\A & B\app.zip""',
+      hiddenCommandLine(r'C:\Windows', 2),
+      r'"C:\Windows\System32\cmd.exe" /d /v:off /s /c '
+      r'""%COUCHPLAY_ARG0%" "%COUCHPLAY_ARG1%" "%COUCHPLAY_ARG2%""',
     );
   });
 
-  test('un % est passé tel quel (cmd le développera)', () {
+  test('chaque mot dans sa variable, script en premier', () {
     expect(
-      hiddenCommandLine(root, r'C:\x.cmd', [r'C:\100%\app']),
-      endsWith(r'"C:\100%\app""'),
+      hiddenArguments(r'C:\Mes jeux\install.cmd', ['42', r'C:\A & B\a.zip']),
+      {
+        'COUCHPLAY_ARG0': r'C:\Mes jeux\install.cmd',
+        'COUCHPLAY_ARG1': '42',
+        'COUCHPLAY_ARG2': r'C:\A & B\a.zip',
+      },
     );
   });
 
-  test('un guillemet dans un argument est refusé', () {
-    expect(
-      () => hiddenCommandLine(root, r'C:\x.cmd', ['a"b']),
-      throwsArgumentError,
-    );
+  test(
+    'un %TEMP% littéral arrive intact au script, dans son chemin aussi',
+    () async {
+      final temp = Directory.systemTemp.createTempSync('couchplay_cmd_');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      // Un dossier nommé %TEMP% est légal : cmd ne doit pas le développer.
+      final dir = Directory('${temp.path}\\%TEMP%')..createSync();
+      final script = File('${dir.path}\\s.cmd')
+        ..writeAsStringSync('@echo off\r\n>"%~dp0out.txt" echo %~1\r\n');
+      const arg = r'C:\%TEMP%\%PATH:~0,3%\100%\app';
+
+      startHiddenScript(script.path, [arg]);
+
+      final out = File('${dir.path}\\out.txt');
+      final deadline = DateTime.now().add(const Duration(seconds: 15));
+      while (!out.existsSync() || out.lengthSync() == 0) {
+        if (DateTime.now().isAfter(deadline)) fail('Script introuvable');
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      expect(out.readAsStringSync().trim(), arg);
+    },
+    skip: !Platform.isWindows,
+  );
+
+  test('un guillemet ou un argument vide est refusé', () {
+    expect(() => hiddenArguments(r'C:\x.cmd', ['a"b']), throwsArgumentError);
+    expect(() => hiddenArguments(r'C:\x.cmd', ['']), throwsArgumentError);
   });
 }
