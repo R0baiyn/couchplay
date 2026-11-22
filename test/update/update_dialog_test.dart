@@ -49,7 +49,8 @@ final class _FakeInstaller implements Installer {
   String get packageName => 'couchplay.apk';
 
   @override
-  Future<void> prepared(Update update, File package) async => prepares++;
+  Future<void> prepared(Update update, File package, String? sha256) async =>
+      prepares++;
 
   @override
   Future<void> installNow() async {

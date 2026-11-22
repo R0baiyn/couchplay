@@ -125,9 +125,10 @@ Future<Map<String, String>?> verifiedSums(
   }
 }
 
-/// [file], publié sous le nom [name], est dans la liste [sums] signée par
-/// [signature] et y a sa somme exacte. [publicKey] : [releaseKey] par défaut.
-Future<bool> isSignedFile({
+/// La somme de [file] (64 chiffres hexadécimaux minuscules) s'il est,
+/// publié sous le nom [name], dans la liste [sums] signée par [signature] et
+/// y a sa somme exacte ; sinon `null`. [publicKey] : [releaseKey] par défaut.
+Future<String?> signedSum({
   required List<int> sums,
   required String signature,
   required String name,
@@ -136,5 +137,7 @@ Future<bool> isSignedFile({
 }) async {
   final listed = await verifiedSums(sums, signature, publicKey ?? releaseKey);
   final expected = listed?[name];
-  return expected != null && await sha256OfFile(file) == expected;
+  return expected != null && await sha256OfFile(file) == expected
+      ? expected
+      : null;
 }

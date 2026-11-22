@@ -34,7 +34,7 @@ final class LinuxInstaller implements Installer {
   String get packageName => 'couchplay.tar.gz';
 
   @override
-  Future<void> prepared(Update update, File package) =>
+  Future<void> prepared(Update update, File package, String? sha256) =>
       throw UnsupportedError('Pas d\'installation sous Linux');
 
   @override

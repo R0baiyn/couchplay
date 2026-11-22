@@ -49,6 +49,9 @@ final class _FakeInstaller implements Installer {
   /// Contenu de chaque fichier préparé.
   final received = <String>[];
 
+  /// Somme confiée avec chaque fichier préparé.
+  final sums = <String?>[];
+
   @override
   final bool signed;
 
@@ -65,8 +68,10 @@ final class _FakeInstaller implements Installer {
   String get packageName => 'update.zip';
 
   @override
-  Future<void> prepared(Update update, File package) async =>
-      received.add(await package.readAsString());
+  Future<void> prepared(Update update, File package, String? sha256) async {
+    received.add(await package.readAsString());
+    sums.add(sha256);
+  }
 
   @override
   Future<void> installNow() async => installs++;
@@ -402,6 +407,8 @@ void main() {
     test('fichier complet : confié à l\'installation', () async {
       await updater(FakeAdapter.replying('abc')).prepare(update);
       expect(installer.received, ['abc']);
+      // Sans liste signée, aucune somme vérifiée à transmettre.
+      expect(installer.sums, [null]);
     });
 
     test('une redirection vers un autre hôte est refusée', () async {
@@ -578,6 +585,8 @@ void main() {
       final adapter = release(sums: sums, signature: signature);
       await updater(adapter).prepare(update);
       expect(installer.received, ['abc']);
+      // La somme de la liste signée, pour la revérifier à l'installation.
+      expect(installer.sums, [sha256.convert(utf8.encode('abc')).toString()]);
       expect(adapter.calls, 3);
     });
 
@@ -696,6 +705,7 @@ void main() {
       await installer().prepared(
         Update(version: '0.2.1', notes: '', asset: Uri(), size: 3),
         apk,
+        null,
       );
     }
 

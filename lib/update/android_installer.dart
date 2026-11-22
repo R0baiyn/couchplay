@@ -82,7 +82,7 @@ final class AndroidInstaller implements Installer {
   File get _version => File('${workDir.path}/version');
 
   @override
-  Future<void> prepared(Update update, File package) =>
+  Future<void> prepared(Update update, File package, String? sha256) =>
       _version.writeAsString(update.version);
 
   @override

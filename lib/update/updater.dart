@@ -169,8 +169,9 @@ abstract interface class Installer {
   String get packageName;
 
   /// [package], le fichier de [update], est téléchargé et vérifié : le
-  /// prépare pour qu'il s'installe plus tard.
-  Future<void> prepared(Update update, File package);
+  /// prépare pour qu'il s'installe plus tard. [sha256] : sa somme lue dans la
+  /// liste signée quand [signed], sinon `null`.
+  Future<void> prepared(Update update, File package, String? sha256);
 
   /// Installe tout de suite la mise à jour préparée.
   Future<void> installNow();
@@ -320,6 +321,7 @@ final class Updater {
     File file(String name) =>
         File('${workDir.path}${Platform.pathSeparator}$name');
     final package = file(installer.packageName);
+    String? sha256;
     if (!installer.signed) {
       await _download(update.asset, package, update.size);
     } else {
@@ -345,17 +347,17 @@ final class Updater {
         // Le nom porte la version annoncée : une release ne peut pas
         // resservir le fichier signé d'une version plus ancienne.
         final name = update.asset.pathSegments.last;
-        final signed =
-            name.contains('-${update.version}-') &&
-            await isSignedFile(
-              sums: await sums.readAsBytes(),
-              // Octets quelconques acceptés : le base64 décide.
-              signature: String.fromCharCodes(await signature.readAsBytes()),
-              name: name,
-              file: package,
-              publicKey: _publicKey,
-            );
-        if (!signed) {
+        sha256 = name.contains('-${update.version}-')
+            ? await signedSum(
+                sums: await sums.readAsBytes(),
+                // Octets quelconques acceptés : le base64 décide.
+                signature: String.fromCharCodes(await signature.readAsBytes()),
+                name: name,
+                file: package,
+                publicKey: _publicKey,
+              )
+            : null;
+        if (sha256 == null) {
           log('Mise à jour ${update.version} refusée : signature');
           throw UnsignedUpdate(name);
         }
@@ -365,7 +367,7 @@ final class Updater {
         rethrow;
       }
     }
-    await installer.prepared(update, package);
+    await installer.prepared(update, package, sha256);
     log('Mise à jour ${update.version} prête');
   }
 

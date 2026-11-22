@@ -33,12 +33,12 @@ void main() {
 
   tearDown(() => temp.delete(recursive: true));
 
-  Future<bool> check({
+  Future<String?> check({
     List<int>? list,
     String? sig,
     String fileName = name,
     List<int>? key,
-  }) => isSignedFile(
+  }) => signedSum(
     sums: list ?? sums,
     signature: sig ?? signature,
     name: fileName,
@@ -47,44 +47,39 @@ void main() {
   );
 
   test('signature valide et bonne somme : accepté', () async {
-    expect(await check(), isTrue);
+    expect(await check(), await sha256OfFile(file));
   });
 
   test('liste modifiée après signature : refusé', () async {
     final changed = [...sums]..[0] ^= 1;
-    expect(await check(list: changed), isFalse);
+    expect(await check(list: changed), isNull);
   });
 
   test('fichier absent de la liste : refusé', () async {
     expect(
       await check(fileName: 'couchplay-1.0.0-windows-portable.zip'),
-      isFalse,
+      isNull,
     );
   });
 
   test('somme fausse : refusé', () async {
     file.writeAsStringSync('exf');
-    expect(await check(), isFalse);
+    expect(await check(), isNull);
   });
 
   test('signature absente ou illisible : refusé', () async {
-    expect(await check(sig: ''), isFalse);
-    expect(await check(sig: 'pas du base64'), isFalse);
-    expect(await check(sig: base64.encode([1, 2, 3])), isFalse);
+    expect(await check(sig: ''), isNull);
+    expect(await check(sig: 'pas du base64'), isNull);
+    expect(await check(sig: base64.encode([1, 2, 3])), isNull);
   });
 
   test('signée par une autre clé : refusé', () async {
     final other = await publicKeyOf(List.filled(keyLength, 7));
-    expect(await check(key: other), isFalse);
+    expect(await check(key: other), isNull);
     // Par défaut, la clé embarquée, qui n'est pas celle du test.
     expect(
-      await isSignedFile(
-        sums: sums,
-        signature: signature,
-        name: name,
-        file: file,
-      ),
-      isFalse,
+      await signedSum(sums: sums, signature: signature, name: name, file: file),
+      isNull,
     );
   });
 

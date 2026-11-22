@@ -38,7 +38,7 @@ final _package = Uint8List.fromList([
 ]);
 final _packageSum = sha256.convert(_package).toString();
 
-/// Installation simulée : retient la somme du fichier reçu et compte les
+/// Installation simulée : retient les sommes du fichier reçu et compte les
 /// installations demandées, sans rien lancer.
 final class _FakeInstaller implements Installer {
   _FakeInstaller(this.workDir);
@@ -65,8 +65,9 @@ final class _FakeInstaller implements Installer {
   String get packageName => 'update.exe';
 
   @override
-  Future<void> prepared(Update update, File package) async =>
-      preparedSums.add(await sha256OfFile(package));
+  Future<void> prepared(Update update, File package, String? sha256) async =>
+      // Somme du fichier reçu, puis celle transmise pour l'installation.
+      preparedSums.add('${await sha256OfFile(package)} $sha256');
 
   @override
   Future<void> installNow() async => installs++;
@@ -233,7 +234,7 @@ void main() {
       what: 'la boîte « Mise à jour » se ferme',
     );
     expect(installer.installs, 1);
-    expect(installer.preparedSums, [_packageSum]);
+    expect(installer.preparedSums, ['$_packageSum $_packageSum']);
     expect(find.text('Mise à jour impossible pour l\'instant.'), findsNothing);
     expect(unexpected, isEmpty, reason: 'requête hors de la release');
   }, timeout: const Timeout(Duration(minutes: 2)));

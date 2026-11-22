@@ -66,9 +66,14 @@ final class WindowsInstaller implements Installer {
 
   File _file(String name) => File('${workDir.path}\\$name');
 
-  /// Lance le script, qui attend la fermeture de l'app.
+  /// Lance le script, qui attend la fermeture de l'app. [sha256] vient de la
+  /// liste signée ([signed]) : le script la recalcule juste avant
+  /// d'installer. Absente ou d'une autre forme, rien n'est lancé.
   @override
-  Future<void> prepared(Update update, File package) async {
+  Future<void> prepared(Update update, File package, String? sha256) async {
+    if (sha256 == null || !_sha256.hasMatch(sha256)) {
+      throw ArgumentError('Somme du paquet absente ou illisible');
+    }
     final script = _file('install.cmd');
     // Fins de ligne Windows, quelles que soient celles du fichier source.
     await script.writeAsString(LineSplitter.split(installScript).join('\r\n'));
@@ -80,8 +85,11 @@ final class WindowsInstaller implements Installer {
       appDir.path,
       Platform.resolvedExecutable,
       _file('relaunch').path,
+      sha256,
     ]);
   }
+
+  static final _sha256 = RegExp(r'^[0-9a-f]{64}$');
 
   /// Demande la relance au script, puis ferme l'app : l'installation
   /// commence aussitôt.
@@ -125,8 +133,15 @@ final class WindowsInstaller implements Installer {
 /// de Git, par exemple) n'est jamais pris.
 ///
 /// Arguments : PID de l'app, paquet (`.zip` ou `.exe`), dossier de l'app,
-/// exe à relancer, fichier qui demande la relance. L'app est attendue toutes
-/// les 3 s : après « Plus tard », le script peut attendre des heures. Avec
+/// exe à relancer, fichier qui demande la relance, SHA-256 attendu du paquet.
+/// L'app est attendue toutes les 3 s : après « Plus tard », le script peut
+/// attendre des heures. Puis le SHA-256 du paquet est recalculé
+/// (`certutil`, 2e ligne de sa sortie, espaces retirés) : s'il diffère de
+/// celui de la liste signée, rien n'est installé, zip comme exe. Limite : ce
+/// script est dans le même dossier que le paquet, modifiable par le même
+/// utilisateur (installation sans droits d'administrateur) ; la
+/// revérification ferme la fenêtre de remplacement du paquet, pas celle du
+/// script. Avec
 /// relance, l'installateur montre sa progression (`/SILENT`) : l'utilisateur
 /// voit que ça avance. L'app est relancée même si l'extraction échoue (elle
 /// reste dans sa version). À la fin, seul un dossier nommé
@@ -143,6 +158,12 @@ set "bin=%SystemRoot%\System32"
 :wait
 "%bin%\tasklist.exe" /fi "PID eq %~1" /fi "IMAGENAME eq %~nx4" /nh > "%~dp2pid.txt"
 "%bin%\find.exe" " %~1 " "%~dp2pid.txt" >nul && ("%bin%\ping.exe" -n 4 127.0.0.1 >nul & goto wait)
+"%bin%\certutil.exe" -hashfile "%~2" SHA256 > "%~dp2sum.txt" || goto relaunch
+set "sum="
+for /f "usebackq skip=1 delims=" %%h in ("%~dp2sum.txt") do if not defined sum set "sum=%%h"
+if not defined sum goto relaunch
+set "sum=%sum: =%"
+if /i not "%sum%"=="%~6" goto relaunch
 if /i "%~x2"==".zip" (
   mkdir "%~dp2files"
   "%bin%\tar.exe" -xf "%~2" -C "%~dp2files" || goto relaunch
