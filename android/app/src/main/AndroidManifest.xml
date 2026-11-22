@@ -71,5 +71,11 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="content" android:mimeType="application/vnd.android.package-archive"/>
         </intent>
+        <!-- Seul l'installateur de paquets déclare celle-ci : le distingue
+             d'un gestionnaire de fichiers système qui ouvre aussi les APK. -->
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE"/>
+            <data android:scheme="content" android:mimeType="application/vnd.android.package-archive"/>
+        </intent>
     </queries>
 </manifest>

@@ -3,6 +3,7 @@ package fr.couchplay
 import android.app.UiModeManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -59,27 +60,54 @@ class MainActivity : FlutterActivity() {
         }
         val uri = FileProvider.getUriForFile(this, "$packageName.update", apk)
         val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, "application/vnd.android.package-archive")
+            .setDataAndType(uri, APK_TYPE)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        // L'installateur du système seulement : une autre app qui déclare ce
-        // filtre ne reçoit pas l'APK. Son paquet change selon l'appareil
-        // (Google, AOSP, Fire OS) : cherché ici, jamais écrit en dur. Visible
-        // grâce au <queries> du manifeste.
-        @Suppress("DEPRECATION")
-        val system = packageManager
-            .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-            .firstOrNull { (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 }
-            ?.activityInfo
-        if (system != null) intent.setClassName(system.packageName, system.name)
+        val installer = systemInstaller(intent)
+        if (installer != null) {
+            try {
+                startActivity(Intent(intent).setClassName(installer.packageName, installer.name))
+                // Paquet de l'installateur, pour le journal de l'app.
+                result.success(installer.packageName)
+                return
+            } catch (e: ActivityNotFoundException) {
+                // Désactivé entre-temps : l'intent implicite, ci-dessous.
+            } catch (e: SecurityException) {
+                // Refusé : l'intent implicite, ci-dessous.
+            }
+        }
         try {
             startActivity(intent)
-            // Paquet de l'installateur, pour le journal de l'app ; "" : aucun
-            // installateur du système trouvé, Android choisit (intent
-            // implicite).
-            result.success(system?.packageName ?: "")
+            // "" : Android choisit l'app (intent implicite), écrit au journal
+            // de l'app.
+            result.success("")
         } catch (e: ActivityNotFoundException) {
             // Appareil sans installateur d'applications.
             result.error("install", e.message, null)
         }
+    }
+
+    /// L'activité d'app système qui ouvre [view] (l'APK) : une autre app qui
+    /// déclare ce filtre ne reçoit pas l'APK. Le paquet de l'installateur
+    /// change selon l'appareil (Google, AOSP, Fire OS) : cherché ici, jamais
+    /// écrit en dur, parmi les apps visibles grâce au <queries> du manifeste.
+    /// Plusieurs apps système peuvent ouvrir un APK (gestionnaire de
+    /// fichiers…) : d'abord celle qui gère aussi INSTALL_PACKAGE, que seul
+    /// l'installateur de paquets déclare ; sinon la première app système ;
+    /// sinon null (intent implicite, D-060).
+    @Suppress("DEPRECATION")
+    private fun systemInstaller(view: Intent): ActivityInfo? {
+        fun system(intent: Intent) = packageManager
+            .queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            .map { it.activityInfo }
+            .filter { (it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 }
+        val viewers = system(view)
+        val installers = system(
+            Intent(Intent.ACTION_INSTALL_PACKAGE).setDataAndType(view.data, APK_TYPE),
+        ).map { it.packageName }.toSet()
+        return viewers.firstOrNull { it.packageName in installers } ?: viewers.firstOrNull()
+    }
+
+    private companion object {
+        const val APK_TYPE = "application/vnd.android.package-archive"
     }
 }
