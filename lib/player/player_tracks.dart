@@ -50,12 +50,12 @@ class TracksMenu extends StatelessWidget {
                 onSelected: player.setAudioTrack,
                 itemBuilder: (_) => [
                   for (final (index, track) in audio.indexed)
-                    CheckedPopupMenuItem(
+                    PopupMenuItem(
                       key: ValueKey('player.audioTrack.${track.id}'),
                       value: track,
-                      checked: track.id == selectedAudio,
-                      child: Text(
-                        trackLabel(
+                      child: _Choice(
+                        checked: track.id == selectedAudio,
+                        label: trackLabel(
                           index: index,
                           language: track.language,
                           title: track.title,
@@ -75,26 +75,27 @@ class TracksMenu extends StatelessWidget {
                   PopupMenuItem(
                     key: const ValueKey('player.subtitleFile'),
                     onTap: () => unawaited(loadSubtitleFile(player)),
-                    child: const ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.upload_file),
-                      title: Text('Charger un fichier…'),
+                    child: const Row(
+                      spacing: _gap,
+                      children: [
+                        Icon(Icons.upload_file),
+                        Flexible(child: Text('Charger un fichier…')),
+                      ],
                     ),
                   ),
                   const PopupMenuDivider(),
-                  CheckedPopupMenuItem(
+                  PopupMenuItem(
                     key: const ValueKey('player.subtitleOff'),
                     value: SubtitleTrack.no(),
-                    checked: subtitlesOff,
-                    child: const Text('Désactivés'),
+                    child: _Choice(checked: subtitlesOff, label: 'Désactivés'),
                   ),
                   for (final (index, track) in subtitles.indexed)
-                    CheckedPopupMenuItem(
+                    PopupMenuItem(
                       key: ValueKey('player.subtitleTrack.${track.id}'),
                       value: track,
-                      checked: !subtitlesOff && track.id == selectedSubtitle,
-                      child: Text(
-                        trackLabel(
+                      child: _Choice(
+                        checked: !subtitlesOff && track.id == selectedSubtitle,
+                        label: trackLabel(
                           index: index,
                           language: track.language,
                           title: track.title,
@@ -110,6 +111,32 @@ class TracksMenu extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Écart entre l'icône et le texte d'une entrée de menu.
+const _gap = 16.0;
+
+/// Entrée cochable d'un menu de pistes. Pas de `CheckedPopupMenuItem` ni de
+/// `ListTile` : leur tuile intérieure prend le focus des flèches sur TV
+/// (navigation directionnelle), et OK y était sans effet.
+class _Choice extends StatelessWidget {
+  const _Choice({required this.checked, required this.label});
+
+  final bool checked;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    checked: checked,
+    child: Row(
+      spacing: _gap,
+      children: [
+        // Place gardée sans coche : les libellés restent alignés.
+        Icon(checked ? Icons.done : null),
+        Flexible(child: Text(label)),
+      ],
+    ),
+  );
 }
 
 const _languages = {
