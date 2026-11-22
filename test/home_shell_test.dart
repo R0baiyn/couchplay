@@ -49,11 +49,14 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('shell.tabDownloads')));
       await settle(tester);
       expect(find.byType(DownloadsScreen), findsOneWidget);
-      // Le titre de l'écran garde son nom complet.
+      // Le titre de l'écran garde son nom complet ; sur téléphone, celui
+      // de l'onglet (D-061).
       expect(
         find.descendant(
           of: find.byType(AppBar),
-          matching: find.text('Téléchargements'),
+          matching: find.text(
+            size.width < 600 ? 'Hors ligne' : 'Téléchargements',
+          ),
         ),
         findsOneWidget,
       );

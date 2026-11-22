@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../confirm.dart';
 import '../format.dart';
+import '../television.dart';
 import '../downloads/download.dart';
 import '../downloads/download_button.dart';
 import '../downloads/downloads.dart';
@@ -40,6 +41,7 @@ class ActiveRow extends ConsumerWidget {
     final notifier = ref.read(downloadsProvider.notifier);
     final failed = d.status == DownloadStatus.failed;
     final stopped = d.status == DownloadStatus.paused || failed;
+    final phone = MediaQuery.sizeOf(context).width < railMinWidth;
     // La ✕ et la pause à côté de la ligne et non en `trailing` : voir
     // l'historique (flèches de la télécommande).
     return Card(
@@ -62,10 +64,11 @@ class ActiveRow extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           spacing: 4,
                           children: [
+                            // Téléphone : titre entier (D-061).
                             Text(
                               d.item.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              maxLines: phone ? null : 2,
+                              overflow: phone ? null : TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             _ActiveStatus(d),

@@ -670,21 +670,80 @@ void main() {
     });
   });
 
+  group('téléphone en portrait (D-061)', () {
+    setUpAll(loadRoboto);
+
+    const phone = Size(360, 800);
+    const tablet = Size(800, 1000);
+    // Longueur relevée dans les vraies données (124 caractères).
+    const long = PlayItem.movie(
+      id: '9',
+      extension: 'mkv',
+      name:
+          'Les Gardiens du Phare : Chronique de la Terrible Tempête - Le '
+          'Voyage des Trois Sœurs et La Promesse Retrouvée (FHD VOSTFR)',
+    );
+
+    Finder appBarText(String text) =>
+        find.descendant(of: find.byType(AppBar), matching: find.text(text));
+
+    testWidgets('T-11 : titre « Hors ligne » sur téléphone, comme l\'onglet', (
+      tester,
+    ) async {
+      await pumpScreen(tester, [], size: phone);
+      expect(appBarText('Hors ligne'), findsOneWidget);
+      await pumpScreen(tester, [], size: tablet);
+      expect(appBarText('Téléchargements'), findsOneWidget);
+    });
+
+    testWidgets('T-07 : écran vide, le téléchargement d\'un épisode est dans '
+        'son menu ⋮ sur téléphone', (tester) async {
+      await pumpScreen(tester, [], size: phone);
+      expect(
+        find.textContaining('« Télécharger » dans le menu ⋮ d\'un épisode'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('l\'icône de téléchargement'), findsNothing);
+      // Tablette : l'icône est toujours sur la ligne de l'épisode.
+      await pumpScreen(tester, [], size: tablet);
+      expect(
+        find.textContaining('l\'icône de téléchargement d\'un épisode'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('T-10 : en cours, titre entier sur téléphone', (tester) async {
+      Future<RenderParagraph> title(Size size) async {
+        await pumpScreen(tester, [
+          download(long, DownloadStatus.running, size: 4500000000),
+        ], size: size);
+        expect(tester.takeException(), isNull);
+        return tester.renderObject<RenderParagraph>(find.text(long.title));
+      }
+
+      final onPhone = await title(phone);
+      expect(onPhone.maxLines, isNull);
+      expect(onPhone.didExceedMaxLines, isFalse);
+      expect((await title(tablet)).maxLines, 2);
+    });
+  });
+
   group('écran étroit : titre entier', () {
     // Vraies largeurs de lettres : sous Ahem le titre ne tient jamais.
     setUpAll(loadRoboto);
 
     for (final desktop in [false, true]) {
       testWidgets('360 dp${desktop ? ' (fenêtre PC étroite)' : ''} : '
-          '« Téléchargements » n\'est pas tronqué', (tester) async {
+          '« Hors ligne » n\'est pas tronqué', (tester) async {
         await pumpScreen(
           tester,
           [download(movie, DownloadStatus.ready, size: 5000)],
           size: const Size(360, 740),
           desktop: desktop,
         );
+        // Titre de l'onglet sur téléphone (D-061).
         final title = tester.renderObject<RenderParagraph>(
-          find.text('Téléchargements'),
+          find.text('Hors ligne'),
         );
         expect(title.didExceedMaxLines, isFalse);
         expect(tester.takeException(), isNull);

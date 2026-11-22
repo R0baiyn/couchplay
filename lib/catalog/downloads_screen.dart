@@ -31,6 +31,9 @@ class DownloadsScreen extends ConsumerWidget {
     final entries = ref.watch(downloadsProvider.select((s) => s.entries));
     final holds = ref.watch(downloadHoldsProvider);
     final theme = Theme.of(context);
+    // Téléphone en portrait : titre de l'onglet, « Tout supprimer » en
+    // icône (D-061).
+    final phone = MediaQuery.sizeOf(context).width < railMinWidth;
 
     final active = activeDownloads(entries.values);
     final groups = readyGroups(entries.values);
@@ -53,7 +56,7 @@ class DownloadsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Téléchargements'),
+        title: Text(phone ? 'Hors ligne' : 'Téléchargements'),
         actions: [
           // PC seulement : la vidéo est un fichier que l'on peut aller voir.
           if (ref.watch(desktopFilesProvider))
@@ -65,7 +68,7 @@ class DownloadsScreen extends ConsumerWidget {
             ),
           if (entries.isNotEmpty)
             // Étroit : une icône, pour que le titre tienne en entier.
-            if (MediaQuery.sizeOf(context).width < railMinWidth)
+            if (phone)
               IconButton(
                 key: const ValueKey('downloads.removeAll'),
                 tooltip: 'Tout supprimer',
@@ -84,7 +87,7 @@ class DownloadsScreen extends ConsumerWidget {
         ],
       ),
       body: entries.isEmpty
-          ? const _Empty()
+          ? _Empty(phone: phone)
           : LayoutBuilder(
               builder: (context, box) {
                 final gutter = math.max(0.0, (box.maxWidth - _maxWidth) / 2);
@@ -193,7 +196,10 @@ class _UsedSpace extends ConsumerWidget {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty();
+  const _Empty({required this.phone});
+
+  /// Le téléchargement d'un épisode est dans son menu ⋮ (`EpisodeTile`).
+  final bool phone;
 
   @override
   Widget build(BuildContext context) {
@@ -214,11 +220,12 @@ class _Empty extends StatelessWidget {
                 color: theme.colorScheme.primary,
               ),
               Text('Aucun téléchargement', style: theme.textTheme.titleMedium),
-              const Text(
+              Text(
                 'Sur la fiche d\'un film, appuie sur « Télécharger » ; sur '
                 'celle d\'une série, sur « Télécharger la saison » ou sur '
-                'l\'icône de téléchargement d\'un épisode. Les vidéos '
-                'téléchargées se regardent ici, même sans réseau.',
+                '${phone ? '« Télécharger » dans le menu ⋮' : 'l\'icône de téléchargement'} '
+                'd\'un épisode. Les vidéos téléchargées se regardent ici, '
+                'même sans réseau.',
                 textAlign: TextAlign.center,
               ),
             ],
