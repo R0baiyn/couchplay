@@ -14,7 +14,8 @@ import 'package:couchplay/update/release_signature.dart';
 /// ```
 ///
 /// `keygen` écrit une nouvelle clé privée (graine ed25519 en base64) dans un
-/// fichier qui n'existe pas encore, hors du dossier courant, et affiche la
+/// fichier qui n'existe pas encore, hors du dossier courant et de tout dépôt
+/// git, lisible par son seul propriétaire (hors Windows), et affiche la
 /// clé publique. `sign` lit la clé privée dans la variable d'environnement
 /// [keyVariable], jamais en argument, et écrit `SHA256SUMS` et
 /// `SHA256SUMS.sig` dans le dossier. `verify` relit les deux et sort en
