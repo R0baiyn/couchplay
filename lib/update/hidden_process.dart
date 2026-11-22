@@ -14,11 +14,12 @@ String hiddenArgument(int i) => 'COUCHPLAY_ARG$i';
 /// sont jamais dans la ligne : cmd y développe `%NOM%` une seule fois, donc
 /// un `%` d'un chemin (dossier `%TEMP%`, `100%`) arrive tel quel au script.
 /// `/s` : cmd retire seulement les guillemets extérieurs. `/v:off` : un `!`
-/// n'est jamais développé.
+/// n'est jamais développé. `/e:on` : `%~1`, `if defined`… même si le registre
+/// coupe les extensions de cmd.
 String hiddenCommandLine(String systemRoot, int count) {
   final line = [for (var i = 0; i <= count; i++) '"%${hiddenArgument(i)}%"']
       .join(' ');
-  return '"$systemRoot\\System32\\cmd.exe" /d /v:off /s /c "$line"';
+  return '"$systemRoot\\System32\\cmd.exe" /d /e:on /v:off /s /c "$line"';
 }
 
 /// Valeurs des variables de [hiddenCommandLine] pour [script] et [args]. Un
@@ -46,29 +47,35 @@ void startHiddenScript(String script, List<String> args) {
     args.length,
   );
   using((arena) {
-    for (final MapEntry(:key, :value) in variables.entries) {
-      final set = SetEnvironmentVariable(
-        PCWSTR(key.toNativeUtf16(allocator: arena)),
-        PCWSTR(value.toNativeUtf16(allocator: arena)),
+    PCWSTR text(String s) => PCWSTR(s.toNativeUtf16(allocator: arena));
+    try {
+      for (final MapEntry(:key, :value) in variables.entries) {
+        final set = SetEnvironmentVariable(text(key), text(value));
+        if (!set.value) throw OSError('SetEnvironmentVariable', set.error);
+      }
+      final startup = arena<STARTUPINFO>()..ref.cb = sizeOf<STARTUPINFO>();
+      final info = arena<PROCESS_INFORMATION>();
+      final result = CreateProcess(
+        null,
+        PWSTR(commandLine.toNativeUtf16(allocator: arena)),
+        null,
+        null,
+        false,
+        CREATE_NO_WINDOW,
+        null,
+        null,
+        startup,
+        info,
       );
-      if (!set.value) throw OSError('SetEnvironmentVariable', set.error);
+      if (!result.value) throw OSError('CreateProcess', result.error);
+      CloseHandle(info.ref.hProcess);
+      CloseHandle(info.ref.hThread);
+    } finally {
+      // Copiées dans le script à sa création : rien ne reste pour les
+      // processus que l'app lancera ensuite.
+      for (final key in variables.keys) {
+        SetEnvironmentVariable(text(key), null);
+      }
     }
-    final startup = arena<STARTUPINFO>()..ref.cb = sizeOf<STARTUPINFO>();
-    final info = arena<PROCESS_INFORMATION>();
-    final result = CreateProcess(
-      null,
-      PWSTR(commandLine.toNativeUtf16(allocator: arena)),
-      null,
-      null,
-      false,
-      CREATE_NO_WINDOW,
-      null,
-      null,
-      startup,
-      info,
-    );
-    if (!result.value) throw OSError('CreateProcess', result.error);
-    CloseHandle(info.ref.hProcess);
-    CloseHandle(info.ref.hThread);
   });
 }

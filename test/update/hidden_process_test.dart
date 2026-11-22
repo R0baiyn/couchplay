@@ -1,13 +1,15 @@
 import 'dart:io';
 
 import 'package:couchplay/update/hidden_process.dart';
+import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:win32/win32.dart';
 
 void main() {
   test('la ligne ne porte que les variables, chacune entre guillemets', () {
     expect(
       hiddenCommandLine(r'C:\Windows', 2),
-      r'"C:\Windows\System32\cmd.exe" /d /v:off /s /c '
+      r'"C:\Windows\System32\cmd.exe" /d /e:on /v:off /s /c '
       r'""%COUCHPLAY_ARG0%" "%COUCHPLAY_ARG1%" "%COUCHPLAY_ARG2%""',
     );
   });
@@ -43,6 +45,17 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       expect(out.readAsStringSync().trim(), arg);
+      // Les variables ne restent pas dans l'app après le lancement.
+      expect(
+        using(
+          (arena) => GetEnvironmentVariable(
+            PCWSTR(hiddenArgument(1).toNativeUtf16(allocator: arena)),
+            null,
+            0,
+          ).value,
+        ),
+        0,
+      );
     },
     skip: !Platform.isWindows,
   );

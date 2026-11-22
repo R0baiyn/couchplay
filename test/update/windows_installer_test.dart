@@ -104,9 +104,11 @@ void main() {
     late File package;
 
     setUp(() {
+      // Caractères que cmd interprète : ils doivent rester littéraux.
+      final odd = '${root.path}\\a&b (c) %TEMP% ^!';
       // Seul un dossier de ce nom est effacé par le script.
-      work = Directory('${root.path}\\couchplay-update')..createSync();
-      app = Directory('${root.path}\\app')..createSync();
+      work = Directory('$odd\\couchplay-update')..createSync(recursive: true);
+      app = Directory('$odd\\app')..createSync();
       package = File('${work.path}\\update.zip');
     });
 
