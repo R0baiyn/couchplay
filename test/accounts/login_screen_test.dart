@@ -227,7 +227,7 @@ void main() {
       await tester.tap(show);
       await tester.pump();
       expect(obscured(), isFalse);
-      final cancel = find.text('Annuler');
+      final cancel = find.byKey(const ValueKey('textEntry.dialogCancel'));
       await tester.tap(cancel);
       await tester.pumpAndSettle();
 
