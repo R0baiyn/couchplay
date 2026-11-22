@@ -1,3 +1,5 @@
+import '../library/library.dart';
+
 import 'download.dart';
 
 /// Ce que la page « Téléchargements » affiche, calculé à partir des entrées :
@@ -57,3 +59,22 @@ int totalSize(Iterable<Download> downloads) =>
 /// Part reçue, entre 0 et 1, `null` si la taille est inconnue.
 double? receivedFraction(int received, int size) =>
     size > 0 ? (received / size).clamp(0, 1).toDouble() : null;
+
+/// Épisode prêt qui suit [current] dans sa série, d'après les seuls
+/// téléchargements : le lecteur le propose quand la fiche de la série n'est
+/// pas chargée (hors ligne), sans appel au serveur. Un épisode non
+/// téléchargé entre les deux est sauté : hors ligne, il ne se lirait pas.
+PlayItem? nextDownloadedEpisode(Iterable<Download> entries, PlayItem current) {
+  final series = current.seriesId;
+  final (season, episode) = (current.season, current.episode);
+  if (series == null || season == null || episode == null) return null;
+  final ready = [
+    for (final d in entries)
+      if (d.status == DownloadStatus.ready && d.item.seriesId == series) d,
+  ];
+  for (final d in sortedEpisodes(ready)) {
+    final (s, e) = (d.item.season!, d.item.episode!);
+    if (s > season || (s == season && e > episode)) return d.item;
+  }
+  return null;
+}

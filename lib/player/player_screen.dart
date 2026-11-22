@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../downloads/downloads.dart';
+import '../downloads/offline_list.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import '../server/models.dart';
@@ -136,13 +137,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   /// Fin d'un épisode : propose le suivant, lancé seul après 10 s. Au
-  /// dernier de la série, le lecteur se ferme. Si la fiche de la série n'a
-  /// pas pu être chargée, le lecteur reste simplement sur la fin.
+  /// dernier de la série, le lecteur se ferme. Sans fiche de la série (hors
+  /// ligne), le suivant vient des téléchargements ; s'il n'y en a pas, le
+  /// lecteur reste simplement sur la fin.
   void _offerNext(String seriesId) {
     final series = ref.read(widget.seriesDetails(seriesId)).value;
-    if (series == null) return;
-    final next = nextEpisode(series, _item);
-    if (next == null) return _exit();
+    final next = series != null
+        ? nextEpisode(series, _item)
+        : switch (nextDownloadedEpisode(
+            ref.read(downloadsProvider).entries.values,
+            _item,
+          )) {
+            final item? => (item: item, image: null),
+            null => null,
+          };
+    if (next == null) {
+      if (series != null) _exit();
+      return;
+    }
     setState(() {
       _nextUp.offer(next, onTick: () => setState(() {}), onElapsed: _playNext);
     });

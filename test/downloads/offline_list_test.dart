@@ -43,6 +43,7 @@ Download _episode(
 );
 
 void main() {
+  _nextDownloaded();
   test('liste vide : rien de partout', () {
     expect(activeDownloads(const []), isEmpty);
     expect(readyGroups(const []), isEmpty);
@@ -108,5 +109,22 @@ void main() {
     expect(receivedFraction(5, 0), isNull);
     expect(receivedFraction(25, 100), 0.25);
     expect(receivedFraction(500, 100), 1);
+  });
+}
+
+void _nextDownloaded() {
+  PlayItem item(Download d) => d.item;
+  final s1e1 = _episode('a', 1, 1);
+  final s1e2 = _episode('b', 1, 2, status: DownloadStatus.queued);
+  final s1e3 = _episode('c', 1, 3);
+  final s2e1 = _episode('d', 2, 1);
+  final other = _episode('e', 1, 2, series: '6');
+  final all = [s2e1, other, s1e3, s1e2, s1e1, _movie('1')];
+
+  test('épisode suivant téléchargé : le prochain prêt de la série', () {
+    expect(nextDownloadedEpisode(all, item(s1e1)), item(s1e3));
+    expect(nextDownloadedEpisode(all, item(s1e3)), item(s2e1));
+    expect(nextDownloadedEpisode(all, item(s2e1)), isNull);
+    expect(nextDownloadedEpisode(all, item(_movie('1'))), isNull);
   });
 }
