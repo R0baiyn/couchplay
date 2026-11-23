@@ -68,7 +68,7 @@ void main() {
 
     // 9. Requête refusée (le faux serveur répond 500 à l'utilisateur
     // « 500 ») : un 2e compte qui ne s'ajoute pas, et une ligne au journal.
-    await tester.pageBack();
+    await settledPageBack(tester);
     await waitFor(tester, byKey('settings.open'));
     await tester.tap(byKey('settings.open'));
     await waitFor(tester, byKey('settings.accounts'));
@@ -92,19 +92,14 @@ void main() {
     expect(journal, isNot(contains('password=$benchPassword')));
     expect(journal, isNot(contains(benchPassword)));
 
-    // 11. Réglages → « Réglages avancés » → « Journal » : l'écran montre le même fichier.
-    // Chaque retour attend la fin du précédent : pendant la transition, deux
-    // boutons Retour sont à l'écran.
-    await tester.pageBack();
-    await waitUntil(
-      tester,
-      () => byKey('accounts.submit').evaluate().isEmpty,
-      what: 'le formulaire est fermé',
-    );
-    await tester.pageBack();
-    await waitFor(tester, byKey('settings.advanced'));
+    // 11. Réglages → « Réglages avancés » → « Journal » : l'écran montre le
+    // même fichier. Chaque retour ou toucher attend la fin de la transition
+    // précédente : pendant une transition, deux pages sont à l'écran.
+    await settledPageBack(tester);
+    await settledPageBack(tester);
+    await waitSettled(tester, byKey('settings.advanced'));
     await tester.tap(byKey('settings.advanced'));
-    await waitFor(tester, byKey('settings.journal'));
+    await waitSettled(tester, byKey('settings.journal'));
     await tester.tap(byKey('settings.journal'));
     await waitFor(
       tester,

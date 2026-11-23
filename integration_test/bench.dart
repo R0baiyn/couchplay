@@ -7,10 +7,12 @@ import 'dart:io';
 
 import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
+import 'package:couchplay/catalog/catalog_index.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/logging.dart';
 import 'package:couchplay/main.dart';
 import 'package:couchplay/server/cloudflare_dns.dart';
+import 'package:couchplay/server/models.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -76,6 +78,25 @@ Future<void> waitUntil(
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await tester.pump();
   }
+}
+
+/// Attend que [finder] trouve un seul widget, sur la page du dessus, entrée
+/// en entier : pendant une transition, la page qui part et celle qui arrive
+/// sont toutes deux à l'écran.
+Future<void> waitSettled(WidgetTester tester, Finder finder) =>
+    waitUntil(tester, () {
+      if (finder.evaluate().length != 1) return false;
+      final route = ModalRoute.of(tester.element(finder));
+      return route != null &&
+          route.isCurrent &&
+          route.animation?.status == AnimationStatus.completed;
+    }, what: 'transition finie : $finder');
+
+/// `pageBack` une fois la transition précédente finie (sinon deux boutons
+/// Retour sont à l'écran).
+Future<void> settledPageBack(WidgetTester tester) async {
+  await waitSettled(tester, find.byTooltip('Back'));
+  await tester.pageBack();
 }
 
 /// Fait tourner l'app en temps réel pendant [duration].
@@ -189,6 +210,18 @@ Future<IsolatedApp> startIsolatedApp(
     // Démonter l'app, attendre la fin de l'arrêt du flux (il écrit encore
     // dans `downloadHoldsProvider`), puis seulement jeter les providers.
     try {
+      // Le préchargement du catalogue (Accueil) écrit son cache dans un
+      // isolate après chaque réponse : un fichier encore ouvert empêcherait
+      // d'effacer le dossier (Windows). Attendu avant de démonter l'app.
+      await waitUntil(
+        tester,
+        () => ContentKind.values.every((kind) {
+          final index = catalogIndexProvider(kind);
+          return !container.read(index.exists) ||
+              !container.read(index).isLoading;
+        }),
+        what: 'fin du préchargement du catalogue',
+      );
       await tester.pumpWidget(const SizedBox.shrink());
       await waitUntil(
         tester,
