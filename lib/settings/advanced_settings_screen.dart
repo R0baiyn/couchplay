@@ -24,9 +24,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
             key: const ValueKey('settings.journal'),
             leading: const Icon(Icons.receipt_long_outlined),
             title: const FocusRing(child: Text('Journal')),
-            subtitle: const Text(
-              "Ce que l'app a noté, pour comprendre un problème",
-            ),
+            subtitle: const Text('Pour comprendre un problème'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
@@ -50,10 +48,7 @@ class _DirectVideoTile extends ConsumerWidget {
       autofocus: true,
       secondary: const Icon(Icons.speed),
       title: const FocusRing(child: Text('Lecture directe')),
-      subtitle: const Text(
-        "Si l'image saccade. Sur certains appareils, l'avance peut bloquer "
-        "la lecture. Prend effet au prochain lancement de l'app.",
-      ),
+      subtitle: const Text("Si l'image saccade (après relance)"),
       value: ref.watch(appSettingsProvider.select((s) => s.directVideo)),
       onChanged: ref.read(appSettingsProvider.notifier).setDirectVideo,
     );

@@ -49,7 +49,7 @@ void main() {
     await pumpAdvanced(tester, tv: true);
     final tile = find.byKey(const ValueKey('settings.directVideo'));
     expect(tester.widget<SwitchListTile>(tile).value, isFalse);
-    expect(find.textContaining('prochain lancement'), findsOneWidget);
+    expect(find.text("Si l'image saccade (après relance)"), findsOneWidget);
 
     await tester.tap(tile);
     await tester.pump();

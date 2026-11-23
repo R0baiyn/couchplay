@@ -68,12 +68,7 @@ void main() {
       }
       final advanced = find.byKey(const ValueKey('settings.advanced'));
       await tester.scrollUntilVisible(advanced, 100);
-      expect(
-        find.text(
-          tv ? 'Journal, mode debug, lecture directe' : 'Journal, mode debug',
-        ),
-        findsOneWidget,
-      );
+      expect(tester.widget<ListTile>(advanced).subtitle, isNull);
 
       await tester.tap(advanced);
       await tester.pumpAndSettle();

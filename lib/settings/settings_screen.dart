@@ -102,7 +102,7 @@ class SettingsScreen extends ConsumerWidget {
             key: const ValueKey('settings.status'),
             leading: const Icon(Icons.verified_user_outlined),
             title: const FocusRing(child: Text('Abonnement')),
-            subtitle: const Text('Statut, expiration, connexions'),
+            subtitle: const Text('Statut et expiration'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
@@ -129,11 +129,6 @@ class SettingsScreen extends ConsumerWidget {
             key: const ValueKey('settings.advanced'),
             leading: const Icon(Icons.tune),
             title: const FocusRing(child: Text('Réglages avancés')),
-            subtitle: Text(
-              tv
-                  ? 'Journal, mode debug, lecture directe'
-                  : 'Journal, mode debug',
-            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(
               context,
@@ -160,7 +155,7 @@ class _WifiOnlyTile extends ConsumerWidget {
       key: const ValueKey('settings.wifiOnly'),
       secondary: const Icon(Icons.wifi),
       title: const FocusRing(child: Text('Télécharger en Wi-Fi seulement')),
-      subtitle: const Text('Sur réseau mobile, les téléchargements attendent'),
+      subtitle: const Text('Pas sur réseau mobile'),
       value: ref.watch(appSettingsProvider.select((s) => s.wifiOnly)),
       onChanged: ref.read(appSettingsProvider.notifier).setWifiOnly,
     );
