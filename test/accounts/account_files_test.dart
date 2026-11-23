@@ -74,6 +74,28 @@ void main() {
     expect(file.readAsStringSync(), 'b');
   });
 
+  test(
+    'track : flushAll attend une écriture hors file, même qui lève',
+    () async {
+      final done = Completer<void>();
+      final ok = SerialFileWriter.track(done.future);
+      final failing = Completer<void>();
+      final ko = SerialFileWriter.track(failing.future);
+      final flushed = SerialFileWriter.flushAll();
+      var finished = false;
+      unawaited(flushed.then((_) => finished = true));
+
+      await Future<void>.delayed(Duration.zero);
+      expect(finished, isFalse);
+      done.complete();
+      failing.completeError(StateError('isolate'));
+      await flushed;
+      await ok;
+      // L'échec reste à l'appelant : flushAll ne l'a pas avalé pour lui.
+      await expectLater(ko, throwsStateError);
+    },
+  );
+
   test('path : un fichier dans le dossier du compte', () {
     final files = AccountFiles(root);
     expect(

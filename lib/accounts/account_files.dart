@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -126,6 +127,16 @@ final class SerialFileWriter {
     });
     _inFlight.add(done);
     return done.whenComplete(() => _inFlight.remove(done));
+  }
+
+  /// Fait attendre par [flushAll] une écriture qui ne passe pas par une file
+  /// (cache du catalogue, écrit par son isolate). Rend [write] telle quelle :
+  /// son échec reste à l'appelant, [flushAll] ne le voit pas.
+  static Future<T> track<T>(Future<T> write) {
+    final done = write.then<void>((_) {}, onError: (_) {});
+    _inFlight.add(done);
+    unawaited(done.whenComplete(() => _inFlight.remove(done)));
+    return write;
   }
 
   /// Attend toutes les écritures demandées jusqu'ici : avant de quitter

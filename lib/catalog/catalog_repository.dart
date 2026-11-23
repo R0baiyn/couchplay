@@ -135,10 +135,14 @@ Future<T> _decodeAndStore<T>(
 ) async {
   final (T, bool) result;
   try {
-    result = await Isolate.run(() {
-      final value = parse(text);
-      return (value, path == null || writeAtomically(path, text) == null);
-    });
+    // Suivi : une mise à jour Windows qui quitte l'app attend cette écriture
+    // (SerialFileWriter.flushAll).
+    result = await SerialFileWriter.track(
+      Isolate.run(() {
+        final value = parse(text);
+        return (value, path == null || writeAtomically(path, text) == null);
+      }),
+    );
   } on FormatException {
     log('Catalogue', error: 'JSON invalide : ${_preview(text)}');
     throw const InvalidResponse('JSON invalide');

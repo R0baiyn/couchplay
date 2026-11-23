@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:couchplay/accounts/account_files.dart';
+
 import 'package:couchplay/catalog/catalog_cache.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
 import 'package:couchplay/catalog/catalog_index.dart';
@@ -10,6 +12,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_server.dart';
+
+/// Fonction de premier niveau (isolate) : marque son départ, puis traîne.
+/// [text] est le chemin du marqueur (corps de la réponse du faux serveur).
+int _slowParse(String text) {
+  File(text).writeAsStringSync('parti');
+  sleep(const Duration(milliseconds: 600));
+  return text.length;
+}
 
 void main() {
   late Directory dir;
@@ -194,5 +204,24 @@ void main() {
     expect(loaded.value.entriesIn('148')!.first.title, 'Horizon (2024)');
     final again = await repository.all(ContentKind.movies, parse);
     expect(again.savedAt, isNotNull, reason: 'relu depuis le cache');
+  });
+
+  test('une écriture du cache en vol est attendue par flushAll', () async {
+    final marker = '${dir.path}/parti';
+    server = FakeAdapter.replying(marker);
+
+    final load = repository().all(ContentKind.movies, _slowParse);
+    // Le décodage et l'écriture ont commencé dans l'isolate, pas fini.
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!File(marker).existsSync()) {
+      expect(DateTime.now().isBefore(deadline), isTrue, reason: 'isolate');
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    final cache = File('${dir.path}/movies_all.json');
+    expect(cache.existsSync(), isFalse);
+
+    await SerialFileWriter.flushAll();
+    expect(cache.existsSync(), isTrue);
+    await load;
   });
 }
