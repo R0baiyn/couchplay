@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   // Valeurs fictives, assemblées par interpolation dans les URL.
   const host = 'http://srv.example.net:8080';
+  // Même URL une fois l'hôte masqué : le port reste.
+  const masked = 'http://***:8080';
   const user = 'jean.d';
   const pass = 'p4ss-w0rd';
 
@@ -16,11 +18,11 @@ void main() {
       () {
         expect(
           redact('$host/player_api.php?username=$user&password=$pass&action=x'),
-          '$host/player_api.php?username=***&password=***&action=x',
+          '$masked/player_api.php?username=***&password=***&action=x',
         );
         expect(
           redact('$host/player_api.php?action=x&password=$pass&username=$user'),
-          '$host/player_api.php?action=x&password=***&username=***',
+          '$masked/player_api.php?action=x&password=***&username=***',
         );
       },
     );
@@ -29,7 +31,7 @@ void main() {
       final encoded = Uri.encodeQueryComponent('a&b #"c');
       expect(
         redact('$host/player_api.php?username=$user&password=$encoded'),
-        '$host/player_api.php?username=***&password=***',
+        '$masked/player_api.php?username=***&password=***',
       );
     });
 
@@ -37,13 +39,13 @@ void main() {
       for (final kind in ['movie', 'series', 'live', 'timeshift']) {
         expect(
           redact('$host/$kind/$user/$pass/42.mkv'),
-          '$host/$kind/***/***/42.mkv',
+          '$masked/$kind/***/***/42.mkv',
           reason: kind,
         );
       }
       expect(
         redact('$host/timeshift/$user/$pass/60/2026-10-26:20-00/42.ts'),
-        '$host/timeshift/***/***/60/2026-10-26:20-00/42.ts',
+        '$masked/timeshift/***/***/60/2026-10-26:20-00/42.ts',
       );
     });
 
@@ -53,19 +55,19 @@ void main() {
         // `Uri.encodeComponent` laisse `'` dans un segment de chemin.
         expect(
           redact("$host/movie/u'x/p'y/42.mkv"),
-          '$host/movie/***/***/42.mkv',
+          '$masked/movie/***/***/42.mkv',
         );
-        expect(redact("$host/u'x/p'y/42.ts"), '$host/***/***/42.ts');
+        expect(redact("$host/u'x/p'y/42.ts"), '$masked/***/***/42.ts');
         expect(
           redact("lien '$host/movie/$user/$pass/42.mkv' refusé"),
-          "lien '$host/movie/***/***/42.mkv' refusé",
+          "lien '$masked/movie/***/***/42.mkv' refusé",
         );
       },
     );
 
     test('masque la forme courte hôte/user/mot de passe/id du direct', () {
-      expect(redact('$host/$user/$pass/42'), '$host/***/***/42');
-      expect(redact('$host/$user/$pass/42.ts'), '$host/***/***/42.ts');
+      expect(redact('$host/$user/$pass/42'), '$masked/***/***/42');
+      expect(redact('$host/$user/$pass/42.ts'), '$masked/***/***/42.ts');
     });
 
     test('masque les identifiants placés avant l\'hôte', () {
@@ -130,6 +132,88 @@ void main() {
         expect(redact(text, secrets: ['', ' ']), text);
       },
     );
+  });
+
+  group('redact : hôte du serveur', () {
+    // Nom d'hôte, IPv4, IPv6, avec et sans port : chacun devient `***`, le
+    // port reste. Valeurs fictives (domaine réservé, plages de documentation).
+    const hosts = {
+      'srv.example.net': '***',
+      'srv.example.net:8080': '***:8080',
+      '192.0.2.7': '***',
+      '192.0.2.7:8080': '***:8080',
+      '[2001:db8::1]': '***',
+      '[2001:db8::1]:8080': '***:8080',
+    };
+
+    test("masque l'hôte d'un flux, d'un direct court et de l'API", () {
+      hosts.forEach((raw, shown) {
+        expect(
+          redact('Failed to open http://$raw/series/$user/$pass/42.mkv'),
+          'Failed to open http://$shown/series/***/***/42.mkv',
+          reason: raw,
+        );
+        expect(
+          redact('http://$raw/$user/$pass/42.ts'),
+          'http://$shown/***/***/42.ts',
+          reason: raw,
+        );
+        expect(
+          redact('http://$raw/player_api.php?action=get_vod_streams'),
+          'http://$shown/player_api.php?action=get_vod_streams',
+          reason: raw,
+        );
+        expect(
+          redact('http://$raw/get.php?type=x'),
+          'http://$shown/get.php?type=x',
+          reason: raw,
+        );
+        expect(
+          redact('https://$raw/x?username=$user&password=$pass'),
+          'https://$shown/x?username=***&password=***',
+          reason: raw,
+        );
+      });
+    });
+
+    test('masque aussi une URL déjà privée de ses identifiants', () {
+      expect(
+        redact('Lecture : Failed to open $host/series/***/***/42.mkv'),
+        'Lecture : Failed to open $masked/series/***/***/42.mkv',
+      );
+    });
+
+    test('masque chaque URL du serveur d\'une même ligne', () {
+      expect(
+        redact('$host/movie/$user/$pass/1.mkv puis $host/player_api.php?a=1'),
+        '$masked/movie/***/***/1.mkv puis $masked/player_api.php?a=1',
+      );
+    });
+
+    test('laisse lisibles les affiches, GitHub et le DoH', () {
+      for (final url in [
+        'https://image.tmdb.org/t/p/w500/abc123.jpg',
+        'https://api.github.com/repos/R0baiyn/couchplay/releases/latest',
+        'https://cloudflare-dns.com/dns-query?name=srv.example.net&type=A',
+        'https://github.com/R0baiyn/couchplay/releases/download/v1/x.apk',
+      ]) {
+        expect(redact('GET $url'), 'GET $url', reason: url);
+      }
+    });
+
+    test('reste rapide sur une ligne de 4 000 caractères', () {
+      final lines = [
+        'x://' * 1000,
+        'http://${'a' * 3980}',
+        'http://a/${'/b' * 1990}',
+        '${'http://srv/movie/' * 235}z',
+      ];
+      for (final line in lines) {
+        final watch = Stopwatch()..start();
+        redact(line);
+        expect(watch.elapsedMilliseconds, lessThan(500), reason: line);
+      }
+    });
   });
 
   group('journal', () {
@@ -213,7 +297,7 @@ void main() {
       await flushJournal();
       final text = file.readAsStringSync();
       expect(text, contains('Erreur non rattrapée : boom'));
-      expect(text, contains('#0 get ($host/movie/***/***/42.mkv)'));
+      expect(text, contains('#0 get ($masked/movie/***/***/42.mkv)'));
       expect(text, contains('#11 frame11'));
       expect(text, isNot(contains('#12 frame12')));
       expect(text, contains('…'));

@@ -46,13 +46,30 @@ final _shortLivePath = RegExp(
   r'''(?=/\d+(?:\.\w+)?(?:$|[\s?#"'/]))''',
 );
 
-/// Remplace les identifiants présents dans [text] par `***`.
+// Hôte (nom, IPv4 ou IPv6 entre crochets) d'une URL du serveur : reconnue à ce
+// qui suit (chemin de flux, direct court, `player_api.php`, `get.php`, query
+// `username=` / `password=`), vu en avance sans le consommer. Le port reste.
+// Pas de quantificateur imbriqué : un seul balayage par `://`.
+const _host = r'''(?:\[[0-9a-f:.]+\]|[^/\s:?#@"'\[\]]+)''';
+final _serverHost = RegExp(
+  '(://)$_host(?=(?::\\d+)?/(?:'
+  '(?:movie|series|live|timeshift)/$_credential/$_credential/'
+  '|$_credential/$_credential/\\d+(?:\\.\\w+)?(?:\$|[\\s?#"\'/])'
+  '|[^\\s"\']*?(?:(?:player_api|get)\\.php'
+  r'''|(?:[?&]|\\u0026)(?:username|password)=)'''
+  '))',
+  caseSensitive: false,
+);
+
+/// Remplace les identifiants présents dans [text] par `***`, ainsi que l'hôte
+/// des URL du serveur (le port est gardé).
 ///
 /// [secrets] ajoute une seconde couche : ces valeurs, brutes ou encodées en URL,
 /// sont masquées partout, même hors d'une URL. Les valeurs de moins de 3
 /// caractères sont ignorées, sans quoi elles masqueraient tout le texte.
 String redact(String text, {Iterable<String> secrets = const []}) {
   var result = text
+      .replaceAllMapped(_serverHost, (m) => '${m[1]}$_mask')
       .replaceAllMapped(_queryCredentials, (m) => '${m[1]}$_mask')
       .replaceAllMapped(_jsonCredentials, (m) => '${m[1]}"$_mask"')
       .replaceAllMapped(_userInfo, (m) => '${m[1]}$_mask:$_mask@')
