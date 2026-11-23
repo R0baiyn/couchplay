@@ -2,11 +2,17 @@ package fr.couchplay
 
 import android.app.UiModeManager
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.StatFs
 import androidx.core.content.FileProvider
@@ -16,8 +22,48 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
+    private var audioChannel: MethodChannel? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private var focusHeld = false
+
+    /// Perte du focus, définitive ou passagère : pause. Une notification
+    /// courte (`CAN_DUCK`) ne fait rien, le système baisse le volume ; un
+    /// retour du focus ne relance rien.
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        if (change == AudioManager.AUDIOFOCUS_LOSS ||
+            change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+        ) {
+            interrupt("focus")
+        }
+    }
+
+    /// Casque filaire ou Bluetooth débranché : pause.
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) interrupt("noisy")
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Focus audio (lib/player/audio_focus.dart) :
+        // - request : demande le focus (vrai s'il est accordé) et écoute le
+        //   débranchement du casque tant qu'il est tenu ;
+        // - abandon : rend le focus (sans effet s'il ne l'est plus).
+        // Vers Dart : interrupted("focus" | "noisy"), le focus déjà rendu.
+        audioChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "couchplay/audio")
+            .apply {
+                setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "request" -> result.success(requestFocus())
+                        "abandon" -> {
+                            abandonFocus()
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
+                }
+            }
         // Appareil (lib/television.dart) : TV ou non, pour adapter la saisie.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "couchplay/device")
             .setMethodCallHandler { call, result ->
@@ -45,6 +91,62 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        abandonFocus()
+        audioChannel = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    private val audioManager get() = getSystemService(AUDIO_SERVICE) as AudioManager
+
+    private fun requestFocus(): Boolean {
+        val audio = audioManager
+        val answer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = focusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                        .build(),
+                )
+                .setOnAudioFocusChangeListener(focusListener)
+                .build()
+                .also { focusRequest = it }
+            audio.requestAudioFocus(request)
+        } else {
+            // Sous l'API 26, AudioFocusRequest n'existe pas.
+            @Suppress("DEPRECATION")
+            audio.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        }
+        val granted = answer == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted && !focusHeld) {
+            // Diffusion protégée du système : aucune autre app ne l'envoie.
+            registerReceiver(noisyReceiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+            focusHeld = true
+        }
+        return granted
+    }
+
+    private fun abandonFocus() {
+        if (!focusHeld) return
+        focusHeld = false
+        unregisterReceiver(noisyReceiver)
+        val request = focusRequest
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && request != null) {
+            audioManager.abandonAudioFocusRequest(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(focusListener)
+        }
+    }
+
+    /// Rend le focus puis prévient Dart, sur le fil principal ; la lecture
+    /// ne reprend jamais d'ici.
+    private fun interrupt(reason: String) = runOnUiThread {
+        abandonFocus()
+        audioChannel?.invokeMethod("interrupted", reason)
     }
 
     private fun install(result: MethodChannel.Result) {
