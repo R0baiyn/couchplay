@@ -3,10 +3,12 @@ import 'dart:async';
 import '../downloads/downloads.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
+import 'audio_focus.dart';
 import 'playback.dart';
 
 /// Ce que le lecteur écrit hors de l'écran : la position (toutes les 10 s, à
-/// la pause et à la sortie) et l'arrêt du flux. Les dépendances sont lues
+/// la pause et à la sortie) et l'arrêt du flux ; il tient aussi le focus
+/// audio d'Android ([AudioFocus]). Les dépendances sont lues
 /// par l'écran dans `initState` : `ref` n'est plus utilisable dans `dispose`,
 /// et une erreur là sauterait l'arrêt du flux.
 class PlayerSession {
@@ -23,6 +25,10 @@ class PlayerSession {
     _timer = Timer.periodic(_saveEvery, (_) {
       if (playback.player.state.playing) save();
     });
+    _audio = AudioFocus(
+      playing: playback.player.stream.playing,
+      pause: playback.player.pause,
+    );
   }
 
   static const _saveEvery = Duration(seconds: 10);
@@ -36,6 +42,7 @@ class PlayerSession {
   final bool Function() _ready;
   late final StreamSubscription<bool> _playing;
   late final Timer _timer;
+  late final AudioFocus _audio;
 
   /// Enregistre où on en est, seulement sur un flux bien démarré : quitter
   /// pendant le chargement ou après un échec (position à 0) ne doit pas
@@ -73,5 +80,6 @@ class PlayerSession {
   void dispose() {
     _timer.cancel();
     unawaited(_playing.cancel());
+    unawaited(_audio.dispose());
   }
 }
