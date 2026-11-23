@@ -119,6 +119,18 @@ void main() {
     expect(pauses, 0);
   });
 
+  test('l\'ancien lecteur fermé après l\'ouverture du suivant ne lui retire '
+      'rien', () async {
+    final old = focus();
+    final next = focus();
+    await old.dispose();
+    expect(calls, isNot(contains('abandon')));
+    await fromAndroid('noisy');
+    expect(pauses, 1);
+    await next.dispose();
+    expect(calls, ['abandon']);
+  });
+
   test('hors Android : aucun appel au canal', () async {
     final audio = focus(android: false);
     playing.add(true);

@@ -18,6 +18,7 @@ final class AudioFocus {
     bool? android,
   }) : _android = android ?? Platform.isAndroid {
     if (!_android) return;
+    _current = this;
     _channel.setMethodCallHandler(_onCall);
     _playing = playing.listen((playing) {
       if (playing && !_held) unawaited(_request());
@@ -25,6 +26,11 @@ final class AudioFocus {
   }
 
   static const _channel = MethodChannel('couchplay/audio');
+
+  /// Le canal et le focus sont ceux de l'app : seul le dernier lecteur
+  /// ouvert les tient. L'ancien, fermé après l'ouverture du suivant (fin de
+  /// son animation), ne les lui retire pas.
+  static AudioFocus? _current;
 
   final Future<void> Function() _pause;
   final bool _android;
@@ -72,8 +78,8 @@ final class AudioFocus {
     if (!_android || _disposed) return;
     _disposed = true;
     await _playing?.cancel();
-    // ponytail: un seul lecteur ouvert à la fois ; deux écrans de lecteur
-    // empilés se prendraient le canal.
+    if (!identical(_current, this)) return;
+    _current = null;
     _channel.setMethodCallHandler(null);
     await _invoke<void>('abandon');
   }
