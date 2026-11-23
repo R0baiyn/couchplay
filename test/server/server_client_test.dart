@@ -233,7 +233,7 @@ void main() {
           .streamUri(ContentKind.movies, '1', 'mp4')
           .toString();
       final masked = redact(url, secrets: [_user, _pass]);
-      expect(masked, 'http://example.com/movie/***/***/1.mp4');
+      expect(masked, 'http://***/movie/***/***/1.mp4');
     });
   });
 }
