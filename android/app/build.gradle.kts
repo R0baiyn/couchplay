@@ -30,7 +30,8 @@ android {
         // Ne change jamais : un autre identifiant serait une autre app.
         applicationId = "fr.couchplay"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // Figé : ne monte plus tout seul avec Flutter ; à relever en testant le comportement du nouvel Android.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
