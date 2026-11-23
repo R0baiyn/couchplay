@@ -235,13 +235,28 @@ Future<IsolatedApp> startIsolatedApp(
       await SerialFileWriter.flushAll();
       // Le journal de l'app est dans `support` : fermé avant l'effacement.
       await closeJournal();
-      await root.delete(recursive: true);
+      await _deleteWithRetries(root);
     }
   }
 
   addTearDown(stop);
   await tester.pump();
   return (container: container, stop: stop);
+}
+
+/// Efface [dir] : sous Windows, un fichier qu'un isolate vient de fermer peut
+/// rester tenu un instant (`PathAccessException`). Quelques essais courts, puis
+/// la dernière erreur est levée : un dossier qui résiste reste un échec.
+Future<void> _deleteWithRetries(Directory dir) async {
+  for (var attempt = 1; ; attempt++) {
+    try {
+      await dir.delete(recursive: true);
+      return;
+    } on PathAccessException {
+      if (attempt == 5) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
 }
 
 /// L'app lancée par [startIsolatedApp].

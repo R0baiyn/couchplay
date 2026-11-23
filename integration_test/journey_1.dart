@@ -91,6 +91,9 @@ void main() {
     expect(journal, contains('player_api.php?username=***&password=*** : '));
     expect(journal, isNot(contains('password=$benchPassword')));
     expect(journal, isNot(contains(benchPassword)));
+    // L'hôte du faux serveur est masqué aussi (le port reste).
+    expect(journal, contains('http://***:'));
+    expect(journal, isNot(contains('127.0.0.1')));
 
     // 11. Réglages → « Réglages avancés » → « Journal » : l'écran montre le
     // même fichier. Chaque retour ou toucher attend la fin de la transition
