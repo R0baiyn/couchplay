@@ -159,6 +159,17 @@ final cloudflareDns = CloudflareDns();
 /// par [cloudflareDns] : la connexion se fait à l'adresse résolue, le nom
 /// reste celui de l'URL (en-tête Host, vérification du certificat HTTPS).
 final class CloudflareHttpOverrides extends HttpOverrides {
+  CloudflareHttpOverrides({this.secure = SecureSocket.secure});
+
+  /// Passage en TLS d'une connexion ouverte : `SecureSocket.secure`, remplacé
+  /// dans les tests pour lire le contexte reçu sans réseau.
+  final Future<Socket> Function(
+    Socket socket, {
+    String? host,
+    SecurityContext? context,
+  })
+  secure;
+
   /// Contexte TLS d'un client : celui qu'il a reçu (DoH, mise à jour), sinon
   /// [appContext], qui ajoute ISRG Root X1 et USERTrust ECC aux racines du
   /// système (absentes d'Android 7.0 ou d'un Windows qui ne les a jamais
@@ -176,8 +187,7 @@ final class CloudflareHttpOverrides extends HttpOverrides {
         if (uri.scheme != 'https') return task;
         return ConnectionTask.fromSocket(
           task.socket.then(
-            (socket) =>
-                SecureSocket.secure(socket, host: uri.host, context: effective),
+            (socket) => secure(socket, host: uri.host, context: effective),
           ),
           task.cancel,
         );

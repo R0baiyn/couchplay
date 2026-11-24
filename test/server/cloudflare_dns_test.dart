@@ -177,6 +177,55 @@ void main() {
     });
   });
 
+  group('CloudflareHttpOverrides : contexte reçu par le passage en TLS', () {
+    // `https://localhost:<port>` vers un serveur TCP local : `localhost` est
+    // résolu sans requête, la connexion s'ouvre, puis l'espion retient le
+    // contexte et coupe. Aucun réseau.
+    Future<SecurityContext?> contextSeenBy(HttpClient Function() create) async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((_) {});
+      SecurityContext? seen;
+      var calls = 0;
+      final overrides = CloudflareHttpOverrides(
+        secure: (socket, {host, context}) {
+          calls++;
+          seen = context;
+          socket.destroy();
+          return Future.error(const SocketException('coupé (test)'));
+        },
+      );
+      try {
+        await HttpOverrides.runWithHttpOverrides(() async {
+          final client = create();
+          try {
+            await expectLater(
+              client.getUrl(Uri.parse('https://localhost:${server.port}/')),
+              throwsA(anything),
+            );
+          } finally {
+            client.close(force: true);
+          }
+        }, overrides);
+      } finally {
+        await server.close();
+      }
+      expect(calls, 1);
+      return seen;
+    }
+
+    test("HttpClient() sans contexte : celui de l'app", () async {
+      expect(await contextSeenBy(HttpClient.new), same(appContext));
+    });
+
+    test('HttpClient(context:) : le contexte donné', () async {
+      final given = SecurityContext(withTrustedRoots: false);
+      expect(
+        await contextSeenBy(() => HttpClient(context: given)),
+        same(given),
+      );
+    });
+  });
+
   // Vraies requêtes à Cloudflare : lancées seulement avec RESEAU=1
   // (`RESEAU=1 flutter test test/server/cloudflare_dns_test.dart`).
   group('réseau', skip: Platform.environment['RESEAU'] != '1', () {
