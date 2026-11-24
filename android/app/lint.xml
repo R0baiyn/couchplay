@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- local.properties est généré par Flutter avec des chemins Windows non échappés -->
+    <issue id="PropertyEscape">
+        <ignore regexp="local\.properties" />
+    </issue>
+</lint>
