@@ -141,7 +141,9 @@ void main() {
       expect(h.entries['movie:1']!.size, 1000);
       expect(h.server.ranges, [null, null]);
       // Ni l'hôte ni les identifiants du compte dans le manifeste écrit.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      // Lu après la fin des écritures : pendant le renommage du fichier
+      // temporaire, Windows refuse de l'ouvrir.
+      await SerialFileWriter.flushAll();
       final manifest = File('${h.root.path}/accounts/a/downloads.json')
           .readAsStringSync();
       expect(manifest, contains('movie:2'));
