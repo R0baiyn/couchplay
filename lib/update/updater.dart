@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../logging.dart';
-import 'github_roots.dart';
+import '../trusted_roots.dart';
 import 'release_signature.dart';
 
 /// Ce que l'accueil propose au démarrage, une fois devant : une mise à jour
@@ -237,8 +237,8 @@ final class Updater {
 
   /// Contexte TLS de toutes les connexions de la mise à jour (vérification,
   /// téléchargement, liste signée) : racines du système plus celles de
-  /// GitHub (`github_roots.dart`). Un seul, chargé au premier usage.
-  static final context = githubContext();
+  /// GitHub (`trusted_roots.dart`). Un seul, chargé au premier usage.
+  static final context = trustedContext();
 
   /// Version de l'app en cours.
   final String version;

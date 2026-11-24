@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
-// Racines au bout des chaînes que GitHub sert aux connexions de la mise à
-// jour (relevé du 2026-11-24) :
+// Racines de confiance ajoutées à celles du système, pour deux usages :
+// - les connexions de la mise à jour (`Updater.context`) ;
+// - toute connexion de l'app créée sans contexte TLS (affiches, API du
+//   serveur, téléchargements), par `CloudflareHttpOverrides`.
+//
+// Chaînes que GitHub sert aux connexions de la mise à jour (relevé du
+// 2026-11-24) :
 // - `api.github.com`, `github.com` : feuille ← « Sectigo DV E36 » ←
 //   « Sectigo Root E46 » ← [userTrustEcc] ;
 // - `release-assets.githubusercontent.com`, `objects.githubusercontent.com`
@@ -22,7 +27,7 @@ import 'dart:io';
 // api.github.com:443 -showcerts`, idem pour les trois autres hôtes), prendre
 // la racine indiquée par le dernier intermédiaire, recouper son empreinte
 // avec la liste de Mozilla, ajouter le bloc ici, mettre à jour l'empreinte
-// attendue de `test/update/github_roots_test.dart` et lancer son groupe
+// attendue de `test/trusted_roots_test.dart` et lancer son groupe
 // réseau (`RESEAU=1`). Les racines du système restent chargées : si GitHub
 // change d'autorité, elles prennent le relais. Ne retirer une racine que
 // lorsqu'elle n'est plus servie.
@@ -86,10 +91,10 @@ m+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 -----END CERTIFICATE-----
 ''';
 
-/// Contexte TLS des connexions de la mise à jour : racines du système plus
-/// [userTrustEcc] et [isrgRootX1]. Seulement des racines en plus : la
-/// vérification du certificat reste entière.
-SecurityContext githubContext({bool withTrustedRoots = true}) =>
+/// Contexte TLS avec les racines du système plus [userTrustEcc] et
+/// [isrgRootX1]. Seulement des racines en plus : la vérification du
+/// certificat reste entière.
+SecurityContext trustedContext({bool withTrustedRoots = true}) =>
     SecurityContext(withTrustedRoots: withTrustedRoots)
       ..setTrustedCertificatesBytes(utf8.encode(userTrustEcc))
       ..setTrustedCertificatesBytes(utf8.encode(isrgRootX1));

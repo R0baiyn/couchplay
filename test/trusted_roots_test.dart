@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/server/cloudflare_dns.dart';
-import 'package:couchplay/update/github_roots.dart';
+import 'package:couchplay/trusted_roots.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/update/windows_installer.dart';
 import 'package:crypto/crypto.dart';
@@ -63,9 +63,9 @@ void main() {
       });
     }
 
-    test('githubContext se construit avec et sans racines du système', () {
-      expect(githubContext, returnsNormally);
-      expect(() => githubContext(withTrustedRoots: false), returnsNormally);
+    test('trustedContext se construit avec et sans racines du système', () {
+      expect(trustedContext, returnsNormally);
+      expect(() => trustedContext(withTrustedRoots: false), returnsNormally);
     });
   });
 
@@ -88,7 +88,7 @@ void main() {
   });
 
   // Vraies connexions à GitHub, en lecture seule : lancées seulement avec
-  // RESEAU=1 (`RESEAU=1 flutter test test/update/github_roots_test.dart`).
+  // RESEAU=1 (`RESEAU=1 flutter test test/trusted_roots_test.dart`).
   // Elles passent par CloudflareHttpOverrides, comme dans l'app.
   group('réseau', skip: Platform.environment['RESEAU'] != '1', () {
     Future<void> head(String host, SecurityContext context) =>
@@ -111,7 +111,7 @@ void main() {
     ]) {
       test('$host : sans racines du système, les racines embarquées '
           'suffisent', () async {
-        await head(host, githubContext(withTrustedRoots: false));
+        await head(host, trustedContext(withTrustedRoots: false));
       });
 
       test('$host : sans aucune racine, le certificat est refusé', () async {
