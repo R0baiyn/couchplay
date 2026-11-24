@@ -116,4 +116,167 @@ void main() {
     // Sous Windows, un fichier encore ouvert ne s'efface pas.
     part.deleteSync();
   });
+
+  group('fetchPoster', () {
+    final jpeg = Uint8List.fromList([0xFF, 0xD8, 0xFF, ...List.filled(20, 9)]);
+    // URL de test construite : hôte, port et chemin ne doivent jamais
+    // ressortir dans la cause.
+    const host = 'images-secrets.example';
+    const port = 8443;
+    const path = 'chemin-secret/affiche.jpg';
+    final url = Uri.parse('https://$host:$port/$path');
+
+    Future<({Uint8List? bytes, String? cause})> poster(
+      Future<ResponseBody> Function(RequestOptions) reply, {
+      int limit = posterLimit,
+      Duration timeout = posterTimeout,
+      Uri? at,
+    }) => fetchPoster(
+      Dio()..httpClientAdapter = _PosterAdapter(reply),
+      at ?? url,
+      CancelToken(),
+      limit: limit,
+      timeout: timeout,
+    );
+
+    test('image reçue : octets, aucune cause', () async {
+      final result = await poster(
+        (_) async => ResponseBody.fromBytes(jpeg, 200),
+      );
+
+      expect(result.bytes, jpeg);
+      expect(result.cause, isNull);
+    });
+
+    final failures =
+        <(String, String, Future<ResponseBody> Function(RequestOptions))>[
+          (
+            'certificat refusé',
+            'HandshakeException',
+            (_) async =>
+                throw HandshakeException('CERTIFICATE_VERIFY_FAILED $url'),
+          ),
+          (
+            'certificat refusé',
+            'badCertificate',
+            (o) async => throw DioException.badCertificate(requestOptions: o),
+          ),
+          (
+            'délai dépassé',
+            'connectionTimeout',
+            (o) async => throw DioException.connectionTimeout(
+              requestOptions: o,
+              timeout: const Duration(seconds: 1),
+            ),
+          ),
+          (
+            'délai dépassé',
+            'receiveTimeout',
+            (o) async => throw DioException.receiveTimeout(
+              requestOptions: o,
+              timeout: const Duration(seconds: 1),
+            ),
+          ),
+          (
+            'connexion coupée',
+            'SocketException',
+            (_) async => throw SocketException('Connection refused $url'),
+          ),
+          (
+            'connexion coupée',
+            'connectionError',
+            (o) async => throw DioException.connectionError(
+              requestOptions: o,
+              reason: 'refusée $url',
+            ),
+          ),
+          (
+            'connexion coupée',
+            'coupée en route',
+            (_) async =>
+                ResponseBody(Stream.error(HttpException('coupée $url')), 200),
+          ),
+          (
+            'réponse HTTP 404',
+            '404',
+            (_) async => ResponseBody.fromString('', 404),
+          ),
+          (
+            'réponse HTTP 503',
+            '503',
+            (_) async => ResponseBody.fromString('', 503),
+          ),
+          (
+            'pas une image',
+            'page HTML',
+            (_) async =>
+                ResponseBody.fromString('<html>erreur $url</html>', 200),
+          ),
+        ];
+    for (final (cause, name, reply) in failures) {
+      test('$name : « $cause », sans hôte, port ni chemin', () async {
+        final result = await poster(reply);
+
+        expect(result.bytes, isNull);
+        expect(result.cause, cause);
+        for (final secret in [host, '$port', 'chemin-secret']) {
+          expect(result.cause, isNot(contains(secret)));
+        }
+      });
+    }
+
+    test('trop grosse : « image trop grosse »', () async {
+      final result = await poster(
+        (_) async => ResponseBody.fromBytes(jpeg, 200),
+        limit: 10,
+      );
+
+      expect(result.bytes, isNull);
+      expect(result.cause, 'image trop grosse');
+    });
+
+    test('envoi trop lent : « délai dépassé »', () async {
+      final result = await poster(
+        (_) async => ResponseBody(() async* {
+          yield jpeg;
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          yield jpeg;
+        }(), 200),
+        timeout: const Duration(milliseconds: 10),
+      );
+
+      expect(result.bytes, isNull);
+      expect(result.cause, 'délai dépassé');
+    });
+
+    test(
+      "adresse qui n'est pas http(s) : « adresse non prise en charge »",
+      () async {
+        final result = await poster(
+          (_) async => fail('aucune requête attendue'),
+          at: Uri.parse('file:///etc/passwd'),
+        );
+
+        expect(result.bytes, isNull);
+        expect(result.cause, 'adresse non prise en charge');
+      },
+    );
+  });
+}
+
+/// Adaptateur dio qui répond par [reply].
+final class _PosterAdapter implements HttpClientAdapter {
+  _PosterAdapter(this.reply);
+
+  final Future<ResponseBody> Function(RequestOptions) reply;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) => reply(options);
+
+  @override
+  void close({bool force = false}) {}
 }

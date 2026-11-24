@@ -455,9 +455,13 @@ class DownloadsNotifier extends Notifier<DownloadsState> {
       await session.tidied;
       final store = session.store;
       if (await store.posterOf(download).exists()) return;
-      final bytes = await fetchPoster(session.dio, url, session.posterCancel);
+      final (:bytes, :cause) = await fetchPoster(
+        session.dio,
+        url,
+        session.posterCancel,
+      );
       if (bytes == null) {
-        log('Affiche non téléchargée');
+        log('Affiche non téléchargée : $cause');
         return;
       }
       // Relu juste avant d'écrire : compte supprimé (dossier effacé),

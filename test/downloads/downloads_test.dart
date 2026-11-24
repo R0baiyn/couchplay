@@ -12,6 +12,7 @@ import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/downloads/transfer.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
+import 'package:couchplay/logging.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/accounts/app_settings.dart';
 import 'package:flutter/widgets.dart';
@@ -497,21 +498,37 @@ void main() {
       expect(Directory('${h.root.path}/downloads/a').existsSync(), isFalse);
     });
 
-    for (final (name, setUp) in [
-      ('refusée (404)', (VideoServer s) => s.posterStatus = 404),
-      ('trop grosse', (VideoServer s) => s.poster = Uint8List(posterLimit + 1)),
+    for (final (name, setUp, cause) in [
+      (
+        'refusée (404)',
+        (VideoServer s) => s.posterStatus = 404,
+        'réponse HTTP 404',
+      ),
+      (
+        'trop grosse',
+        (VideoServer s) => s.poster = Uint8List(posterLimit + 1),
+        'image trop grosse',
+      ),
     ]) {
       test("$name : pas d'affiche, la vidéo se télécharge", () async {
         final server = VideoServer(_source);
         setUp(server);
         final h = await _Harness.start(server: server);
+        final journal = File('${h.root.path}/couchplay.log');
+        openJournal(journal);
+        addTearDown(closeJournal);
         await h.notifier.add([film]);
         await h.until(() => h.status('1') == DownloadStatus.ready);
         await h.until(() => h.server.posters.isNotEmpty);
         await Future<void>.delayed(const Duration(milliseconds: 50));
+        await flushJournal();
 
         expect(files(h), {'movie-1.mkv'});
         expect(h.notifier.posterOf(film), isNull);
+        expect(
+          journal.readAsStringSync(),
+          contains('Affiche non téléchargée : $cause'),
+        );
       });
     }
 

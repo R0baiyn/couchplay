@@ -242,18 +242,23 @@ const posterLimit = 4 << 20;
 const posterTimeout = Duration(seconds: 30);
 
 /// Lit l'affiche [url] en mémoire, [limit] octets au plus (comptés à la
-/// réception : la taille annoncée peut mentir). `null` si l'URL n'est pas
-/// en http(s), si le serveur refuse ou coupe, ou si l'image est trop
-/// grosse ou n'est pas une image (page d'erreur, portail captif) : la
-/// vidéo se télécharge sans elle. Aucune URL n'en sort : celle
-/// d'un fournisseur peut porter des identifiants.
-Future<Uint8List?> fetchPoster(
+/// réception : la taille annoncée peut mentir) et [timeout] au plus. Sans
+/// octets (`bytes` nul) si l'URL n'est pas en http(s), si le serveur refuse
+/// ou coupe, ou si l'image est trop grosse ou n'est pas une image (page
+/// d'erreur, portail captif) : la vidéo se télécharge sans elle. `cause`
+/// dit pourquoi, en mots, d'après les seuls types d'erreur : ni message
+/// d'exception ni URL n'en sortent, celle d'un fournisseur peut porter des
+/// identifiants.
+Future<({Uint8List? bytes, String? cause})> fetchPoster(
   Dio dio,
   Uri url,
   CancelToken cancel, {
   int limit = posterLimit,
+  Duration timeout = posterTimeout,
 }) async {
-  if (!url.isScheme('http') && !url.isScheme('https')) return null;
+  if (!url.isScheme('http') && !url.isScheme('https')) {
+    return (bytes: null, cause: 'adresse non prise en charge');
+  }
   try {
     final response = await dio.getUri<ResponseBody>(
       url,
@@ -266,16 +271,41 @@ Future<Uint8List?> fetchPoster(
       bytes.add(chunk);
       // Quitter la boucle ferme la connexion. La durée aussi est bornée :
       // un hôte qui envoie au compte-gouttes ne retient pas les suivantes.
-      if (bytes.length > limit || clock.elapsed > posterTimeout) return null;
+      if (bytes.length > limit) {
+        return (bytes: null, cause: 'image trop grosse');
+      }
+      if (clock.elapsed > timeout) {
+        return (bytes: null, cause: 'délai dépassé');
+      }
     }
     final image = bytes.takeBytes();
-    return _isImage(image) ? image : null;
-  } on DioException {
-    return null;
-  } on Exception {
+    return _isImage(image)
+        ? (bytes: image, cause: null)
+        : (bytes: null, cause: 'pas une image');
+  } on DioException catch (e) {
+    return (bytes: null, cause: _posterCause(e));
+  } on Exception catch (e) {
     // HttpException, SocketException : connexion coupée en route.
-    return null;
+    return (bytes: null, cause: _posterCause(e));
   }
+}
+
+/// La cause d'un échec d'affiche, lue sur les types seulement.
+String _posterCause(Object? e) {
+  if (e is DioException) {
+    return switch (e.type) {
+      DioExceptionType.badCertificate => 'certificat refusé',
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.transformTimeout => 'délai dépassé',
+      DioExceptionType.badResponse => 'réponse HTTP ${e.response?.statusCode}',
+      DioExceptionType.cancel => 'annulée',
+      DioExceptionType.connectionError ||
+      DioExceptionType.unknown => _posterCause(e.error),
+    };
+  }
+  return e is TlsException ? 'certificat refusé' : 'connexion coupée';
 }
 
 /// JPEG, PNG, GIF, WebP ou BMP, reconnus à leurs premiers octets.
