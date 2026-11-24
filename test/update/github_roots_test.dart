@@ -22,13 +22,14 @@ String _fingerprint(String pem) {
 /// la connexion : aucun accès au réseau.
 final class _ContextSpy extends HttpOverrides {
   SecurityContext? context;
+  HttpClient? client;
   var created = 0;
 
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     this.context = context;
     created++;
-    return super.createHttpClient(context)
+    return client = super.createHttpClient(context)
       ..connectionFactory = (_, _, _) =>
           Future.error(const SocketException('hors ligne (test)'));
   }
@@ -82,6 +83,8 @@ void main() {
     }, spy);
     expect(spy.created, greaterThan(0));
     expect(spy.context, same(Updater.context));
+    // Comme dio : une connexion inutilisée se ferme après 3 s, pas 15.
+    expect(spy.client!.idleTimeout, const Duration(seconds: 3));
   });
 
   // Vraies connexions à GitHub, en lecture seule : lancées seulement avec

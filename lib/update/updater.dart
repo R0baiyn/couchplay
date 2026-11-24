@@ -221,7 +221,9 @@ final class Updater {
     _dio.httpClientAdapter =
         adapter ??
         IOHttpClientAdapter(
-          createHttpClient: () => HttpClient(context: context),
+          createHttpClient: () =>
+              HttpClient(context: context)
+                ..idleTimeout = const Duration(seconds: 3),
         );
   }
 
