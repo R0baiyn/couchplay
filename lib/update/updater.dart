@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../logging.dart';
+import 'github_roots.dart';
 import 'release_signature.dart';
 
 /// Ce que l'accueil propose au démarrage, une fois devant : une mise à jour
@@ -216,7 +218,11 @@ final class Updater {
            headers: {'User-Agent': 'couchplay'},
          ),
        ) {
-    if (adapter != null) _dio.httpClientAdapter = adapter;
+    _dio.httpClientAdapter =
+        adapter ??
+        IOHttpClientAdapter(
+          createHttpClient: () => HttpClient(context: context),
+        );
   }
 
   /// Dépôt R0baiyn/couchplay désigné par son identifiant, qui ne change
@@ -226,6 +232,11 @@ final class Updater {
     'api.github.com',
     '/repositories/1433672657/releases/latest',
   );
+
+  /// Contexte TLS de toutes les connexions de la mise à jour (vérification,
+  /// téléchargement, liste signée) : racines du système plus celles de
+  /// GitHub (`github_roots.dart`). Un seul, chargé au premier usage.
+  static final context = githubContext();
 
   /// Version de l'app en cours.
   final String version;
