@@ -98,3 +98,7 @@ SecurityContext trustedContext({bool withTrustedRoots = true}) =>
     SecurityContext(withTrustedRoots: withTrustedRoots)
       ..setTrustedCertificatesBytes(utf8.encode(userTrustEcc))
       ..setTrustedCertificatesBytes(utf8.encode(isrgRootX1));
+
+/// Le [trustedContext] de l'app : un seul, chargé au premier usage (les PEM
+/// sont lus à la création, jamais une fois par client).
+final appContext = trustedContext();

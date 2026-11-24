@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../logging.dart';
+import '../trusted_roots.dart';
 import 'doh_root.dart';
 
 /// Résout les noms d'hôte par Cloudflare (1.1.1.1, puis 1.0.0.1 en secours),
@@ -100,7 +101,8 @@ final class CloudflareDns {
 
   /// Contexte TLS de la connexion DoH, et d'elle seule : racines du système
   /// plus [sslComRootEcc] (voir `doh_root.dart`). Les autres connexions de
-  /// l'app gardent le contexte par défaut.
+  /// l'app prennent [appContext] (`trusted_roots.dart`) quand elles n'ont pas
+  /// de contexte à elles.
   static SecurityContext dohContext({bool withTrustedRoots = true}) =>
       SecurityContext(withTrustedRoots: withTrustedRoots)
         ..setTrustedCertificatesBytes(utf8.encode(sslComRootEcc));
@@ -157,21 +159,30 @@ final cloudflareDns = CloudflareDns();
 /// par [cloudflareDns] : la connexion se fait à l'adresse résolue, le nom
 /// reste celui de l'URL (en-tête Host, vérification du certificat HTTPS).
 final class CloudflareHttpOverrides extends HttpOverrides {
+  /// Contexte TLS d'un client : celui qu'il a reçu (DoH, mise à jour), sinon
+  /// [appContext], qui ajoute ISRG Root X1 et USERTrust ECC aux racines du
+  /// système (absentes d'Android 7.0 ou d'un Windows qui ne les a jamais
+  /// téléchargées).
+  static SecurityContext contextFor(SecurityContext? context) =>
+      context ?? appContext;
+
   @override
-  HttpClient createHttpClient(SecurityContext? context) =>
-      super.createHttpClient(context)
-        ..connectionFactory = (uri, proxyHost, proxyPort) async {
-          final address = await cloudflareDns.lookup(uri.host);
-          final task = await Socket.startConnect(address, uri.port);
-          if (uri.scheme != 'https') return task;
-          return ConnectionTask.fromSocket(
-            task.socket.then(
-              (socket) =>
-                  SecureSocket.secure(socket, host: uri.host, context: context),
-            ),
-            task.cancel,
-          );
-        };
+  HttpClient createHttpClient(SecurityContext? context) {
+    final effective = contextFor(context);
+    return super.createHttpClient(effective)
+      ..connectionFactory = (uri, proxyHost, proxyPort) async {
+        final address = await cloudflareDns.lookup(uri.host);
+        final task = await Socket.startConnect(address, uri.port);
+        if (uri.scheme != 'https') return task;
+        return ConnectionTask.fromSocket(
+          task.socket.then(
+            (socket) =>
+                SecureSocket.secure(socket, host: uri.host, context: effective),
+          ),
+          task.cancel,
+        );
+      };
+  }
 }
 
 /// [url] avec l'adresse résolue par Cloudflare à la place du nom, et

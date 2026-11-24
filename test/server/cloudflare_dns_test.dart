@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/server/cloudflare_dns.dart';
+import 'package:couchplay/trusted_roots.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String _answer(List<Map<String, Object>> records) =>
@@ -158,6 +159,21 @@ void main() {
         Uri.parse('http://localhost/a.mkv'),
       );
       expect(noPort, {'Host': 'localhost'});
+    });
+  });
+
+  group('CloudflareHttpOverrides.contextFor', () {
+    test("sans contexte : celui de l'app, toujours la même instance", () {
+      expect(CloudflareHttpOverrides.contextFor(null), same(appContext));
+      expect(
+        CloudflareHttpOverrides.contextFor(null),
+        same(CloudflareHttpOverrides.contextFor(null)),
+      );
+    });
+
+    test('contexte donné (DoH, mise à jour) : gardé tel quel', () {
+      final given = SecurityContext(withTrustedRoots: false);
+      expect(CloudflareHttpOverrides.contextFor(given), same(given));
     });
   });
 

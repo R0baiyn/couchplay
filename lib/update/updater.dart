@@ -237,8 +237,8 @@ final class Updater {
 
   /// Contexte TLS de toutes les connexions de la mise à jour (vérification,
   /// téléchargement, liste signée) : racines du système plus celles de
-  /// GitHub (`trusted_roots.dart`). Un seul, chargé au premier usage.
-  static final context = trustedContext();
+  /// GitHub. C'est le contexte unique de l'app (`trusted_roots.dart`).
+  static final context = appContext;
 
   /// Version de l'app en cours.
   final String version;
