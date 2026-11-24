@@ -66,6 +66,23 @@ Future<FakeDownloads> pumpScreen(
   return fake;
 }
 
+/// L'export copie en vraies E/S sans roue de chargement : `settle` seul
+/// rendrait la main avant la fin de la copie. Attend que la ligne ne dise
+/// plus « Export en cours » (l'export est fini, réussi ou non), puis le
+/// reste du chargement.
+Future<void> exported(WidgetTester tester) async {
+  final running = find.textContaining('Export en cours');
+  await tester.pump();
+  for (var i = 0; i < 100 && running.evaluate().isNotEmpty; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  expect(running, findsNothing, reason: "l'export ne se termine pas");
+  await settle(tester);
+}
+
 void main() {
   testWidgets('rien téléchargé : état vide, pas de « Tout supprimer »', (
     tester,
@@ -331,7 +348,7 @@ void main() {
     testWidgets('copie sous le vrai titre, puis le dit', (tester) async {
       await pump(tester, picked: target.path);
       await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
-      await settle(tester);
+      await exported(tester);
       expect(File('${target.path}/Mirage.mkv').readAsBytesSync(), [
         1,
         2,
@@ -366,7 +383,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      await settle(tester);
+      await exported(tester);
       expect(find.textContaining('Export en cours'), findsNothing);
     });
 
@@ -391,7 +408,7 @@ void main() {
       expect(export().onPressed, isNull);
 
       choice.complete(null);
-      await settle(tester);
+      await exported(tester);
       expect(export().onPressed, isNotNull);
       expect(target.listSync(), isEmpty);
     });
@@ -409,7 +426,7 @@ void main() {
         ],
       );
       await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
-      await settle(tester);
+      await exported(tester);
       expect(
         find.text('Impossible d\'ouvrir le choix du dossier.'),
         findsOneWidget,
@@ -429,7 +446,7 @@ void main() {
     ) async {
       await pump(tester);
       await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
-      await settle(tester);
+      await exported(tester);
       expect(target.listSync(), isEmpty);
       expect(find.byType(SnackBar), findsNothing);
     });
@@ -438,7 +455,7 @@ void main() {
       File('${target.path}/Mirage.mkv').writeAsStringSync('à moi');
       await pump(tester, picked: target.path);
       await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
-      await settle(tester);
+      await exported(tester);
       expect(File('${target.path}/Mirage.mkv').readAsStringSync(), 'à moi');
       expect(File('${target.path}/Mirage (2).mkv').readAsBytesSync(), [
         1,
@@ -455,7 +472,7 @@ void main() {
       await pump(tester, picked: target.path);
       fake.files.clear();
       await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
-      await settle(tester);
+      await exported(tester);
       expect(find.text('La vidéo n\'existe plus.'), findsOneWidget);
       expect(target.listSync(), isEmpty);
     });
@@ -466,7 +483,7 @@ void main() {
       fake.files[movie.key]!.deleteSync();
       await pump(tester, picked: target.path);
       await tester.tap(find.byKey(const ValueKey('downloads.export.movie:1')));
-      await settle(tester);
+      await exported(tester);
       expect(find.text('La vidéo n\'existe plus.'), findsOneWidget);
       expect(target.listSync(), isEmpty);
     });
@@ -577,10 +594,7 @@ void main() {
       await tester.pump();
       // L'export est parti : l'action se grise, la ligne le dit.
       expect(find.textContaining('Export en cours'), findsOneWidget);
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 200)),
-      );
-      await tester.pump();
+      await exported(tester);
     });
 
     testWidgets('« Tout supprimer » en icône : anneau de focus, Entrée agit', (

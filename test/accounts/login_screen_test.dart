@@ -72,14 +72,22 @@ void main() {
       'mdp',
     );
     await tester.tap(find.byKey(const ValueKey('accounts.submit')));
-    // Laisse le faux serveur et le stockage répondre. Pas de pumpAndSettle :
-    // après la connexion, le catalogue tourne avec une roue de chargement.
-    for (var i = 0; i < 5; i++) {
+    await tester.pump();
+    // Attend la fin de la connexion (faux serveur, puis stockage en vraies
+    // E/S) : la roue du bouton disparaît, ou l'écran avec lui. Ni
+    // pumpAndSettle ni settle : après la connexion, le catalogue tourne avec
+    // une roue de chargement.
+    final connecting = find.descendant(
+      of: find.byKey(const ValueKey('accounts.submit')),
+      matching: find.byType(CircularProgressIndicator),
+    );
+    for (var i = 0; i < 100 && connecting.evaluate().isNotEmpty; i++) {
       await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        () => Future<void>.delayed(const Duration(milliseconds: 30)),
       );
       await tester.pump(const Duration(milliseconds: 50));
     }
+    expect(connecting, findsNothing, reason: 'la connexion ne se termine pas');
   }
 
   testWidgets('premier lancement : écran de connexion, User-Agent prérempli', (
