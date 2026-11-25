@@ -8,7 +8,8 @@ import 'catalog/catalog_index.dart';
 import 'catalog/catalog_screen.dart';
 import 'catalog/downloads_screen.dart';
 import 'home_shell_nav.dart';
-import 'settings/settings_screen.dart';
+import 'live/channel.dart';
+import 'live/live_screen.dart';
 import 'catalog/home_screen.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
@@ -16,9 +17,9 @@ import 'television.dart';
 import 'update/update_dialog.dart';
 import 'update/updater.dart';
 
-/// Onglets Accueil, Films, Séries et Recherche (les réglages sont en haut à
+/// Onglets Accueil, Films, Séries, TV et Recherche (les réglages sont en haut à
 /// droite) : barre en bas sur écran étroit, rail sur le côté sur grand écran
-/// (règle 9).
+/// (règle 9), avec en plus l'onglet « Hors ligne » (voir [shownTabs]).
 ///
 /// Une fois l'accueil affiché, l'index des films et celui des séries (d'où
 /// viennent les grilles, la recherche et les versions) se chargent en
@@ -32,25 +33,20 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  static const _searchTab = 3;
+  var _tab = ShellTab.home;
 
-  /// Pas d'onglet « Hors ligne » sur TV (D-034) : le dernier est retiré.
-  List<(IconData, IconData, String, Key)> get _shown =>
-      ref.read(televisionProvider)
-      ? shellTabs.sublist(0, shellTabs.length - 1)
-      : shellTabs;
-
-  var _index = 0;
+  /// Onglets affichés, selon la largeur et la TV : fixés par `build`.
+  var _tabs = const <ShellTab>[];
 
   // Un onglet n'est construit qu'à sa première visite : pas de requête pour
   // les films ni les séries tant qu'on ne les ouvre pas. Ensuite, il garde son état.
-  final _visited = {0};
+  final _visited = {ShellTab.home};
 
   /// Pour Ctrl+F : le champ de la recherche.
   final _searchField = FocusNode();
 
   /// Les deux zones de focus du rail et de l'onglet (TV).
-  late final _zones = ShellZones(selectedIndex: () => _index);
+  late final _zones = ShellZones(selectedIndex: () => _tabs.indexOf(_tab));
 
   @override
   void initState() {
@@ -133,14 +129,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       );
   }
 
-  void _select(int index) {
+  void _select(ShellTab tab) {
     setState(() {
-      _index = index;
-      _visited.add(index);
+      _tab = tab;
+      _visited.add(tab);
     });
     // La recherche s'ouvre prête à taper. Après la reconstruction : un
     // onglet tout juste créé n'a pas encore attaché son champ.
-    if (index == _searchTab) {
+    if (tab == ShellTab.search) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _searchField.requestFocus();
       });
@@ -166,7 +162,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ?.findAncestorWidgetOfExactType<EditableText>() ==
             null;
     if (!ctrlF && !slash) return false;
-    _select(_searchTab);
+    _select(ShellTab.search);
     return true;
   }
 
@@ -189,20 +185,28 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   // Créés une fois : changer d'onglet, ou ouvrir et fermer une fiche (la
   // route de l'accueil change d'état), ne reconstruit pas les onglets.
-  final _built = <int, Widget>{};
+  final _built = <ShellTab, Widget>{};
 
-  Widget _tab(int index) => switch (index) {
-    0 => const HomeScreen(settingsButton: SettingsButton()),
-    1 => const CatalogScreen(
+  /// Le lecteur du direct se branche ici.
+  void _openChannel(Channel channel) {}
+
+  Widget _view(ShellTab tab) => switch (tab) {
+    ShellTab.home => const HomeScreen(headerActions: ShellHeaderActions()),
+    ShellTab.movies => const CatalogScreen(
       kind: ContentKind.movies,
-      settingsButton: SettingsButton(),
+      headerActions: ShellHeaderActions(),
     ),
-    2 => const CatalogScreen(
+    ShellTab.series => const CatalogScreen(
       kind: ContentKind.series,
-      settingsButton: SettingsButton(),
+      headerActions: ShellHeaderActions(),
     ),
-    3 => SearchScreen(focusNode: _searchField),
-    _ => const DownloadsScreen(settingsButton: SettingsButton()),
+    ShellTab.live => LiveScreen(
+      onOpen: _openChannel,
+      headerActions: const ShellHeaderActions(),
+    ),
+    ShellTab.search => SearchScreen(focusNode: _searchField),
+    // Rail seulement : les réglages y sont, pas dans l'en-tête.
+    ShellTab.downloads => const DownloadsScreen(),
   };
 
   @override
@@ -214,15 +218,19 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Retour (Android, télécommande, Échap) depuis un autre onglet : revient
     // à l'Accueil. Seul l'Accueil quitte l'app ; sur TV, au 2e appui.
     final tv = ref.watch(televisionProvider);
+    final wide = MediaQuery.sizeOf(context).width >= railMinWidth;
+    _tabs = shownTabs(television: tv, wide: wide);
+    // Fenêtre rétrécie sur « Hors ligne », qui n'est plus dans la barre.
+    if (!_tabs.contains(_tab)) _tab = ShellTab.home;
     return PopScope(
-      canPop: _index == 0 && (!tv || _exitArmed != null),
+      canPop: _tab == ShellTab.home && (!tv || _exitArmed != null),
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (_index == 0) {
+        if (_tab == ShellTab.home) {
           _armExit();
           return;
         }
-        _select(0);
+        _select(ShellTab.home);
         // Sur TV, le focus suit : l'onglet quitté est caché, il le perdrait.
         if (ref.read(televisionProvider)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -230,23 +238,25 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           });
         }
       },
-      child: _shell(context),
+      child: _shell(context, wide: wide, television: tv),
     );
   }
 
-  Widget _shell(BuildContext context) {
-    final tabs = _shown;
+  Widget _shell(
+    BuildContext context, {
+    required bool wide,
+    required bool television,
+  }) {
     final body = IndexedStack(
-      index: _index,
+      index: _tabs.indexOf(_tab),
       children: [
-        for (var i = 0; i < tabs.length; i++)
-          _visited.contains(i)
-              ? _built.putIfAbsent(i, () => _tab(i))
+        for (final tab in _tabs)
+          _visited.contains(tab)
+              ? _built.putIfAbsent(tab, () => _view(tab))
               : const SizedBox.shrink(),
       ],
     );
-    if (MediaQuery.sizeOf(context).width >= railMinWidth) {
-      final television = ref.watch(televisionProvider);
+    if (wide) {
       Widget zone(
         FocusScopeNode node,
         FocusOnKeyEventCallback onKey,
@@ -268,7 +278,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               _zones.railKey,
               // Peu de hauteur (fenêtre basse, clavier ouvert) : le rail défile
               // au lieu de superposer les réglages aux onglets.
-              ShellRail(tabs: tabs, selectedIndex: _index, onSelect: _select),
+              ShellRail(tabs: _tabs, selected: _tab, onSelect: _select),
             ),
             const VerticalDivider(width: 1),
             Expanded(child: zone(_zones.content, _zones.contentKey, body)),
@@ -279,8 +289,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return Scaffold(
       body: body,
       bottomNavigationBar: ShellBottomBar(
-        tabs: tabs,
-        selectedIndex: _index,
+        tabs: _tabs,
+        selected: _tab,
         onSelect: _select,
       ),
     );

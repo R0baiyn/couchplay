@@ -14,11 +14,11 @@ import '../library/library_store.dart';
 
 /// Premier onglet : « Continuer à regarder », puis « Ma liste », en rangées.
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key, this.settingsButton});
+  const HomeScreen({super.key, this.headerActions});
 
-  /// Bouton Réglages de l'en-tête, posé par la coquille : les réglages sont
+  /// Boutons de fin d'en-tête posés par la coquille : les réglages sont
   /// au-dessus du catalogue (D-050).
-  final Widget? settingsButton;
+  final Widget? headerActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +48,7 @@ class HomeScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Accueil'), actions: [?settingsButton]),
+      appBar: AppBar(title: const Text('Accueil'), actions: [?headerActions]),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [

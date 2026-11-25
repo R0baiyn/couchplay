@@ -116,6 +116,13 @@ void main() {
     await tap(tester, 'shell.tabSeries');
     clean(tester, 'Séries');
 
+    await tap(tester, 'shell.tabLive');
+    clean(tester, 'TV');
+    await tap(tester, 'live.categoryPicker');
+    clean(tester, 'panneau des catégories de chaînes');
+    await tester.tapAt(const Offset(180, 40));
+    await settle(tester);
+
     await tap(tester, 'shell.tabSearch');
     clean(tester, 'Recherche vide');
     await tester.enterText(find.byKey(const ValueKey('search.field')), 'a');
@@ -128,7 +135,9 @@ void main() {
     await settle(tester);
     clean(tester, 'Recherche, aucun résultat');
 
-    await tap(tester, 'shell.tabDownloads');
+    // Sur téléphone, « Hors ligne » s'ouvre depuis l'en-tête (D-082).
+    await tap(tester, 'shell.tabHome');
+    await tap(tester, 'shell.offline');
     clean(tester, 'Hors ligne');
   });
 

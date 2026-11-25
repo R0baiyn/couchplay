@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'catalog/downloads_screen.dart';
 import 'focus_ring.dart';
 import 'settings/settings_screen.dart';
 import 'television.dart';
-
-/// Onglets de l'accueil : icône, icône choisie, libellé, Key (posée sur
-/// l'icône, ou sur l'icône choisie quand l'onglet l'est : une seule à la fois).
-typedef ShellTab = (IconData, IconData, String, Key);
 
 /// L'icône d'un onglet, à la taille de sa pastille ([width] × 32) : comme
 /// le bouton Réglages du rail, l'anneau entoure la pastille, pas le libellé.
@@ -17,36 +15,85 @@ Widget _tabIcon(IconData icon, double width, [Key? key]) => FocusRing(
   child: SizedBox(width: width, height: 32, child: Icon(icon)),
 );
 
-const List<ShellTab> shellTabs = [
-  (Icons.home_outlined, Icons.home, 'Accueil', ValueKey('shell.tabHome')),
-  (Icons.movie_outlined, Icons.movie, 'Films', ValueKey('shell.tabMovies')),
-  (Icons.tv_outlined, Icons.tv, 'Séries', ValueKey('shell.tabSeries')),
-  (
+/// Onglets de l'accueil, dans l'ordre : icône, icône choisie, libellé et Key
+/// (posée sur l'icône, ou sur l'icône choisie quand l'onglet l'est : une seule
+/// à la fois).
+enum ShellTab {
+  home(Icons.home_outlined, Icons.home, 'Accueil', ValueKey('shell.tabHome')),
+  movies(
+    Icons.movie_outlined,
+    Icons.movie,
+    'Films',
+    ValueKey('shell.tabMovies'),
+  ),
+  series(Icons.tv_outlined, Icons.tv, 'Séries', ValueKey('shell.tabSeries')),
+  live(Icons.live_tv_outlined, Icons.live_tv, 'TV', ValueKey('shell.tabLive')),
+  search(
     Icons.search_outlined,
     Icons.search,
     'Recherche',
     ValueKey('shell.tabSearch'),
   ),
-  (
+  downloads(
     Icons.download_outlined,
     Icons.download,
     'Hors ligne',
     ValueKey('shell.tabDownloads'),
-  ),
+  );
+
+  const ShellTab(this.icon, this.selectedIcon, this.label, this.key);
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final Key key;
+}
+
+/// Onglets du rail ou de la barre. « Hors ligne » : jamais sur TV (D-034) ; sur
+/// écran étroit, il laisse la barre pour une icône en haut des écrans (voir
+/// [ShellHeaderActions]).
+List<ShellTab> shownTabs({required bool television, required bool wide}) => [
+  for (final tab in ShellTab.values)
+    if (tab != ShellTab.downloads || (!television && wide)) tab,
 ];
+
+/// Fin de l'en-tête des écrans Accueil, Films, Séries et TV : « Hors ligne » sur
+/// écran étroit, puis les réglages.
+class ShellHeaderActions extends ConsumerWidget {
+  const ShellHeaderActions({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (!ref.watch(televisionProvider) &&
+          MediaQuery.sizeOf(context).width < railMinWidth)
+        IconButton(
+          key: const ValueKey('shell.offline'),
+          tooltip: 'Hors ligne',
+          icon: const Icon(Icons.download_outlined),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const DownloadsScreen()),
+          ),
+        ),
+      const SettingsButton(),
+    ],
+  );
+}
 
 /// Rail des onglets (grand écran).
 class ShellRail extends StatelessWidget {
   const ShellRail({
     super.key,
     required this.tabs,
-    required this.selectedIndex,
+    required this.selected,
     required this.onSelect,
   });
 
   final List<ShellTab> tabs;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
+  final ShellTab selected;
+  final ValueChanged<ShellTab> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +105,8 @@ class ShellRail extends StatelessWidget {
           constraints: BoxConstraints(minHeight: constraints.maxHeight),
           child: IntrinsicHeight(
             child: NavigationRail(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: onSelect,
+              selectedIndex: tabs.indexOf(selected),
+              onDestinationSelected: (i) => onSelect(tabs[i]),
               labelType: NavigationRailLabelType.all,
               // Les réglages, tout en bas du rail.
               trailingAtBottom: true,
@@ -68,15 +115,19 @@ class ShellRail extends StatelessWidget {
                 child: SettingsButton(inRail: true),
               ),
               destinations: [
-                for (final (i, (icon, selected, label, key)) in tabs.indexed)
+                for (final tab in tabs)
                   NavigationRailDestination(
-                    icon: _tabIcon(icon, 56, i == selectedIndex ? null : key),
-                    selectedIcon: _tabIcon(
-                      selected,
+                    icon: _tabIcon(
+                      tab.icon,
                       56,
-                      i == selectedIndex ? key : null,
+                      tab == selected ? null : tab.key,
                     ),
-                    label: Text(label),
+                    selectedIcon: _tabIcon(
+                      tab.selectedIcon,
+                      56,
+                      tab == selected ? tab.key : null,
+                    ),
+                    label: Text(tab.label),
                   ),
               ],
             ),
@@ -92,29 +143,29 @@ class ShellBottomBar extends StatelessWidget {
   const ShellBottomBar({
     super.key,
     required this.tabs,
-    required this.selectedIndex,
+    required this.selected,
     required this.onSelect,
   });
 
   final List<ShellTab> tabs;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
+  final ShellTab selected;
+  final ValueChanged<ShellTab> onSelect;
 
   @override
   Widget build(BuildContext context) {
     return NavigationBar(
-      selectedIndex: selectedIndex,
-      onDestinationSelected: onSelect,
+      selectedIndex: tabs.indexOf(selected),
+      onDestinationSelected: (i) => onSelect(tabs[i]),
       destinations: [
-        for (final (i, (icon, selected, label, key)) in tabs.indexed)
+        for (final tab in tabs)
           NavigationDestination(
-            icon: _tabIcon(icon, 64, i == selectedIndex ? null : key),
+            icon: _tabIcon(tab.icon, 64, tab == selected ? null : tab.key),
             selectedIcon: _tabIcon(
-              selected,
+              tab.selectedIcon,
               64,
-              i == selectedIndex ? key : null,
+              tab == selected ? tab.key : null,
             ),
-            label: label,
+            label: tab.label,
           ),
       ],
     );

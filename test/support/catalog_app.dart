@@ -42,6 +42,8 @@ void setUpCatalogApp() {
       'get_series_categories': fixture('series_categories'),
       'get_series': fixture('series'),
       'get_series_info': fixture('series_info'),
+      'get_live_categories': fixture('live_categories'),
+      'get_live_streams': fixture('live_streams'),
     });
   });
   tearDown(() {

@@ -33,13 +33,13 @@ void openDetails(
 /// un bouton dans un en-tête qui se replie au défilement ouvre leur liste.
 /// Chercher un titre passe par l'onglet Recherche.
 class CatalogScreen extends ConsumerStatefulWidget {
-  const CatalogScreen({super.key, required this.kind, this.settingsButton});
+  const CatalogScreen({super.key, required this.kind, this.headerActions});
 
   final ContentKind kind;
 
-  /// Bouton Réglages de l'en-tête, posé par la coquille : les réglages sont
+  /// Boutons de fin d'en-tête posés par la coquille : les réglages sont
   /// au-dessus du catalogue (D-050).
-  final Widget? settingsButton;
+  final Widget? headerActions;
 
   @override
   ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
@@ -92,7 +92,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       icon: const Icon(Icons.refresh),
       onPressed: categories.isLoading || _refreshing ? null : _refresh,
     ),
-    ?widget.settingsButton,
+    ?widget.headerActions,
   ];
 
   @override
