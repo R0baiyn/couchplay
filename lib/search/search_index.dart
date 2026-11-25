@@ -1,4 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../catalog/versions.dart';
+import '../live/channel.dart';
+import '../live/live_providers.dart';
 import '../server/item_name.dart';
 
 /// Mots d'une recherche, normalisés comme les titres ([normalize]).
@@ -7,20 +11,23 @@ List<String> queryWords(String query) => [
     if (word.isNotEmpty) word,
 ];
 
-/// Affiches dont un titre (de n'importe quelle version) contient chaque mot
-/// de [query], dans l'ordre de [entries] ; celles dont le titre commence par
-/// la recherche passent devant. Une recherche vide garde tout.
-List<CatalogEntry> search(List<CatalogEntry> entries, String query) {
+/// Éléments de [items] dont un des textes normalisés ([texts]) contient
+/// chaque mot de [query], dans l'ordre de [items] ; ceux dont un texte
+/// commence par la recherche passent devant. Une recherche vide garde tout.
+List<T> _rank<T>(
+  List<T> items,
+  Iterable<String> Function(T) texts,
+  String query,
+) {
   final words = queryWords(query);
-  if (words.isEmpty) return entries;
+  if (words.isEmpty) return items;
   final start = words.join(' ');
-  final first = <CatalogEntry>[];
-  final rest = <CatalogEntry>[];
-  for (final entry in entries) {
+  final first = <T>[];
+  final rest = <T>[];
+  for (final item in items) {
     var matches = false;
     var starts = false;
-    for (final version in entry.versions) {
-      final text = version.parsedName.text;
+    for (final text in texts(item)) {
       if (words.every(text.contains)) {
         matches = true;
         if (text.startsWith(start)) {
@@ -29,7 +36,40 @@ List<CatalogEntry> search(List<CatalogEntry> entries, String query) {
         }
       }
     }
-    if (matches) (starts ? first : rest).add(entry);
+    if (matches) (starts ? first : rest).add(item);
   }
   return [...first, ...rest];
 }
+
+/// Affiches dont un titre (de n'importe quelle version) contient chaque mot
+/// de [query], dans l'ordre de [entries] ; celles dont le titre commence par
+/// la recherche passent devant. Une recherche vide garde tout.
+List<CatalogEntry> search(List<CatalogEntry> entries, String query) => _rank(
+  entries,
+  (entry) => entry.versions.map((version) => version.parsedName.text),
+  query,
+);
+
+/// Une chaîne et son nom normalisé, calculé une fois par liste de chaînes.
+typedef SearchableChannel = ({Channel channel, String text});
+
+/// Chaînes visibles prêtes à chercher : refaites seulement quand la liste
+/// ou le filtre changent, pas à chaque frappe.
+final channelSearchIndexProvider =
+    Provider.autoDispose<AsyncValue<List<SearchableChannel>>>(
+      (ref) => ref
+          .watch(visibleChannelsProvider)
+          .whenData(
+            (channels) => [
+              for (final channel in channels)
+                (channel: channel, text: normalize(channel.name)),
+            ],
+          ),
+    );
+
+/// Chaînes dont le nom contient chaque mot de [query], même règle que
+/// [search]. Les variantes d'une chaîne (`FHD`, `SD`) restent séparées.
+List<Channel> searchChannels(List<SearchableChannel> index, String query) => [
+  for (final (:channel, text: _) in _rank(index, (c) => [c.text], query))
+    channel,
+];

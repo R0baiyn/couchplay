@@ -5,6 +5,7 @@ import 'package:couchplay/catalog/catalog_repository.dart';
 import 'package:couchplay/catalog/category_filter.dart';
 import 'package:couchplay/catalog/versions.dart';
 import 'package:couchplay/catalog/catalog_index.dart';
+import 'package:couchplay/live/channel.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/server/item_name.dart';
 import 'package:couchplay/server/models.dart';
@@ -169,5 +170,40 @@ void main() {
         expect(server.calls, 1);
       },
     );
+  });
+
+  group('chaînes', () {
+    List<SearchableChannel> index(List<String> names) => [
+      for (final (i, name) in names.indexed)
+        (channel: Channel(id: '$i', name: name), text: normalize(name)),
+    ];
+    List<String> found(List<String> names, String query) => [
+      for (final c in searchChannels(index(names), query)) c.name,
+    ];
+
+    test('même normalisation que les films : accents, casse, mots dans le '
+        'désordre', () {
+      final names = ["L'ÉQUIPE FHD", 'Équipe 21', 'Arte HD', 'TV5 Monde'];
+      // « Équipe 21 » commence par la recherche : devant.
+      expect(found(names, 'equipe'), ['Équipe 21', "L'ÉQUIPE FHD"]);
+      expect(found(names, 'hd arte'), ['Arte HD']);
+      expect(found(names, 'monde tv5'), ['TV5 Monde']);
+      expect(found(names, 'zzz'), isEmpty);
+    });
+
+    test('qualités d\'une même chaîne : deux résultats, pas fusionnés', () {
+      expect(found(["L'EQUIPE FHD", "L'EQUIPE SD"], "l'equipe"), [
+        "L'EQUIPE FHD",
+        "L'EQUIPE SD",
+      ]);
+    });
+
+    test('nom qui commence par la recherche : devant, ordre gardé sinon', () {
+      expect(found(['Sport Arena', 'Euro Sport 2', 'Sport 1'], 'sport'), [
+        'Sport Arena',
+        'Sport 1',
+        'Euro Sport 2',
+      ]);
+    });
   });
 }

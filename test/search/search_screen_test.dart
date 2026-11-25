@@ -2,11 +2,16 @@ import 'dart:async';
 
 import 'package:couchplay/catalog/catalog_index.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
+import 'package:couchplay/live/live_player_screen.dart';
+import 'package:couchplay/player/playback.dart';
+import 'package:couchplay/search/search_index.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/catalog_app.dart';
+import '../support/fake_playback.dart';
 import '../support/fake_server.dart';
 import '../support/settle.dart';
 
@@ -110,6 +115,9 @@ void main() {
       waitForIndex: false,
       overrides: [
         catalogIndexProvider.overrideWith2((kind) => _GatedIndex(kind, gate)),
+        // Ce test porte sur l'index des films et des séries ; la liste des
+        // chaînes (deux requêtes espacées) resterait en vol à la fin.
+        channelSearchIndexProvider.overrideWithValue(const AsyncData([])),
       ],
     );
 
@@ -121,6 +129,47 @@ void main() {
     await settle(tester);
     expect(find.byKey(const ValueKey('search.loading')), findsNothing);
     expect(find.byKey(const ValueKey('search.results')), findsOneWidget);
+  });
+
+  testWidgets('chaînes visibles trouvées par leur nom, chaque qualité à part ; '
+      'OK ouvre le lecteur, zapping dans les chaînes trouvées', (tester) async {
+    await pumpApp(
+      tester,
+      openMovies: false,
+      overrides: [
+        playbackProvider.overrideWithValue(fakePlayback(FakePlayer())),
+      ],
+    );
+    await tester.tap(find.byKey(const ValueKey('shell.tabSearch')));
+    await settle(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('search.field')),
+      'chaine 1',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await settle(tester);
+
+    expect(
+      find.byKey(const ValueKey('search.sectionChannels')),
+      findsOneWidget,
+    );
+    expect(find.text('Chaînes (3)'), findsOneWidget);
+    // HD, FHD et SD ; « Chaîne 10 » (EX-YU) est masquée par le filtre.
+    for (final id in ['9001', '9006', '9008']) {
+      expect(find.byKey(ValueKey('live.channel.$id')), findsOneWidget);
+    }
+    expect(find.byKey(const ValueKey('live.channel.9020')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('live.channel.9006')));
+    await tester.pump();
+    await tester.pump();
+    final player = tester.widget<LivePlayerScreen>(
+      find.byType(LivePlayerScreen),
+    );
+    expect(player.channel.id, '9006');
+    expect([for (final c in player.channels) c.id], ['9001', '9006', '9008']);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await settle(tester);
   });
 }
 

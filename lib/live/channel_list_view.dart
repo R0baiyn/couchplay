@@ -36,10 +36,6 @@ class ChannelList extends ConsumerStatefulWidget {
   /// chaque nouvelle valeur.
   final String? focusId;
 
-  /// Hauteur fixe d'une chaîne : certaines catégories en comptent des
-  /// centaines. Laisse la place d'une seconde ligne sous le nom.
-  static const _rowHeight = 72.0;
-
   @override
   ConsumerState<ChannelList> createState() => _ChannelListState();
 }
@@ -72,7 +68,7 @@ class _ChannelListState extends ConsumerState<ChannelList> {
       if (!mounted || !_scroll.hasClients) return;
       final position = _scroll.position;
       _scroll.jumpTo(
-        (index * ChannelList._rowHeight).clamp(
+        (index * ChannelTile.height).clamp(
           position.minScrollExtent,
           position.maxScrollExtent,
         ),
@@ -125,7 +121,7 @@ class _ChannelListState extends ConsumerState<ChannelList> {
               SliverPadding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 sliver: SliverFixedExtentList.builder(
-                  itemExtent: ChannelList._rowHeight,
+                  itemExtent: ChannelTile.height,
                   itemCount: channels.length,
                   itemBuilder: (context, i) => ChannelTile(
                     key: ObjectKey(channels[i]),
@@ -145,7 +141,7 @@ class _ChannelListState extends ConsumerState<ChannelList> {
 /// Numéro, logo (ou icône de repli) et nom d'une chaîne, puis ce qu'elle
 /// passe si le guide le dit, et son cœur. OK maintenu, appui long ou touche
 /// Menu : favorite ajoutée ou retirée. Son nœud de focus est inscrit dans
-/// [tiles] tant qu'elle est construite. Rangée de 72 de haut.
+/// [tiles] tant qu'elle est construite.
 class ChannelTile extends ConsumerStatefulWidget {
   const ChannelTile({
     super.key,
@@ -157,6 +153,10 @@ class ChannelTile extends ConsumerStatefulWidget {
   final Channel channel;
   final Map<String, FocusNode>? tiles;
   final VoidCallback onOpen;
+
+  /// Hauteur fixe d'une rangée : certaines catégories comptent des centaines
+  /// de chaînes. Laisse la place d'une seconde ligne sous le nom.
+  static const height = 72.0;
 
   @override
   ConsumerState<ChannelTile> createState() => _ChannelTileState();

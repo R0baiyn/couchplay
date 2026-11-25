@@ -26,6 +26,7 @@ const allowedArcs = <String>[
   'player -> library',
   'player -> server',
   'search -> catalog',
+  'search -> live',
   'search -> server',
   'search -> settings',
   'settings -> accounts',

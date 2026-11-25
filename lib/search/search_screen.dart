@@ -13,9 +13,14 @@ import '../server/models.dart';
 import '../settings/settings_screen.dart';
 import '../text_entry.dart';
 import '../catalog/catalog_index.dart';
+import '../live/channel.dart';
+import '../live/channel_list_view.dart';
+import '../live/live_player_screen.dart';
 import 'search_index.dart';
 
-/// Onglet Recherche : tout le catalogue visible, films puis séries.
+/// Onglet Recherche : tout le catalogue visible, chaînes, films puis séries.
+/// Les chaînes ne retiennent pas les résultats : elles s'ajoutent quand leur
+/// liste est chargée.
 ///
 /// La recherche part 300 ms après la dernière frappe (tout de suite avec
 /// Entrée). Si l'index charge encore, elle attend qu'il soit prêt.
@@ -39,9 +44,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   // Derniers résultats, refaits seulement si un index ou la recherche change.
   KindIndex? _moviesIndex;
   KindIndex? _seriesIndex;
+  List<SearchableChannel>? _channelsIndex;
   String? _searched;
   var _movies = const <CatalogEntry>[];
   var _series = const <CatalogEntry>[];
+  var _channels = const <Channel>[];
 
   @override
   void dispose() {
@@ -64,6 +71,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final movies = ref.watch(catalogIndexProvider(ContentKind.movies));
     final series = ref.watch(catalogIndexProvider(ContentKind.series));
+    final channelsIndex = ref.watch(channelSearchIndexProvider).value;
     final words = queryWords(_query);
     // Fini : chargé, ou en échec sans rien à montrer.
     bool settled(AsyncValue<Object?> index) =>
@@ -82,7 +90,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (words.isEmpty) {
       body = message(
         const ValueKey('search.hint'),
-        'Tape quelques lettres d\'un film ou d\'une série.',
+        'Tape quelques lettres d\'un film, d\'une série ou d\'une chaîne.',
       );
     } else if (settled(movies) && settled(series)) {
       // Un type en échec n'empêche pas de chercher dans l'autre.
@@ -100,20 +108,28 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       } else {
         if (!identical(moviesIndex, _moviesIndex) ||
             !identical(seriesIndex, _seriesIndex) ||
+            !identical(channelsIndex, _channelsIndex) ||
             _query != _searched) {
           _moviesIndex = moviesIndex;
           _seriesIndex = seriesIndex;
+          _channelsIndex = channelsIndex;
           _searched = _query;
           _movies = search(moviesIndex?.entries ?? const [], _query);
           _series = search(seriesIndex?.entries ?? const [], _query);
+          _channels = searchChannels(channelsIndex ?? const [], _query);
         }
-        body = _movies.isEmpty && _series.isEmpty
+        body = _movies.isEmpty && _series.isEmpty && _channels.isEmpty
             ? message(
                 const ValueKey('search.none'),
                 'Aucun résultat pour « ${_query.trim()} ».',
               )
             // Clé par recherche : une nouvelle recherche repart en haut.
-            : _Results(key: ValueKey(_query), movies: _movies, series: _series);
+            : _Results(
+                key: ValueKey(_query),
+                channels: _channels,
+                movies: _movies,
+                series: _series,
+              );
       }
     } else {
       body = Center(
@@ -145,7 +161,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             },
             onSubmitted: _run,
             decoration: InputDecoration(
-              hintText: 'Rechercher un film, une série',
+              hintText: 'Rechercher un film, une série, une chaîne',
               prefixIcon: const Icon(Icons.search),
               border: InputBorder.none,
               suffixIcon: value.text.isEmpty
@@ -176,30 +192,39 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-/// Résultats en deux sections, Films puis Séries, dans une seule liste qui
-/// défile ; les affiches ne sont construites qu'à l'écran.
+/// Résultats en sections, Chaînes (courte, en tête), Films puis Séries, dans
+/// une seule liste qui défile ; les affiches et les rangées ne sont
+/// construites qu'à l'écran. Une chaîne ouvre le lecteur, zapping dans les
+/// chaînes trouvées.
 class _Results extends StatelessWidget {
-  const _Results({super.key, required this.movies, required this.series});
+  const _Results({
+    super.key,
+    required this.channels,
+    required this.movies,
+    required this.series,
+  });
 
+  final List<Channel> channels;
   final List<CatalogEntry> movies;
   final List<CatalogEntry> series;
 
   @override
   Widget build(BuildContext context) {
     void open(CatalogEntry entry) => openDetails(context, entry);
-    Widget section(Key key, String title, List<CatalogEntry> entries) =>
+    Widget title(Key key, String title, int count) => SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Text(
+          key: key,
+          '$title ($count)',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+      ),
+    );
+    Widget section(Key key, String name, List<CatalogEntry> entries) =>
         SliverMainAxisGroup(
           slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Text(
-                  key: key,
-                  '$title (${entries.length})',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-            ),
+            title(key, name, entries.length),
             SliverPadding(
               padding: const EdgeInsets.all(16),
               sliver: SliverPosterGrid(entries: entries, onOpen: open),
@@ -210,6 +235,29 @@ class _Results extends StatelessWidget {
       child: CustomScrollView(
         key: const ValueKey('search.results'),
         slivers: [
+          if (channels.isNotEmpty)
+            SliverMainAxisGroup(
+              slivers: [
+                title(
+                  const ValueKey('search.sectionChannels'),
+                  'Chaînes',
+                  channels.length,
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  sliver: SliverFixedExtentList.builder(
+                    itemExtent: ChannelTile.height,
+                    itemCount: channels.length,
+                    itemBuilder: (context, i) => ChannelTile(
+                      key: ObjectKey(channels[i]),
+                      channel: channels[i],
+                      onOpen: () =>
+                          openLivePlayer(context, channels[i], channels),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           if (movies.isNotEmpty)
             section(const ValueKey('search.sectionMovies'), 'Films', movies),
           if (series.isNotEmpty)
