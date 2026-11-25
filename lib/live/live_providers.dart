@@ -15,6 +15,7 @@ import '../server/models.dart';
 import '../server/server_client.dart';
 import 'channel.dart';
 import 'guide.dart';
+import 'guide_layout.dart';
 import 'guide_repository.dart';
 import 'live_repository.dart';
 
@@ -338,3 +339,16 @@ final guideRangeProvider = Provider.autoDispose
               .between(range.channel, range.from, range.to) ??
           const [],
     );
+
+/// Mise en page de la grille des programmes d'une catégorie. L'axe part de
+/// l'heure de la première lecture (maintenant − 2 h) : il ne glisse pas à
+/// chaque minute, seulement quand le guide ou les chaînes changent.
+final guideLayoutProvider = Provider.autoDispose.family<GuideLayout, String>((
+  ref,
+  categoryId,
+) {
+  final channels =
+      ref.watch(liveChannelsProvider(categoryId)).value ?? const <Channel>[];
+  final guide = ref.watch(guideProvider).value?.value ?? Guide.empty;
+  return GuideLayout.of(channels, guide, ref.read(guideNowProvider)());
+});
