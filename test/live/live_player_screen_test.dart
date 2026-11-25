@@ -205,6 +205,20 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('lecture / pause : bouton des barres et touche média (une '
+      'autre app qui prend le son met en pause)', (tester) async {
+    await open(tester);
+
+    await key(tester, LogicalKeyboardKey.mediaPlayPause);
+    await tester.tap(byKey('live.player.video'));
+    await run(tester, const Duration(milliseconds: 400));
+    await tester.tap(byKey('live.player.playPause'));
+    await run(tester);
+
+    expect(player.toggles, 2);
+    await close(tester);
+  });
+
   testWidgets('TV, barres affichées : ↓ va aux boutons au lieu de zapper', (
     tester,
   ) async {
@@ -216,7 +230,7 @@ void main() {
     await afterZap(tester);
     // OK affiche les barres, le focus sur le premier bouton.
     await key(tester, LogicalKeyboardKey.select);
-    expect(FocusManager.instance.primaryFocus?.debugLabel, 'chaîne précédente');
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'lecture');
     final before = player.urls.length;
     await key(tester, LogicalKeyboardKey.arrowDown);
     await afterZap(tester);
@@ -273,12 +287,17 @@ void main() {
       find.textContaining('un autre appareil utilise peut-être'),
       findsOneWidget,
     );
-    // Depuis le message, CH+ zappe toujours.
+    // Depuis le message, ↓ zappe (pas de touches CH sur bien des
+    // télécommandes).
     player.refuse = false;
-    await key(tester, LogicalKeyboardKey.channelUp);
+    await key(tester, LogicalKeyboardKey.arrowDown);
     await afterZap(tester);
     expect(player.urls.last, _url('9003'));
     expect(byKey('live.player.error'), findsNothing);
+    // Le message parti, les touches reviennent à l'image.
+    await key(tester, LogicalKeyboardKey.arrowDown);
+    await afterZap(tester);
+    expect(player.urls.last, _url('9004'));
     await close(tester);
   });
 }

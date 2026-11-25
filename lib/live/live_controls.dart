@@ -17,7 +17,8 @@ import 'live_tuner.dart';
 ///   passent de l'un à l'autre) ; un zapping n'affiche pas les barres, sinon
 ///   le 2e appui irait aux boutons.
 /// - OK, Entrée, Espace, ← → : affichent les barres, le focus sur le premier
-///   bouton.
+///   bouton (lecture / pause : une autre app qui prend le son met en pause,
+///   D-071). Touches média : lecture, pause.
 /// - Souris : survol = barres ; double-clic = plein écran. Toucher : affiche
 ///   ou masque les barres.
 /// - F : plein écran ; Échap : quitte le plein écran, puis le lecteur.
@@ -52,7 +53,7 @@ class LiveControls extends StatefulWidget {
 class _LiveControlsState extends State<LiveControls> {
   final _bars = AutoHide(const Duration(seconds: 3));
   final _videoFocus = FocusNode(debugLabel: 'vidéo du direct');
-  final _firstButton = FocusNode(debugLabel: 'chaîne précédente');
+  final _firstButton = FocusNode(debugLabel: 'lecture');
 
   LiveTuner get _tuner => widget.tuner;
 
@@ -107,6 +108,12 @@ class _LiveControlsState extends State<LiveControls> {
             key == LogicalKeyboardKey.arrowLeft ||
             key == LogicalKeyboardKey.arrowRight)) {
       if (!repeat) _focusButtons();
+    } else if (key == LogicalKeyboardKey.mediaPlayPause) {
+      if (!repeat) widget.player.playOrPause();
+    } else if (key == LogicalKeyboardKey.mediaPlay) {
+      if (!repeat) widget.player.play();
+    } else if (key == LogicalKeyboardKey.mediaPause) {
+      if (!repeat) widget.player.pause();
     } else if (key == LogicalKeyboardKey.keyF) {
       if (!repeat && widget.fullscreen != null) widget.onToggleFullscreen();
     } else if (key == LogicalKeyboardKey.escape) {
@@ -190,9 +197,25 @@ class _LiveControlsState extends State<LiveControls> {
     return FocusTraversalGroup(
       child: Row(
         children: [
+          StreamBuilder<bool>(
+            stream: widget.player.stream.playing,
+            initialData: widget.player.state.playing,
+            builder: (context, snapshot) {
+              final playing = snapshot.data ?? false;
+              return IconButton(
+                key: const ValueKey('live.player.playPause'),
+                focusNode: _firstButton,
+                tooltip: playing ? 'Pause' : 'Lecture',
+                icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+                onPressed: () {
+                  widget.player.playOrPause();
+                  _bars.show();
+                },
+              );
+            },
+          ),
           IconButton(
             key: const ValueKey('live.player.previous'),
-            focusNode: _firstButton,
             tooltip: 'Chaîne précédente',
             icon: const Icon(Icons.keyboard_arrow_up),
             onPressed: () {

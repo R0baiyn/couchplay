@@ -302,6 +302,23 @@ void main() {
       });
     });
 
+    test('arrêté (app en arrière-plan) : ni zapping ni reconnexion en '
+        'attente ne rouvrent', () {
+      fakeAsync((async) {
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        t
+          ..lost()
+          ..zap(1)
+          ..stop();
+        async.elapse(const Duration(seconds: 5));
+        t.retry();
+        async.elapse(const Duration(seconds: 5));
+        expect(opened, ['9001']);
+        t.dispose();
+      });
+    });
+
     test('fermé : plus rien ne s\'ouvre', () {
       fakeAsync((async) {
         final t = tuner(twelve, twelve[0]);

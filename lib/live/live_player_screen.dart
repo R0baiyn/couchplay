@@ -99,6 +99,9 @@ class _LivePlayerScreenState extends ConsumerState<LivePlayerScreen> {
   /// puis quitte le lecteur (comme pour un film).
   void _onHide() {
     if (!_mobile || !mounted) return;
+    // Plus de zapping ni de reconnexion en attente : rien ne rouvre le flux
+    // en arrière-plan avant la fin de la fermeture.
+    _tuner.stop();
     if (_ticket case final ticket?) unawaited(_holds.stop(_playback, ticket));
     final route = ModalRoute.of(context);
     final navigator = Navigator.of(context);
@@ -147,11 +150,17 @@ class _LivePlayerScreenState extends ConsumerState<LivePlayerScreen> {
               PlayerVideo(playback: _playback, fill: _fill),
               if (error != null)
                 // On zappe aussi depuis le message, et Échap quitte.
+                // ↑ ↓ aussi : ses boutons sont côte à côte, et une
+                // télécommande n'a souvent pas de touches CH.
                 CallbackShortcuts(
                   bindings: {
                     const SingleActivator(LogicalKeyboardKey.channelUp): () =>
                         _tuner.zap(1),
                     const SingleActivator(LogicalKeyboardKey.channelDown): () =>
+                        _tuner.zap(-1),
+                    const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+                        _tuner.zap(1),
+                    const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
                         _tuner.zap(-1),
                     const SingleActivator(LogicalKeyboardKey.escape): _exit,
                   },

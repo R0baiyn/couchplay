@@ -46,6 +46,12 @@ final class FakePlayer implements Player {
   @override
   Future<void> stop() async => stops++;
 
+  /// Appels à `playOrPause` (bouton lecture / pause).
+  var toggles = 0;
+
+  @override
+  Future<void> playOrPause() async => toggles++;
+
   /// Fin du flux en cours.
   void cut() => _streams.completions.add(true);
 

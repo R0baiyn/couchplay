@@ -53,7 +53,7 @@ final class LiveTuner extends ChangeNotifier {
   Channel? _tuned;
   var _generation = 0;
   var _reconnected = false;
-  var _disposed = false;
+  var _stopped = false;
   Timer? _zap;
   Timer? _reconnect;
 
@@ -100,7 +100,7 @@ final class LiveTuner extends ChangeNotifier {
   /// Le flux en cours s'est terminé (un direct ne finit pas : il a été
   /// coupé). Ignoré pendant une ouverture, une attente ou après un message.
   void lost() {
-    if (_disposed ||
+    if (_stopped ||
         _opening ||
         _error != null ||
         (_zap?.isActive ?? false) ||
@@ -124,7 +124,7 @@ final class LiveTuner extends ChangeNotifier {
     _zap?.cancel();
     _reconnect?.cancel();
     final channel = this.channel;
-    if (_disposed || (identical(_tuned, channel) && _error == null)) return;
+    if (_stopped || (identical(_tuned, channel) && _error == null)) return;
     final generation = ++_generation;
     _tuned = channel;
     _opening = true;
@@ -132,14 +132,14 @@ final class LiveTuner extends ChangeNotifier {
     notifyListeners();
     try {
       await _open(channel);
-      if (generation != _generation || _disposed) return;
+      if (generation != _generation || _stopped) return;
       _opening = false;
       notifyListeners();
       _onWatched?.call(channel);
     } on PlaybackAbandoned {
       return;
     } on Exception catch (e) {
-      if (generation != _generation || _disposed) return;
+      if (generation != _generation || _stopped) return;
       _tuned = null;
       _setError(switch (e) {
         PlaybackFailed() => e.message,
@@ -155,12 +155,18 @@ final class LiveTuner extends ChangeNotifier {
     notifyListeners();
   }
 
-  @override
-  void dispose() {
-    _disposed = true;
+  /// Arrête tout : attentes annulées, ouverture en cours ignorée, plus rien
+  /// ne s'ouvre.
+  void stop() {
+    _stopped = true;
     _generation++;
     _zap?.cancel();
     _reconnect?.cancel();
+  }
+
+  @override
+  void dispose() {
+    stop();
     banner.dispose();
     super.dispose();
   }
