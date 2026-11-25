@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/catalog/catalog_settings_screen.dart';
 import 'package:couchplay/live/live_settings_view.dart';
+import 'package:couchplay/logging.dart';
 import 'package:couchplay/main.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -15,13 +17,7 @@ void main() {
       'catalogue', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final root = Directory.systemTemp.createTempSync('couchplay_composition_');
-    addTearDown(() {
-      try {
-        root.deleteSync(recursive: true);
-      } on FileSystemException {
-        // Le journal reste ouvert (Windows) : sans effet.
-      }
-    });
+    addTearDown(() => root.deleteSync(recursive: true));
     final accounts = await tester.runAsync(AccountStore.open);
 
     // Sans compte : l'écran de connexion, aucune requête.
@@ -40,5 +36,10 @@ void main() {
     );
     await tester.pumpWidget(const SizedBox.shrink());
     container.dispose();
+    // Le journal est dans `root` : fermé avant l'effacement (Windows).
+    await tester.runAsync(() async {
+      await SerialFileWriter.flushAll();
+      await closeJournal();
+    });
   });
 }

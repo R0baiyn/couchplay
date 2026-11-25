@@ -36,13 +36,7 @@ void main() {
     server = routes();
     opened = [];
   });
-  tearDown(() {
-    try {
-      root.deleteSync(recursive: true);
-    } on FileSystemException {
-      // Une écriture du cache encore en cours (Windows) : sans effet.
-    }
-  });
+  tearDown(() => root.deleteSync(recursive: true));
 
   Future<void> pump(
     WidgetTester tester, {

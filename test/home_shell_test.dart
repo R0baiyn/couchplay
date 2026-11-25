@@ -46,7 +46,7 @@ void main() {
       // Le libellé tient sur une ligne : aussi haut que celui de « Films ».
       expect(
         tester
-            .getSize(find.text(size.width < 600 ? 'TV' : 'Hors ligne'))
+            .getSize(find.text(size.width < 600 ? 'Recherche' : 'Hors ligne'))
             .height,
         tester.getSize(find.text('Films')).height,
       );
