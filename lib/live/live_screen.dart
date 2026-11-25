@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,6 +50,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     setState(() => _refreshing = true);
     try {
       await ref.read(liveCatalogProvider.notifier).refresh();
+      // Le guide (plusieurs Mo) suit sans retenir la liste : ses programmes
+      // apparaissent quand il est lu.
+      unawaited(ref.read(guideProvider.notifier).refresh());
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }

@@ -27,6 +27,12 @@ String formatDate(DateTime date) {
   return '${twoDigits(local.day)}/${twoDigits(local.month)}/${local.year}';
 }
 
+/// Heure locale : `21:05`.
+String formatClock(DateTime time) {
+  final local = time.toLocal();
+  return '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
+}
+
 /// Taille d'un fichier : `350 Mo`, `1,4 Go` (unités de 1000, à la française).
 String formatSize(int bytes) {
   String unit(double value, String name) =>

@@ -6,6 +6,9 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/downloads/downloads.dart';
+import 'package:couchplay/format.dart';
+import 'package:couchplay/live/guide.dart';
+import 'package:couchplay/live/live_providers.dart';
 import 'package:couchplay/live/live_screen.dart';
 import 'package:couchplay/live/live_tuner.dart';
 import 'package:couchplay/player/playback.dart';
@@ -14,12 +17,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_downloads.dart';
 import '../support/fake_playback.dart';
 import '../support/fake_server.dart';
+import '../support/fixed_guide.dart';
 import '../support/settle.dart';
 
 String _fixture(String name) =>
@@ -45,6 +50,8 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(1280, 800),
     String? settings,
+    List<Override> overrides = const [],
+    Guide guide = Guide.empty,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -92,6 +99,10 @@ void main() {
               adapter: server,
             ),
           ),
+          // Guide vide par défaut : le vrai (30 Mo, 3e requête) est prouvé par
+          // `test/live/guide_*_test.dart` ; il resterait en vol à la fin des tests.
+          guideProvider.overrideWith(() => FixedGuide(guide)),
+          ...overrides,
         ],
         child: const CouchPlayApp(home: LiveScreen()),
       ),
@@ -262,5 +273,90 @@ void main() {
     await pump(tester, settings: '{"tags":["ZZ"]}');
     expect(byKey('live.noCategory'), findsOneWidget);
     expect(find.textContaining('réglages'), findsOneWidget);
+  });
+
+  group('guide des programmes', () {
+    final origin = DateTime.utc(2026, 11, 24, 12);
+    late DateTime now;
+
+    Guide guide({String suffix = ''}) => Guide(
+      channels: const {'chaine1.test', 'chaine2.test', 'sansprogramme.test'},
+      programmes: {
+        'chaine1.test': [
+          programmeAt(origin, -600, 90, 'Journal$suffix'),
+          programmeAt(origin, 90, 1800, 'Météo$suffix'),
+        ],
+        // Trou : rien en cours, le suivant dans une heure.
+        'chaine2.test': [programmeAt(origin, 3600, 7200, 'Film$suffix')],
+      },
+    );
+
+    Future<void> pumpGuide(
+      WidgetTester tester, {
+      Size size = const Size(1280, 800),
+      String suffix = '',
+    }) {
+      now = origin;
+      return pump(
+        tester,
+        size: size,
+        guide: guide(suffix: suffix),
+        overrides: [guideNowProvider.overrideWithValue(() => now)],
+      );
+    }
+
+    String? text(WidgetTester tester, String channel, String key) =>
+        tester.widget<Text>(inChannel(channel, byKey(key))).data;
+
+    testWidgets('en cours et à suivre sous le nom ; sans programme, aucun '
+        'sous-titre', (tester) async {
+      await pumpGuide(tester);
+
+      expect(text(tester, '9001', 'live.onAir.current'), 'Journal');
+      expect(
+        text(tester, '9001', 'live.onAir.next'),
+        '${formatClock(origin.add(const Duration(seconds: 90)))} Météo',
+      );
+      expect(inChannel('9001', byKey('live.onAir.progress')), findsOneWidget);
+      // Dans un trou du guide : le suivant seul, sans barre.
+      expect(inChannel('9002', byKey('live.onAir.current')), findsNothing);
+      expect(inChannel('9002', byKey('live.onAir.progress')), findsNothing);
+      expect(text(tester, '9002', 'live.onAir.next'), endsWith(' Film'));
+      // Sans id de guide, id absent du guide, chaîne sans programme.
+      for (final id in ['9003', '9004', '9005']) {
+        expect(inChannel(id, byKey('live.onAir')), findsNothing, reason: id);
+        final tile = tester.widget<ListTile>(byKey('live.channel.$id'));
+        expect(tile.subtitle, isNull, reason: id);
+      }
+    });
+
+    testWidgets('à la fin du programme, le suivant prend sa place', (
+      tester,
+    ) async {
+      await pumpGuide(tester);
+      expect(text(tester, '9001', 'live.onAir.current'), 'Journal');
+
+      now = origin.add(const Duration(seconds: 89));
+      await tester.pump(const Duration(seconds: 89));
+      expect(text(tester, '9001', 'live.onAir.current'), 'Journal');
+
+      now = origin.add(const Duration(seconds: 90));
+      await tester.pump(const Duration(seconds: 1));
+      expect(text(tester, '9001', 'live.onAir.current'), 'Météo');
+      expect(inChannel('9001', byKey('live.onAir.next')), findsNothing);
+    });
+
+    testWidgets('téléphone, titres très longs : rien ne déborde', (
+      tester,
+    ) async {
+      await pumpGuide(
+        tester,
+        size: const Size(360, 740),
+        suffix: ' : une émission au titre beaucoup trop long pour la rangée',
+      );
+      expect(inChannel('9001', byKey('live.onAir.current')), findsOneWidget);
+      expect(inChannel('9001', byKey('live.onAir.next')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

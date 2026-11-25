@@ -21,6 +21,17 @@ void main() {
     expect(formatDate(DateTime(2026, 3, 7, 12)), '07/03/2026');
   });
 
+  test('formatClock, en heure locale', () {
+    expect(formatClock(DateTime(2026, 3, 7, 9, 5)), '09:05');
+    expect(formatClock(DateTime(2026, 3, 7, 21, 30)), '21:30');
+    final utc = DateTime.utc(2026, 3, 7, 12);
+    final local = utc.toLocal();
+    expect(
+      formatClock(utc),
+      '${twoDigits(local.hour)}:${twoDigits(local.minute)}',
+    );
+  });
+
   test('formatSize', () {
     expect(formatSize(0), '0 o');
     expect(formatSize(999), '999 o');

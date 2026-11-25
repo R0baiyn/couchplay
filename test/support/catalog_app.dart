@@ -14,6 +14,8 @@ import 'package:couchplay/catalog/home_screen.dart';
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/update/updater.dart';
+import 'package:couchplay/live/guide.dart';
+import 'package:couchplay/live/live_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +24,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_server.dart';
+import 'fixed_guide.dart';
 import 'settle.dart';
 
 String fixture(String name) =>
@@ -103,6 +106,9 @@ Future<void> pumpApp(
             adapter: server,
           ),
         ),
+        // Guide vide par défaut : le vrai (30 Mo, 3e requête) est prouvé par
+        // `test/live/guide_*_test.dart` ; il resterait en vol à la fin des tests.
+        guideProvider.overrideWith(() => FixedGuide(Guide.empty)),
         ...overrides,
       ],
       child: const CouchPlayApp(home: HomeGate()),

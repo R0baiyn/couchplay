@@ -7,6 +7,7 @@ import '../poster_image.dart';
 import '../server/status_views.dart';
 import 'channel.dart';
 import 'live_providers.dart';
+import 'on_air_view.dart';
 
 /// Chaînes d'une catégorie, avec son éventuel en-tête repliable. La tirer vers
 /// le bas l'actualise (toucher).
@@ -139,9 +140,10 @@ class _ChannelListState extends ConsumerState<ChannelList> {
   }
 }
 
-/// Numéro, logo (ou icône de repli) et nom d'une chaîne. Son nœud de focus
-/// est inscrit dans [tiles] tant qu'elle est construite.
-class _ChannelTile extends StatefulWidget {
+/// Numéro, logo (ou icône de repli) et nom d'une chaîne, puis ce qu'elle
+/// passe si le guide le dit. Son nœud de focus est inscrit dans [tiles] tant
+/// qu'elle est construite.
+class _ChannelTile extends ConsumerStatefulWidget {
   const _ChannelTile({
     super.key,
     required this.channel,
@@ -154,10 +156,10 @@ class _ChannelTile extends StatefulWidget {
   final VoidCallback onOpen;
 
   @override
-  State<_ChannelTile> createState() => _ChannelTileState();
+  ConsumerState<_ChannelTile> createState() => _ChannelTileState();
 }
 
-class _ChannelTileState extends State<_ChannelTile> {
+class _ChannelTileState extends ConsumerState<_ChannelTile> {
   late final _focus = FocusNode(debugLabel: 'chaîne ${widget.channel.id}');
 
   @override
@@ -179,6 +181,10 @@ class _ChannelTileState extends State<_ChannelTile> {
   @override
   Widget build(BuildContext context) {
     final channel = widget.channel;
+    final onAir = switch (channel.epgChannelId) {
+      final id? => ref.watch(onAirProvider(id)),
+      null => null,
+    };
     return ListTile(
       key: ValueKey('live.channel.${channel.id}'),
       focusNode: _focus,
@@ -209,7 +215,8 @@ class _ChannelTileState extends State<_ChannelTile> {
       title: FocusRing(
         child: Text(channel.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
-      // Le programme en cours et le suivant iront en `subtitle`.
+      // Chaîne sans programme : pas de sous-titre du tout, pas de texte vide.
+      subtitle: onAir == null ? null : OnAirView(onAir: onAir),
       onTap: widget.onOpen,
     );
   }
