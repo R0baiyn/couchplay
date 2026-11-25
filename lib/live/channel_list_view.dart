@@ -43,7 +43,9 @@ class ChannelList extends ConsumerStatefulWidget {
 
 class _ChannelListState extends ConsumerState<ChannelList> {
   final _scroll = ScrollController();
-  final _focus = FocusNode(debugLabel: 'chaîne regardée');
+
+  /// Nœud de focus de chaque rangée construite, par id de chaîne.
+  final _tiles = <String, FocusNode>{};
 
   @override
   void didUpdateWidget(ChannelList old) {
@@ -54,7 +56,6 @@ class _ChannelListState extends ConsumerState<ChannelList> {
   @override
   void dispose() {
     _scroll.dispose();
-    _focus.dispose();
     super.dispose();
   }
 
@@ -74,9 +75,10 @@ class _ChannelListState extends ConsumerState<ChannelList> {
         ),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final context = _focus.context;
-        if (!mounted || context == null) return;
-        _focus.requestFocus();
+        final node = _tiles[id];
+        final context = node?.context;
+        if (!mounted || node == null || context == null) return;
+        node.requestFocus();
         Scrollable.ensureVisible(context);
       });
     });
@@ -123,8 +125,9 @@ class _ChannelListState extends ConsumerState<ChannelList> {
                   itemExtent: ChannelList._rowHeight,
                   itemCount: channels.length,
                   itemBuilder: (context, i) => _ChannelTile(
+                    key: ObjectKey(channels[i]),
                     channel: channels[i],
-                    focusNode: channels[i].id == widget.focusId ? _focus : null,
+                    tiles: _tiles,
                     onOpen: () => widget.onOpen(channels[i], channels),
                   ),
                 ),
@@ -136,50 +139,78 @@ class _ChannelListState extends ConsumerState<ChannelList> {
   }
 }
 
-/// Numéro, logo (ou icône de repli) et nom d'une chaîne.
-class _ChannelTile extends StatelessWidget {
+/// Numéro, logo (ou icône de repli) et nom d'une chaîne. Son nœud de focus
+/// est inscrit dans [tiles] tant qu'elle est construite.
+class _ChannelTile extends StatefulWidget {
   const _ChannelTile({
+    super.key,
     required this.channel,
-    required this.focusNode,
+    required this.tiles,
     required this.onOpen,
   });
 
   final Channel channel;
-  final FocusNode? focusNode;
+  final Map<String, FocusNode> tiles;
   final VoidCallback onOpen;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    key: ValueKey('live.channel.${channel.id}'),
-    focusNode: focusNode,
-    leading: Row(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 12,
-      children: [
-        SizedBox(
-          width: 44,
-          child: Text(
-            '${channel.number ?? ''}',
-            textAlign: TextAlign.end,
-            maxLines: 1,
+  State<_ChannelTile> createState() => _ChannelTileState();
+}
+
+class _ChannelTileState extends State<_ChannelTile> {
+  late final _focus = FocusNode(debugLabel: 'chaîne ${widget.channel.id}');
+
+  @override
+  void initState() {
+    super.initState();
+    widget.tiles[widget.channel.id] = _focus;
+  }
+
+  @override
+  void dispose() {
+    // Une rangée plus récente de la même chaîne a pu prendre la place.
+    if (identical(widget.tiles[widget.channel.id], _focus)) {
+      widget.tiles.remove(widget.channel.id);
+    }
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final channel = widget.channel;
+    return ListTile(
+      key: ValueKey('live.channel.${channel.id}'),
+      focusNode: _focus,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 12,
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(
+              '${channel.number ?? ''}',
+              textAlign: TextAlign.end,
+              maxLines: 1,
+            ),
           ),
-        ),
-        SizedBox(
-          width: 56,
-          height: 40,
-          child: PosterImage(
-            url: channel.logo,
-            icon: Icons.live_tv,
-            fit: BoxFit.contain,
-            deferred: true,
+          SizedBox(
+            width: 56,
+            height: 40,
+            child: PosterImage(
+              url: channel.logo,
+              icon: Icons.live_tv,
+              fit: BoxFit.contain,
+              deferred: true,
+            ),
           ),
-        ),
-      ],
-    ),
-    title: FocusRing(
-      child: Text(channel.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-    ),
-    // Le programme en cours et le suivant iront en `subtitle`.
-    onTap: onOpen,
-  );
+        ],
+      ),
+      title: FocusRing(
+        child: Text(channel.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      // Le programme en cours et le suivant iront en `subtitle`.
+      onTap: widget.onOpen,
+    );
+  }
 }
