@@ -14,6 +14,7 @@ import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/live_providers.dart';
 import 'package:couchplay/live/live_screen.dart';
 import 'package:couchplay/live/live_tuner.dart';
+import 'package:couchplay/live/recent_channels_row.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
@@ -56,6 +57,7 @@ void main() {
     List<Override> overrides = const [],
     Guide guide = Guide.empty,
     void Function()? onGuideRefresh,
+    Widget home = const LiveScreen(),
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -110,7 +112,7 @@ void main() {
           ),
           ...overrides,
         ],
-        child: const CouchPlayApp(home: LiveScreen()),
+        child: CouchPlayApp(home: home),
       ),
     );
     await settle(tester);
@@ -408,6 +410,50 @@ void main() {
       expect(library(tester).isChannelFavorite('9002'), isTrue);
       expect(byKey('live.player'), findsOneWidget);
     });
+  });
+
+  testWidgets('rangée des chaînes récentes : la plus récente en premier, OK '
+      'ouvre le lecteur, zapping dans les récentes ; retirer une chaîne', (
+    tester,
+  ) async {
+    await pump(tester, home: const Scaffold(body: RecentChannelsRow()));
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(RecentChannelsRow)),
+    );
+    expect(byKey('live.recentRow'), findsNothing);
+    final library = container.read(libraryProvider.notifier);
+    // Sans attendre l'écriture du fichier : hors de l'horloge factice.
+    unawaited(library.addRecentChannel(id: '9001', name: 'Chaîne 1 HD'));
+    unawaited(library.addRecentChannel(id: '9003', name: 'Chaîne 3'));
+    await settle(tester);
+    expect(
+      tester.getTopLeft(byKey('live.recentTile.9003')).dx,
+      lessThan(tester.getTopLeft(byKey('live.recentTile.9001')).dx),
+    );
+    // Sans logo : l'icône de télé.
+    expect(
+      find.descendant(
+        of: byKey('live.recentTile.9003'),
+        matching: find.byIcon(Icons.live_tv),
+      ),
+      findsOneWidget,
+    );
+
+    await tap(tester, 'live.recentTile.9001');
+    expect(byKey('live.player'), findsOneWidget);
+    // Après 9001 dans les récentes : 9003 (dans la catégorie, ce serait 9002).
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump(LiveTuner.zapDelay);
+    await settle(tester);
+    expect(opened(), ['9001', '9003']);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+
+    await tester.longPress(byKey('live.recentTile.9001'));
+    await settle(tester);
+    await tap(tester, 'confirm.action');
+    expect(byKey('live.recentTile.9001'), findsNothing);
+    expect(byKey('live.recentTile.9003'), findsOneWidget);
   });
 
   group('guide des programmes', () {

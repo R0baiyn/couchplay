@@ -135,4 +135,32 @@ void main() {
     expect(badgeOf(ready), findsOneWidget);
     expect(badgeOf(other), findsNothing);
   });
+
+  testWidgets('rangée des chaînes posée par la composition : sous « Continuer '
+      'à regarder », au-dessus de « Ma liste » ; absente sans elle', (
+    tester,
+  ) async {
+    final container = await libraryContainer(tester);
+    Future<void> show(Widget home) async {
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(home: home),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await show(const HomeScreen());
+    expect(find.byKey(const ValueKey('rangée')), findsNothing);
+
+    await show(
+      const HomeScreen(channelsRow: Text('Rangée', key: ValueKey('rangée'))),
+    );
+    expect(find.byKey(const ValueKey('rangée')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Rangée')).dy,
+      lessThan(tester.getTopLeft(find.text('Ma liste')).dy),
+    );
+  });
 }

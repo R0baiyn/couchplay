@@ -4,6 +4,9 @@ import 'package:couchplay/catalog/home_screen.dart';
 import 'package:couchplay/live/live_screen.dart';
 import 'package:couchplay/settings/settings_screen.dart';
 import 'package:couchplay/television.dart';
+
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +19,20 @@ void main() {
   setUpCatalogApp();
   // Vraies largeurs de lettres : les libellés des onglets doivent tenir.
   setUpAll(loadRoboto);
+
+  testWidgets("l'accueil de l'app a la rangée « Chaînes récentes »", (
+    tester,
+  ) async {
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        '{"version": 1, "channels": {"recent": '
+        '[{"id": "9001", "name": "Chaîne 1", "at": "2026-11-25T20:00:00Z"}]}}',
+      );
+    await pumpApp(tester, openMovies: false);
+    expect(find.text('Chaînes récentes'), findsOneWidget);
+    expect(find.byKey(const ValueKey('live.recentTile.9001')), findsOneWidget);
+  });
 
   testWidgets('rail peu haut : Réglages ne recouvre aucun onglet', (
     tester,
