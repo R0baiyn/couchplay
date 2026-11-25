@@ -96,6 +96,13 @@ final class GuideLayout {
   double x(DateTime t) =>
       (_minutes(from, t) * pixelsPerMinute).clamp(0, width).toDouble();
 
+  /// Heure à la position [x] de l'axe (inverse de [x], sans borne).
+  DateTime timeAt(double x) =>
+      from.add(Duration(microseconds: (x / pixelsPerMinute * 60e6).round()));
+
+  /// [t] est sur l'axe.
+  bool shows(DateTime t) => !t.isBefore(from) && t.isBefore(to);
+
   List<GuideSlot> slots(int row) => _row(row).slots;
   double left(int row, int i) => _row(row).lefts[i];
   double right(int row, int i) => _row(row).rights[i];
@@ -167,9 +174,7 @@ final class GuideLayout {
   /// arrière).
   DateTime anchorOf(int row, int i, double offset) {
     final start = slots(row)[i].start;
-    final edge = from.add(
-      Duration(microseconds: (offset / pixelsPerMinute * 60e6).round()),
-    );
+    final edge = timeAt(offset);
     return edge.isAfter(start) && edge.isBefore(slots(row)[i].stop)
         ? edge
         : start;

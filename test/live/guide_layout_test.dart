@@ -67,6 +67,16 @@ void main() {
     expect(l.ticks(0, l.width * 2).last, at(210));
   });
 
+  test('heure d’une position, et heures sur l’axe', () {
+    final l = layout([[]]);
+    expect(l.timeAt(90 * perMinute), from.add(const Duration(minutes: 90)));
+    expect(l.x(l.timeAt(123.5)), closeTo(123.5, 0.001));
+    expect(l.shows(from), isTrue);
+    expect(l.shows(from.add(const Duration(minutes: 239))), isTrue);
+    expect(l.shows(from.add(const Duration(minutes: 240))), isFalse);
+    expect(l.shows(from.subtract(const Duration(seconds: 1))), isFalse);
+  });
+
   group('cases d’une ligne', () {
     test('trou entre deux programmes : une case vide entre les deux', () {
       final l = layout([

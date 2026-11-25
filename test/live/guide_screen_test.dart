@@ -67,6 +67,7 @@ void main() {
     Guide? withGuide,
     String? streams,
     bool open = true,
+    DateTime Function()? clock,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -113,7 +114,7 @@ void main() {
             ),
           ),
           guideProvider.overrideWith(() => FixedGuide(withGuide ?? guide)),
-          guideNowProvider.overrideWithValue(() => now),
+          guideNowProvider.overrideWithValue(clock ?? () => now),
         ],
         child: const CouchPlayApp(home: LiveScreen()),
       ),
@@ -299,6 +300,44 @@ void main() {
       await press(tester, LogicalKeyboardKey.arrowUp);
     }
     expectShown(cell('20000', 15 * 30));
+  });
+
+  testWidgets('guide relu 24 h plus tard, grille ouverte : le focus reste '
+      'sur la chaîne tenue, à l’heure qu’il est, et ↓ répond', (tester) async {
+    var at = now;
+    await pump(
+      tester,
+      size: const Size(960, 540),
+      streams: bigStreams(),
+      withGuide: bigGuide(),
+      clock: () => at,
+    );
+    for (var i = 0; i < 3; i++) {
+      await press(tester, LogicalKeyboardKey.arrowDown);
+    }
+    for (var i = 0; i < 15; i++) {
+      await press(tester, LogicalKeyboardKey.arrowRight);
+    }
+    expect(focused(), cell('20003', 15 * 30));
+
+    // Rechargement quotidien : l'axe repart de la nouvelle heure.
+    at = now.add(const Duration(hours: 24));
+    ProviderScope.containerOf(tester.element(byKey('live.guide')))
+        .invalidate(guideProvider);
+    await settle(tester);
+    await tester.pumpAndSettle();
+
+    final grid = tester.getRect(byKey('live.guide.grid'));
+    void expectShown(String key) {
+      expect(focused(), key);
+      final rect = tester.getRect(byKey(key));
+      expect(grid.overlaps(rect), isTrue, reason: '$rect hors de $grid');
+    }
+
+    expectShown(cell('20003', 24 * 60));
+    expect(byKey('live.guide.nowLine'), findsOneWidget);
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expectShown(cell('20004', 24 * 60));
   });
 
   testWidgets('télécommande seule : ouvrir le guide, ↑ vers « Maintenant », '
