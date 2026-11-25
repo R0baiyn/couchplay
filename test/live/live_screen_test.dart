@@ -5,8 +5,10 @@ import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
-import 'package:couchplay/live/channel.dart';
+import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/live/live_screen.dart';
+import 'package:couchplay/live/live_tuner.dart';
+import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +17,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/fake_downloads.dart';
+import '../support/fake_playback.dart';
 import '../support/fake_server.dart';
 import '../support/settle.dart';
 
@@ -24,7 +28,7 @@ String _fixture(String name) =>
 void main() {
   late Directory root;
   late HttpClientAdapter server;
-  late List<Channel> opened;
+  late FakePlayer player;
 
   FakeAdapter routes() => FakeAdapter.routes({
     'get_live_categories': _fixture('live_categories'),
@@ -34,7 +38,6 @@ void main() {
   setUp(() {
     root = Directory.systemTemp.createTempSync('couchplay_live_screen_');
     server = routes();
-    opened = [];
   });
   tearDown(() => root.deleteSync(recursive: true));
 
@@ -47,6 +50,8 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     FlutterSecureStorage.setMockInitialValues({});
+    // Créé dans l'horloge factice du test (voir `FakePlayer`).
+    player = FakePlayer();
     final account = Directory('${root.path}/accounts/compte')
       ..createSync(recursive: true);
     if (settings != null) {
@@ -59,7 +64,8 @@ void main() {
           const Account(
             id: 'compte',
             name: 'Salon',
-            host: 'http://example.com',
+            // Une adresse IP : le lecteur n'a rien à résoudre par Cloudflare.
+            host: 'http://127.0.0.1:9',
             username: 'u',
             password: 'p',
             userAgent: defaultUserAgent,
@@ -75,6 +81,8 @@ void main() {
           accountFilesProvider.overrideWithValue(
             AccountFiles(Directory('${root.path}/accounts')),
           ),
+          playbackProvider.overrideWithValue(fakePlayback(player)),
+          downloadsProvider.overrideWith(FakeDownloads.new),
           serverClientFactoryProvider.overrideWithValue(
             (a) => ServerClient(
               host: a.host,
@@ -85,7 +93,7 @@ void main() {
             ),
           ),
         ],
-        child: CouchPlayApp(home: LiveScreen(onOpen: opened.add)),
+        child: const CouchPlayApp(home: LiveScreen()),
       ),
     );
     await settle(tester);
@@ -147,10 +155,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  /// Chaînes dont le flux a été ouvert, dans l'ordre.
+  List<String> opened() => [
+    for (final url in player.urls) url.split('/').last.split('.').first,
+  ];
+
   testWidgets('toucher une chaîne l\'ouvre', (tester) async {
     await pump(tester);
     await tap(tester, 'live.channel.9002');
-    expect(opened.map((c) => c.id), ['9002']);
+    expect(byKey('live.player'), findsOneWidget);
+    expect(opened(), ['9002']);
+  });
+
+  testWidgets('retour du lecteur : le focus sur la dernière chaîne regardée', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tap(tester, 'live.channel.9001');
+    // Zapping dans la catégorie affichée : 9001 → 9003.
+    for (var i = 0; i < 2; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+    }
+    await tester.pump(LiveTuner.zapDelay);
+    await settle(tester);
+    expect(opened(), ['9001', '9003']);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+
+    expect(byKey('live.player'), findsNothing);
+    expect(focused(), '9003');
   });
 
   testWidgets('clavier : les flèches parcourent la liste, OK ouvre', (
@@ -172,8 +206,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(focused(), first);
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
-    await tester.pump();
-    expect(opened.map((c) => c.id), [first]);
+    await settle(tester);
+    expect(byKey('live.player'), findsOneWidget);
+    expect(opened(), [first]);
   });
 
   testWidgets('erreur du serveur : « Réessayer » recharge', (tester) async {

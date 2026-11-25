@@ -6,16 +6,14 @@ import '../server/models.dart';
 import '../server/status_views.dart';
 import 'channel.dart';
 import 'channel_list_view.dart';
+import 'live_player_screen.dart';
 import 'live_providers.dart';
 
 /// Onglet TV : catégories de chaînes visibles, puis les chaînes de celle
 /// choisie. Même disposition que Films et Séries : catégories en panneau
 /// latéral sur grand écran, sinon un bouton dans un en-tête repliable.
 class LiveScreen extends ConsumerStatefulWidget {
-  const LiveScreen({super.key, required this.onOpen, this.headerActions});
-
-  /// Chaîne choisie (toucher, clic ou OK).
-  final ValueChanged<Channel> onOpen;
+  const LiveScreen({super.key, this.headerActions});
 
   /// Boutons de fin d'en-tête posés par la coquille.
   final Widget? headerActions;
@@ -30,7 +28,19 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   String? _selectedId;
   var _refreshing = false;
 
+  /// Dernière chaîne affichée par le lecteur : elle reprend le focus.
+  String? _watched;
+
   void _select(String id) => setState(() => _selectedId = id);
+
+  /// Chaîne choisie (toucher, clic ou OK) : le lecteur, zapping dans la
+  /// liste affichée.
+  Future<void> _open(Channel channel, List<Channel> channels) async {
+    // Remis à zéro : la même chaîne au retour suivant reprend aussi le focus.
+    setState(() => _watched = null);
+    final last = await openLivePlayer(context, channel, channels);
+    if (last != null && mounted) setState(() => _watched = last.id);
+  }
 
   Future<void> _refresh() async {
     // Tirer la liste pendant un rechargement ne le relance pas.
@@ -91,8 +101,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       // Une autre catégorie repart en haut.
       key: ValueKey(category.id),
       categoryId: category.id,
-      onOpen: widget.onOpen,
+      onOpen: _open,
       onRefresh: _refresh,
+      focusId: _watched,
       header: header,
     );
 

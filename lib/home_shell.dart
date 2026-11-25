@@ -8,7 +8,6 @@ import 'catalog/catalog_index.dart';
 import 'catalog/catalog_screen.dart';
 import 'catalog/downloads_screen.dart';
 import 'home_shell_nav.dart';
-import 'live/channel.dart';
 import 'live/live_screen.dart';
 import 'catalog/home_screen.dart';
 import 'search/search_screen.dart';
@@ -187,9 +186,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   // route de l'accueil change d'état), ne reconstruit pas les onglets.
   final _built = <ShellTab, Widget>{};
 
-  /// Le lecteur du direct se branche ici.
-  void _openChannel(Channel channel) {}
-
   Widget _view(ShellTab tab) => switch (tab) {
     ShellTab.home => const HomeScreen(headerActions: ShellHeaderActions()),
     ShellTab.movies => const CatalogScreen(
@@ -200,10 +196,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       kind: ContentKind.series,
       headerActions: ShellHeaderActions(),
     ),
-    ShellTab.live => LiveScreen(
-      onOpen: _openChannel,
-      headerActions: const ShellHeaderActions(),
-    ),
+    ShellTab.live => const LiveScreen(headerActions: ShellHeaderActions()),
     ShellTab.search => SearchScreen(focusNode: _searchField),
     // Rail seulement : les réglages y sont, pas dans l'en-tête.
     ShellTab.downloads => const DownloadsScreen(),
