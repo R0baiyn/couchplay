@@ -29,14 +29,14 @@ void main() {
     bool television = false,
   }) async {
     final store = await tester.runAsync(AccountStore.open);
+    final root = Directory.systemTemp.createTempSync('couchplay_');
+    addTearDown(() => root.deleteSync(recursive: true));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           televisionProvider.overrideWithValue(television),
           accountStoreProvider.overrideWithValue(store!),
-          accountFilesProvider.overrideWithValue(
-            AccountFiles(Directory.systemTemp.createTempSync('couchplay_')),
-          ),
+          accountFilesProvider.overrideWithValue(AccountFiles(root)),
           serverClientFactoryProvider.overrideWithValue(
             (account) => ServerClient(
               host: account.host,

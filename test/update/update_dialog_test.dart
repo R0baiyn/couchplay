@@ -190,6 +190,15 @@ void main() {
       tester,
       () => journal.existsSync() && journal.readAsStringSync().contains(line),
     );
+    // La ligne est lisible avant la fermeture du fichier, et l'écriture
+    // n'avance que pendant les pompes du test : sans cette attente, l'effacement
+    // échoue sous Windows (fichier encore ouvert).
+    var flushed = false;
+    unawaited(
+      flushJournal(timeout: const Duration(minutes: 1))
+          .then((_) => flushed = true),
+    );
+    await waitFor(tester, () => flushed);
   });
 
   testWidgets('« Mettre à jour » : signature refusée, rien installé, dit', (

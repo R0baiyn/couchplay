@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/catalog/history_screen.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:couchplay/library/library_store.dart';
@@ -52,6 +55,18 @@ void main() {
 
       expect(find.text('Récent'), findsNothing);
       expect(find.text('Ancien'), findsOneWidget);
+
+      // Le retrait s'écrit en fond : attendu avant la fin du test, sinon le
+      // dossier temporaire ne s'efface pas (fichier ouvert sous Windows).
+      var written = false;
+      unawaited(SerialFileWriter.flushAll().then((_) => written = true));
+      for (var i = 0; i < 100 && !written; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      }
+      expect(written, isTrue);
     },
   );
 
