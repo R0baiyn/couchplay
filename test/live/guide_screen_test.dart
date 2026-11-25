@@ -7,6 +7,7 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/downloads/downloads.dart';
+import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/guide_cell_view.dart';
 import 'package:couchplay/live/guide_layout.dart';
@@ -184,6 +185,11 @@ void main() {
     await tester.pump(LiveTuner.zapDelay);
     await settle(tester);
     expect(opened(), ['9001', '9002']);
+    // Regardées depuis la grille : comptées dans les récentes.
+    final library = ProviderScope.containerOf(
+      tester.element(find.byKey(const ValueKey('live.player'))),
+    ).read(libraryProvider);
+    expect(library.recentChannels.map((c) => c.id), ['9002', '9001']);
   });
 
   testWidgets('← → changent de programme sur la même chaîne', (tester) async {

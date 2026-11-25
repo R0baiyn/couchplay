@@ -35,9 +35,14 @@ final class Channel {
 /// sans `num` à la fin). Fonction de premier niveau : appelée dans un isolate,
 /// la liste fait plusieurs Mo.
 List<Channel> parseChannels(String text) {
-  final channels = [
+  return sortedByNumber([
     for (final entry in asList(jsonDecode(text))) ?_channel(asMap(entry)),
-  ];
+  ]);
+}
+
+/// [channels] triées par `num`, sans `num` à la fin, l'ordre de départ gardé
+/// entre égales.
+List<Channel> sortedByNumber(List<Channel> channels) {
   // `List.sort` n'est pas stable : l'index départage les égalités.
   final indexed = channels.indexed.toList()
     ..sort((a, b) {

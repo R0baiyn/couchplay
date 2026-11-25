@@ -76,12 +76,15 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   Widget build(BuildContext context) {
     final catalog = ref.watch(liveCatalogProvider);
     final visible =
-        ref.watch(visibleLiveCategoriesProvider).value ?? const <Category>[];
+        ref.watch(liveTabCategoriesProvider).value ?? const <Category>[];
     // Après un changement de compte ou de filtre, l'ancienne sélection peut
     // avoir disparu : la première catégorie visible la remplace.
     final selected =
         visible.where((c) => c.id == _selectedId).firstOrNull ??
         visible.firstOrNull;
+    // Gardée : la première favorite ajoutée met « Favorites » en tête, sans
+    // changer la liste affichée.
+    _selectedId = selected?.id ?? _selectedId;
     final actions = [
       IconButton(
         key: const ValueKey('live.guide.open'),

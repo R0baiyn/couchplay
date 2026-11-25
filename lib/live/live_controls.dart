@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../player/player_bars.dart';
 import '../player/player_tracks.dart';
+import 'channel_favorite.dart';
 import 'live_banner.dart';
 import 'live_tuner.dart';
 
@@ -231,6 +232,7 @@ class _LiveControlsState extends State<LiveControls> {
               _bars.show();
             },
           ),
+          ChannelFavoriteButton(channel: _tuner.channel, onPressed: _bars.show),
           const Spacer(),
           TracksMenu(player: widget.player, onOpened: _bars.show),
           IconButton(

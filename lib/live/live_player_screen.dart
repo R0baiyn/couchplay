@@ -16,12 +16,13 @@ import '../player/stream_holds.dart';
 import '../server/status_views.dart';
 import '../television.dart';
 import 'channel.dart';
+import 'channel_favorite.dart';
 import 'live_banner.dart';
 import 'live_controls.dart';
 import 'live_tuner.dart';
 
 /// Lecteur du direct : la chaîne [channel], zapping dans [channels] (la liste
-/// d'où l'on vient). Un seul flux à la fois (`Playback`), téléchargements
+/// d'où l'on vient). Chaque chaîne qui démarre va en tête des récentes. Un seul flux à la fois (`Playback`), téléchargements
 /// mis en pause si le serveur refuse le flux pendant l'un d'eux (D-036).
 /// Fermé, il rend la dernière chaîne affichée à qui l'a ouvert.
 class LivePlayerScreen extends ConsumerStatefulWidget {
@@ -29,14 +30,10 @@ class LivePlayerScreen extends ConsumerStatefulWidget {
     super.key,
     required this.channel,
     required this.channels,
-    this.onWatched,
   });
 
   final Channel channel;
   final List<Channel> channels;
-
-  /// Une chaîne a vraiment démarré (pour les chaînes récentes).
-  final void Function(Channel)? onWatched;
 
   @override
   ConsumerState<LivePlayerScreen> createState() => _LivePlayerScreenState();
@@ -68,7 +65,11 @@ class _LivePlayerScreenState extends ConsumerState<LivePlayerScreen> {
       channels: widget.channels,
       start: widget.channel,
       open: _open,
-      onWatched: widget.onWatched,
+      // Une chaîne a vraiment démarré, d'où que vienne le lecteur (liste,
+      // grille, accueil, recherche) : en tête des récentes du compte.
+      onWatched: (channel) {
+        if (mounted) recordRecentChannel(ref, channel);
+      },
     );
     // Un direct ne finit pas : une fin de fichier est une coupure.
     _completed = _playback.player.stream.completed.listen((completed) {

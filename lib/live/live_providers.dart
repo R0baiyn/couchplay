@@ -10,6 +10,8 @@ import '../accounts/server_session.dart';
 import '../catalog/catalog_cache.dart';
 import '../catalog/catalog_repository.dart';
 import '../catalog/catalog_settings.dart';
+import '../library/library.dart';
+import '../library/library_store.dart';
 import '../logging.dart';
 import '../server/models.dart';
 import '../server/server_client.dart';
@@ -69,6 +71,11 @@ final class LiveCatalog {
     }
     return groups;
   }();
+
+  /// Chaînes par id : pour retrouver une favorite.
+  late final Map<String, Channel> byId = {
+    for (final channel in channels) channel.id: channel,
+  };
 }
 
 final liveCatalogProvider =
@@ -120,15 +127,62 @@ final visibleLiveCategoriesProvider =
     });
 
 /// Chaînes d'une catégorie, triées par `num` ; vide pour une catégorie
-/// inconnue.
+/// inconnue. [favoritesCategory] : les chaînes favorites (liste, grille et
+/// zapping restent dans les favorites).
 final liveChannelsProvider = Provider.autoDispose
-    .family<AsyncValue<List<Channel>>, String>(
-      (ref, categoryId) => ref
+    .family<AsyncValue<List<Channel>>, String>((ref, categoryId) {
+      if (categoryId == favoritesCategory.id) {
+        return ref.watch(favoriteChannelsProvider);
+      }
+      return ref
           .watch(liveCatalogProvider)
           .whenData(
             (loaded) => loaded.value.byCategory[categoryId] ?? const [],
-          ),
-    );
+          );
+    });
+
+/// Entrée « Favorites » en tête du choix de catégorie de l'onglet TV. Son id
+/// n'est pas un nombre : aucune catégorie du serveur ne le prend.
+const favoritesCategory = Category(id: 'favorites', name: 'Favorites');
+
+/// Chaînes favorites du compte, triées par `num` (sans numéro à la fin, dans
+/// l'ordre d'ajout). Une chaîne encore au catalogue en garde toutes les
+/// données (guide, catégorie), même masquée par le filtre ; une chaîne qui
+/// n'y est plus reste affichée telle qu'enregistrée, pour pouvoir la retirer.
+final favoriteChannelsProvider =
+    Provider.autoDispose<AsyncValue<List<Channel>>>((ref) {
+      final saved = ref.watch(
+        libraryProvider.select((l) => l.channelFavorites),
+      );
+      return ref.watch(liveCatalogProvider).whenData((loaded) {
+        final channels = [
+          for (final channel in saved)
+            loaded.value.byId[channel.id] ?? channelOf(channel),
+        ];
+        return sortedByNumber(channels);
+      });
+    });
+
+/// Catégories de l'onglet TV : « Favorites » s'il y en a, puis les visibles.
+final liveTabCategoriesProvider =
+    Provider.autoDispose<AsyncValue<List<Category>>>((ref) {
+      final hasFavorites = ref.watch(
+        libraryProvider.select((l) => l.channelFavorites.isNotEmpty),
+      );
+      return ref
+          .watch(visibleLiveCategoriesProvider)
+          .whenData(
+            (visible) => [if (hasFavorites) favoritesCategory, ...visible],
+          );
+    });
+
+/// Une chaîne de `library.json`, de quoi l'afficher et la lire (sans guide).
+Channel channelOf(SavedChannel saved) => Channel(
+  id: saved.id,
+  name: saved.name,
+  number: saved.number,
+  logo: saved.logo,
+);
 
 /// Toutes les chaînes visibles, catégorie après catégorie : pour la
 /// recherche et le zapping.

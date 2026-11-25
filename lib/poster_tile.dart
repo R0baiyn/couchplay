@@ -75,7 +75,7 @@ class PosterTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final progress = this.progress;
-    return _RemoteKeys(
+    return RemoteKeys(
       onTap: onTap,
       onMenu: onMenu,
       child: InkWell(
@@ -169,9 +169,10 @@ class PosterTile extends StatelessWidget {
 /// Télécommande : OK maintenu ouvre le menu de la tuile (les répétitions de
 /// la touche ne sont plus des clics), OK appuyé ouvre la fiche au relâchement,
 /// la touche Menu ouvre le menu. Sans menu, OK reste un appui court et ses
-/// répétitions sont ignorées.
-class _RemoteKeys extends StatefulWidget {
-  const _RemoteKeys({
+/// répétitions sont ignorées. Sert aussi aux rangées de chaînes.
+class RemoteKeys extends StatefulWidget {
+  const RemoteKeys({
+    super.key,
     required this.onTap,
     required this.onMenu,
     required this.child,
@@ -182,10 +183,10 @@ class _RemoteKeys extends StatefulWidget {
   final Widget child;
 
   @override
-  State<_RemoteKeys> createState() => _RemoteKeysState();
+  State<RemoteKeys> createState() => _RemoteKeysState();
 }
 
-class _RemoteKeysState extends State<_RemoteKeys> {
+class _RemoteKeysState extends State<RemoteKeys> {
   /// OK enfoncé, ni relâché ni maintenu : la fiche s'ouvre au relâchement.
   var _pressed = false;
 

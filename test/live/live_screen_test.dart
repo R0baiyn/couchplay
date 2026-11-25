@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account.dart';
@@ -7,6 +8,8 @@ import 'package:couchplay/accounts/server_session.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/format.dart';
+import 'package:couchplay/library/library.dart';
+import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/live_providers.dart';
 import 'package:couchplay/live/live_screen.dart';
@@ -283,6 +286,128 @@ void main() {
     await pump(tester, settings: '{"tags":["ZZ"]}');
     expect(byKey('live.noCategory'), findsOneWidget);
     expect(find.textContaining('réglages'), findsOneWidget);
+  });
+
+  group('chaînes favorites et récentes', () {
+    ProviderContainer container(WidgetTester tester) =>
+        ProviderScope.containerOf(
+          tester.element(find.byType(LiveScreen, skipOffstage: false)),
+        );
+    Library library(WidgetTester tester) =>
+        container(tester).read(libraryProvider);
+
+    testWidgets('cœur de la rangée : favorite ajoutée, entrée « Favorites » en '
+        'tête, zapping dans les favorites', (tester) async {
+      await pump(tester);
+      expect(byKey('live.categoryTile.favorites'), findsNothing);
+
+      await tap(tester, 'live.favorite.9003');
+      await tap(tester, 'live.favorite.9001');
+      expect(library(tester).channelFavorites.map((c) => c.id), [
+        '9003',
+        '9001',
+      ]);
+      expect(library(tester).favorites, isEmpty, reason: 'pas dans Ma liste');
+      expect(inChannel('9001', find.byIcon(Icons.favorite)), findsOneWidget);
+      expect(
+        inChannel('9002', find.byIcon(Icons.favorite_border)),
+        findsOneWidget,
+      );
+      final tiles = tester.widgetList<ListTile>(
+        find.byWidgetPredicate(
+          (w) =>
+              w is ListTile &&
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith(
+                'live.categoryTile.',
+              ),
+        ),
+      );
+      expect(
+        (tiles.first.key! as ValueKey<String>).value,
+        'live.categoryTile.favorites',
+      );
+
+      // Plus au catalogue du serveur : affichée telle qu'enregistrée.
+      // Sans attendre l'écriture du fichier : hors de l'horloge factice.
+      unawaited(
+        container(tester)
+            .read(libraryProvider.notifier)
+            .addChannelFavorite(id: '777', name: 'Disparue'),
+      );
+      await tap(tester, 'live.categoryTile.favorites');
+      expect(inChannel('777', find.text('Disparue')), findsOneWidget);
+      // Par numéro, pas par ordre d'ajout, sans numéro à la fin ; 9002 n'y
+      // est pas.
+      expect(byKey('live.channel.9002'), findsNothing);
+      expect(
+        tester.getTopLeft(byKey('live.channel.9001')).dy,
+        lessThan(tester.getTopLeft(byKey('live.channel.9003')).dy),
+      );
+      expect(
+        tester.getTopLeft(byKey('live.channel.9003')).dy,
+        lessThan(tester.getTopLeft(byKey('live.channel.777')).dy),
+      );
+      await tap(tester, 'live.channel.9001');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump(LiveTuner.zapDelay);
+      await settle(tester);
+      expect(opened(), ['9001', '9003']);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+
+      // Retirer la dernière : l'entrée disparaît, la 1re catégorie revient.
+      for (final id in ['9001', '9003', '777']) {
+        await tap(tester, 'live.favorite.$id');
+      }
+      expect(byKey('live.categoryTile.favorites'), findsNothing);
+      expect(byKey('live.channel.9002'), findsOneWidget);
+    });
+
+    testWidgets('OK maintenu : favorite ajoutée puis retirée, avec un '
+        'message ; le lecteur ne s\'ouvre pas', (tester) async {
+      await pump(tester);
+      for (var i = 0; focused() == null; i++) {
+        if (i == 20) fail('aucune chaîne atteinte au clavier');
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      final id = focused()!;
+      Future<void> hold() async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.select);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+        await tester.pump();
+      }
+
+      await hold();
+      expect(library(tester).isChannelFavorite(id), isTrue);
+      expect(find.textContaining('ajoutée aux favorites'), findsOneWidget);
+      expect(byKey('live.player'), findsNothing);
+      await hold();
+      expect(library(tester).isChannelFavorite(id), isFalse);
+      expect(find.textContaining('retirée des favorites'), findsOneWidget);
+      expect(opened(), isEmpty);
+    });
+
+    testWidgets('flux démarré : en tête des récentes, au zapping aussi ; cœur '
+        'du lecteur', (tester) async {
+      await pump(tester);
+      await tap(tester, 'live.channel.9001');
+      expect(library(tester).recentChannels.map((c) => c.id), ['9001']);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump(LiveTuner.zapDelay);
+      await settle(tester);
+      expect(library(tester).recentChannels.map((c) => c.id), ['9002', '9001']);
+      expect(library(tester).recentChannels.first.name, 'Chaîne 2 HD');
+
+      // Toucher l'image affiche les barres, avec le cœur.
+      await tester.tap(byKey('live.player.video'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tap(tester, 'live.favorite.9002');
+      expect(library(tester).isChannelFavorite('9002'), isTrue);
+      expect(byKey('live.player'), findsOneWidget);
+    });
   });
 
   group('guide des programmes', () {

@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../focus_ring.dart';
 import '../focus_scroll.dart';
 import '../poster_image.dart';
+import '../poster_tile.dart';
 import '../server/status_views.dart';
 import 'channel.dart';
+import 'channel_favorite.dart';
 import 'live_providers.dart';
 import 'on_air_view.dart';
 
@@ -125,7 +127,7 @@ class _ChannelListState extends ConsumerState<ChannelList> {
                 sliver: SliverFixedExtentList.builder(
                   itemExtent: ChannelList._rowHeight,
                   itemCount: channels.length,
-                  itemBuilder: (context, i) => _ChannelTile(
+                  itemBuilder: (context, i) => ChannelTile(
                     key: ObjectKey(channels[i]),
                     channel: channels[i],
                     tiles: _tiles,
@@ -141,38 +143,40 @@ class _ChannelListState extends ConsumerState<ChannelList> {
 }
 
 /// Numéro, logo (ou icône de repli) et nom d'une chaîne, puis ce qu'elle
-/// passe si le guide le dit. Son nœud de focus est inscrit dans [tiles] tant
-/// qu'elle est construite.
-class _ChannelTile extends ConsumerStatefulWidget {
-  const _ChannelTile({
+/// passe si le guide le dit, et son cœur. OK maintenu, appui long ou touche
+/// Menu : favorite ajoutée ou retirée. Son nœud de focus est inscrit dans
+/// [tiles] tant qu'elle est construite. Rangée de 72 de haut.
+class ChannelTile extends ConsumerStatefulWidget {
+  const ChannelTile({
     super.key,
     required this.channel,
-    required this.tiles,
+    this.tiles,
     required this.onOpen,
   });
 
   final Channel channel;
-  final Map<String, FocusNode> tiles;
+  final Map<String, FocusNode>? tiles;
   final VoidCallback onOpen;
 
   @override
-  ConsumerState<_ChannelTile> createState() => _ChannelTileState();
+  ConsumerState<ChannelTile> createState() => _ChannelTileState();
 }
 
-class _ChannelTileState extends ConsumerState<_ChannelTile> {
+class _ChannelTileState extends ConsumerState<ChannelTile> {
   late final _focus = FocusNode(debugLabel: 'chaîne ${widget.channel.id}');
 
   @override
   void initState() {
     super.initState();
-    widget.tiles[widget.channel.id] = _focus;
+    widget.tiles?[widget.channel.id] = _focus;
   }
 
   @override
   void dispose() {
     // Une rangée plus récente de la même chaîne a pu prendre la place.
-    if (identical(widget.tiles[widget.channel.id], _focus)) {
-      widget.tiles.remove(widget.channel.id);
+    if (widget.tiles case final tiles?
+        when identical(tiles[widget.channel.id], _focus)) {
+      tiles.remove(widget.channel.id);
     }
     _focus.dispose();
     super.dispose();
@@ -185,39 +189,50 @@ class _ChannelTileState extends ConsumerState<_ChannelTile> {
       final id? => ref.watch(onAirProvider(id)),
       null => null,
     };
-    return ListTile(
-      key: ValueKey('live.channel.${channel.id}'),
-      focusNode: _focus,
-      leading: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 12,
-        children: [
-          SizedBox(
-            width: 44,
-            child: Text(
-              '${channel.number ?? ''}',
-              textAlign: TextAlign.end,
-              maxLines: 1,
-            ),
-          ),
-          SizedBox(
-            width: 56,
-            height: 40,
-            child: PosterImage(
-              url: channel.logo,
-              icon: Icons.live_tv,
-              fit: BoxFit.contain,
-              deferred: true,
-            ),
-          ),
-        ],
-      ),
-      title: FocusRing(
-        child: Text(channel.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-      // Chaîne sans programme : pas de sous-titre du tout, pas de texte vide.
-      subtitle: onAir == null ? null : OnAirView(onAir: onAir),
+    void toggle() => toggleChannelFavoriteWithMessage(context, ref, channel);
+    return RemoteKeys(
       onTap: widget.onOpen,
+      onMenu: toggle,
+      child: ListTile(
+        key: ValueKey('live.channel.${channel.id}'),
+        focusNode: _focus,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 12,
+          children: [
+            SizedBox(
+              width: 44,
+              child: Text(
+                '${channel.number ?? ''}',
+                textAlign: TextAlign.end,
+                maxLines: 1,
+              ),
+            ),
+            SizedBox(
+              width: 56,
+              height: 40,
+              child: PosterImage(
+                url: channel.logo,
+                icon: Icons.live_tv,
+                fit: BoxFit.contain,
+                deferred: true,
+              ),
+            ),
+          ],
+        ),
+        title: FocusRing(
+          child: Text(
+            channel.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        // Chaîne sans programme : pas de sous-titre du tout, pas de texte vide.
+        subtitle: onAir == null ? null : OnAirView(onAir: onAir),
+        trailing: ChannelFavoriteButton(channel: channel, focusable: false),
+        onTap: widget.onOpen,
+        onLongPress: toggle,
+      ),
     );
   }
 }

@@ -18,6 +18,7 @@ const allowedArcs = <String>[
   'library -> server',
   'live -> accounts',
   'live -> catalog',
+  'live -> library',
   'live -> player',
   'live -> server',
   'player -> accounts',
