@@ -26,6 +26,19 @@ void main() {
 
   Finder byKey(String key) => find.byKey(ValueKey(key));
 
+  /// La section « Chaînes » est sous le bas de l'écran : `settle` ne voit pas
+  /// son chargement (lecture du cache, isolate), attendu ici.
+  Future<void> waitForChannels(WidgetTester tester) async {
+    final loading = find.text('Chargement…', skipOffstage: false);
+    for (var i = 0; i < 100 && loading.evaluate().isNotEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 30)),
+      );
+      // Le client espace ses requêtes : l'horloge factice avance aussi.
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+
   testWidgets('sans section injectée : Films et Séries seuls', (tester) async {
     await pumpApp(tester, openMovies: false);
     await openSettings(tester);
@@ -40,6 +53,33 @@ void main() {
     expect(find.text('Chaînes', skipOffstage: false), findsNothing);
   });
 
+  for (final live in [false, true]) {
+    testWidgets('${live ? 'avec' : 'sans'} la section « Chaînes » : ce que '
+        'deviennent les catégories sans pays', (tester) async {
+      await pumpApp(
+        tester,
+        openMovies: false,
+        overrides: [
+          if (live)
+            catalogSettingsSectionsProvider.overrideWithValue(const [
+              LiveCategorySettings(),
+            ]),
+        ],
+      );
+      await openSettings(tester);
+      await waitForChannels(tester);
+      expect(
+        find.text(
+          live
+              ? 'Films et séries sans pays : toujours affichés. Chaînes sans '
+                    'pays : masquées.'
+              : 'Les catégories sans pays restent toujours affichées.',
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
   testWidgets('section « Chaînes » injectée : une case cochée est gardée', (
     tester,
   ) async {
@@ -53,16 +93,7 @@ void main() {
       ],
     );
     await openSettings(tester);
-    // La section est sous le bas de l'écran : `settle` ne voit pas son
-    // chargement (lecture du cache, isolate), attendu ici.
-    final loading = find.text('Chargement…', skipOffstage: false);
-    for (var i = 0; i < 100 && loading.evaluate().isNotEmpty; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 30)),
-      );
-      // Le client espace ses requêtes : l'horloge factice avance aussi.
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    await waitForChannels(tester);
     // 13 catégories, 8 françaises : les autres sont masquées par défaut.
     expect(
       find.text('8 affichées sur 13', skipOffstage: false),

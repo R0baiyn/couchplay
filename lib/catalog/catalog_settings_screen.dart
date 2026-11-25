@@ -37,6 +37,9 @@ class CatalogSettingsScreen extends ConsumerWidget {
     final notifier = ref.read(catalogFilterProvider.notifier);
     final movies = ref.watch(categoriesProvider(ContentKind.movies));
     final series = ref.watch(categoriesProvider(ContentKind.series));
+    // La section injectée est celle des chaînes, où une catégorie sans pays
+    // est masquée.
+    final sections = ref.watch(catalogSettingsSectionsProvider);
 
     final Widget body;
     if (movies case AsyncError(:final error)) {
@@ -74,7 +77,10 @@ class CatalogSettingsScreen extends ConsumerWidget {
                 subtitle: Text(
                   filter.tags.isEmpty
                       ? 'Aucun coché : tout est affiché.'
-                      : 'Les catégories sans pays restent toujours affichées.',
+                      : sections.isEmpty
+                      ? 'Les catégories sans pays restent toujours affichées.'
+                      : 'Films et séries sans pays : toujours affichés. Chaînes '
+                            'sans pays : masquées.',
                 ),
               ),
               for (final tag in tags)
@@ -114,7 +120,7 @@ class CatalogSettingsScreen extends ConsumerWidget {
               checkKey: (id) =>
                   ValueKey('catalog.categoryCheck.${kind.name}.$id'),
             ),
-          ...ref.watch(catalogSettingsSectionsProvider),
+          ...sections,
         ],
       );
     } else {
