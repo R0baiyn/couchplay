@@ -8,6 +8,7 @@ import '../server/models.dart';
 import '../server/status_views.dart';
 import 'channel.dart';
 import 'channel_list_view.dart';
+import 'guide_screen.dart';
 import 'live_player_screen.dart';
 import 'live_providers.dart';
 
@@ -82,6 +83,12 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
         visible.where((c) => c.id == _selectedId).firstOrNull ??
         visible.firstOrNull;
     final actions = [
+      IconButton(
+        key: const ValueKey('live.guide.open'),
+        tooltip: 'Guide des programmes',
+        icon: const Icon(Icons.view_timeline),
+        onPressed: selected == null ? null : () => openGuide(context, selected),
+      ),
       IconButton(
         key: const ValueKey('live.refresh'),
         tooltip: 'Actualiser',
