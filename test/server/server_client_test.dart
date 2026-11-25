@@ -215,6 +215,84 @@ void main() {
     }
   });
 
+  group('guide des programmes', () {
+    late Directory dir;
+    late String path;
+    setUp(() {
+      dir = Directory.systemTemp.createTempSync('couchplay_guide_dl_');
+      path = '${dir.path}/guide.part';
+    });
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    test(
+      'xmltv.php, identifiants encodés, écrit tel quel dans le fichier',
+      () async {
+        final adapter = FakeAdapter.replying('<tv>é</tv>');
+        await _client(adapter).downloadGuide(path);
+        final uri = adapter.last!.uri;
+        expect(uri.path, '/xmltv.php');
+        expect(uri.queryParameters, {'username': _user, 'password': _pass});
+        expect(adapter.last!.headers['User-Agent'], 'TestAgent/1.0');
+        expect(File(path).readAsStringSync(), '<tv>é</tv>');
+      },
+    );
+
+    test(
+      'refus et erreurs : mêmes exceptions que les listes, aucun fichier',
+      () async {
+        final cases = {
+          FakeAdapter.replying('', status: 401): isA<CredentialsRejected>(),
+          FakeAdapter.replying('{"user_info":{"auth":0}}', status: 404):
+              isA<CredentialsRejected>(),
+          FakeAdapter.replying('', status: 403): isA<AccessDenied>(),
+          FakeAdapter.replying('x' * 5000, status: 500): isA<InvalidResponse>(),
+          FakeAdapter.failing(DioExceptionType.receiveTimeout):
+              isA<ServerTimeout>(),
+          FakeAdapter.failing(DioExceptionType.connectionError):
+              isA<ServerUnreachable>(),
+        };
+        for (final MapEntry(key: adapter, value: matcher) in cases.entries) {
+          await expectLater(
+            _client(adapter).downloadGuide(path),
+            throwsA(matcher),
+          );
+          expect(File(path).existsSync(), isFalse);
+        }
+      },
+    );
+
+    test('journal sans identifiants ni hôte', () async {
+      final lines = <String>[];
+      final original = debugPrint;
+      debugPrint = (message, {wrapWidth}) => lines.add('$message');
+      addTearDown(() => debugPrint = original);
+
+      for (final adapter in [
+        FakeAdapter.failing(DioExceptionType.connectionError),
+        FakeAdapter.replying('', status: 500),
+      ]) {
+        await expectLater(
+          _client(adapter).downloadGuide(path),
+          throwsA(anything),
+        );
+      }
+
+      expect(lines, hasLength(2));
+      for (final line in lines) {
+        expect(line, contains('xmltv.php'));
+        for (final secret in [
+          _user,
+          _pass,
+          'example.com',
+          Uri.encodeQueryComponent(_user),
+          Uri.encodeQueryComponent(_pass),
+        ]) {
+          expect(line, isNot(contains(secret)), reason: line);
+        }
+      }
+    });
+  });
+
   group('adresses des flux', () {
     test('film et épisode, identifiants encodés dans le chemin', () {
       final client = _client(FakeAdapter.replying(''));

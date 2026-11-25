@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:couchplay/library/library.dart';
+import 'package:couchplay/live/guide.dart';
 
 /// Générateur maison pour les tests d'aller-retour des fichiers locaux : une
 /// graine fixe, donc la même suite à chaque lancement. Aucun identifiant ni
@@ -143,6 +144,38 @@ final class Gen {
       library = library.withProgress(progress());
     }
     return library;
+  }
+
+  /// Guide du direct : par chaîne, des programmes dans l'ordre, sans
+  /// chevauchement, à la seconde (ce que le cache garde).
+  Guide guide() {
+    final channels = {for (var i = 0; i < between(0, 5); i++) text()};
+    return Guide(
+      channels: channels,
+      programmes: {
+        for (final id in channels)
+          if (chance(0.8)) id: _programmes(),
+      },
+    );
+  }
+
+  List<Programme> _programmes() {
+    var t = between(0, 4000000000);
+    return [
+      for (var i = 0; i < between(1, 8); i++)
+        Programme(
+          start: DateTime.fromMillisecondsSinceEpoch(
+            (t += between(0, 3600)) * 1000,
+            isUtc: true,
+          ),
+          stop: DateTime.fromMillisecondsSinceEpoch(
+            (t += between(1, 14400)) * 1000,
+            isUtc: true,
+          ),
+          title: text(),
+          description: chance() ? text() : null,
+        ),
+    ];
   }
 
   static const _junk = <Object?>[

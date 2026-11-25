@@ -141,34 +141,13 @@ final class ServerClient {
     String? action,
     Map<String, String> params = const {},
   ]) async {
-    final uri = Uri.parse('$host/player_api.php').replace(
-      queryParameters: {
-        'username': username,
-        'password': password,
-        'action': ?action,
-        ...params,
-      },
-    );
+    final uri = _apiUri('player_api.php', {'action': ?action, ...params});
     await _waitTurn();
     final Response<String> response;
     try {
       response = await _dio.getUri<String>(uri);
     } on DioException catch (e) {
-      // Seulement le type : le message de dio recopie l'URL complète.
-      _log('Échec GET $uri', e.type);
-      throw switch (e.type) {
-        DioExceptionType.connectionTimeout ||
-        DioExceptionType.sendTimeout ||
-        DioExceptionType.receiveTimeout => const ServerTimeout(),
-        // L'erreur système ne contient que l'hôte et le port, jamais l'URL.
-        _ => ServerUnreachable(switch (e.error) {
-          SocketException(:final message, :final osError) =>
-            osError?.message ?? message,
-          // Autre erreur : son seul type, son message peut citer l'URL.
-          final Object error => error.runtimeType.toString(),
-          null => null,
-        }),
-      };
+      throw _failure(uri, e);
     }
 
     final status = response.statusCode ?? 0;
@@ -184,6 +163,61 @@ final class ServerClient {
       return text;
     }
 
+    _refuse(uri, status, text);
+  }
+
+  /// Guide des programmes (`xmltv.php`, plus de 30 Mo chez certains
+  /// fournisseurs) écrit dans [path] au fil de la réception, déjà décompressé
+  /// (gzip du transport) : jamais en mémoire. Mêmes erreurs que [fetch] ; rien
+  /// ne reste à [path] après une erreur.
+  Future<void> downloadGuide(String path) async {
+    final uri = _apiUri('xmltv.php', const {});
+    await _waitTurn();
+    final Response<dynamic> response;
+    try {
+      response = await _dio.downloadUri(uri, path);
+    } on DioException catch (e) {
+      throw _failure(uri, e);
+    }
+    final status = response.statusCode ?? 0;
+    if (status == 200) return;
+    final file = File(path);
+    // Corps d'erreur, petit : relu pour y chercher `auth: 0`.
+    final text = await file.length() < 4096 ? await file.readAsString() : '';
+    await file.delete();
+    _refuse(uri, status, text);
+  }
+
+  Uri _apiUri(String file, Map<String, String> params) =>
+      Uri.parse('$host/$file').replace(
+        queryParameters: {
+          'username': username,
+          'password': password,
+          ...params,
+        },
+      );
+
+  /// Échec réseau de [uri], journalisé sans l'URL de dio.
+  ServerException _failure(Uri uri, DioException e) {
+    // Seulement le type : le message de dio recopie l'URL complète.
+    _log('Échec GET $uri', e.type);
+    return switch (e.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout => const ServerTimeout(),
+      // L'erreur système ne contient que l'hôte et le port, jamais l'URL.
+      _ => ServerUnreachable(switch (e.error) {
+        SocketException(:final message, :final osError) =>
+          osError?.message ?? message,
+        // Autre erreur : son seul type, son message peut citer l'URL.
+        final Object error => error.runtimeType.toString(),
+        null => null,
+      }),
+    };
+  }
+
+  /// Réponse [status] ≠ 200 de [uri], traduite en exception.
+  Never _refuse(Uri uri, int status, String text) {
     // Corps d'erreur, petit : décodé ici. Mauvais identifiants : `auth: 0`
     // avec un code d'erreur chez certains serveurs (404). Le contenu prime.
     _checkAuth(_tryDecode(text));
