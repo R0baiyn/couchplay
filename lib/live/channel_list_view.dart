@@ -148,11 +148,16 @@ class ChannelTile extends ConsumerStatefulWidget {
     required this.channel,
     this.tiles,
     required this.onOpen,
+    this.guide = true,
   });
 
   final Channel channel;
   final Map<String, FocusNode>? tiles;
   final VoidCallback onOpen;
+
+  /// Faux dans la recherche : pas de « en cours », qui chargerait le guide
+  /// (plusieurs Mo) à chaque fois que la section des chaînes apparaît.
+  final bool guide;
 
   /// Hauteur fixe d'une rangée : certaines catégories comptent des centaines
   /// de chaînes. Laisse la place d'une seconde ligne sous le nom.
@@ -186,8 +191,8 @@ class _ChannelTileState extends ConsumerState<ChannelTile> {
   Widget build(BuildContext context) {
     final channel = widget.channel;
     final onAir = switch (channel.epgChannelId) {
-      final id? => ref.watch(onAirProvider(id)),
-      null => null,
+      final id? when widget.guide => ref.watch(onAirProvider(id)),
+      _ => null,
     };
     void toggle() => toggleChannelFavoriteWithMessage(context, ref, channel);
     return RemoteKeys(

@@ -54,7 +54,9 @@ List<CatalogEntry> search(List<CatalogEntry> entries, String query) => _rank(
 typedef SearchableChannel = ({Channel channel, String text});
 
 /// Chaînes visibles prêtes à chercher : refaites seulement quand la liste
-/// ou le filtre changent, pas à chaque frappe.
+/// ou le filtre changent, pas à chaque frappe. Sans valeur pendant un
+/// rechargement ou après un échec (`whenData`) : jamais la liste de l'ancien
+/// compte après un changement de compte.
 final channelSearchIndexProvider =
     Provider.autoDispose<AsyncValue<List<SearchableChannel>>>(
       (ref) => ref

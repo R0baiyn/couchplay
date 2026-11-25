@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:couchplay/catalog/catalog_index.dart';
 import 'package:couchplay/catalog/catalog_repository.dart';
+import 'package:couchplay/live/channel.dart';
+import 'package:couchplay/live/channel_list_view.dart';
 import 'package:couchplay/live/live_player_screen.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/search/search_index.dart';
+import 'package:couchplay/server/item_name.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -105,6 +108,73 @@ void main() {
     expect(find.byKey(const ValueKey('search.results')), findsOneWidget);
   });
 
+  testWidgets('films et séries en échec : les chaînes trouvées s\'affichent '
+      'quand même', (tester) async {
+    final routes = {
+      '': activeAccountJson,
+      'get_vod_categories': fixture('vod_categories'),
+      'get_series_categories': fixture('series_categories'),
+    };
+    server = FakeAdapter((options) async {
+      final body = routes[options.uri.queryParameters['action'] ?? ''];
+      return body == null
+          ? ResponseBody.fromString('', 500)
+          : ResponseBody.fromString(body, 200);
+    });
+    await pumpApp(
+      tester,
+      openMovies: false,
+      searchChannels: true,
+      overrides: [
+        channelSearchIndexProvider.overrideWithValue(
+          AsyncData([
+            (
+              channel: const Channel(id: '9011', name: 'Sport 1 FHD'),
+              text: normalize('Sport 1 FHD'),
+            ),
+          ]),
+        ),
+      ],
+    );
+
+    await typeQuery(tester, 'sport');
+    expect(find.byKey(const ValueKey('search.error')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('search.sectionChannels')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('live.channel.9011')), findsOneWidget);
+    // Rien trouvé du tout : l'erreur des listes revient.
+    await tester.enterText(find.byKey(const ValueKey('search.field')), 'zz');
+    await tester.pump(const Duration(milliseconds: 300));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('search.error')), findsOneWidget);
+  });
+
+  testWidgets('chaînes encore en chargement : la roue plutôt que « Aucun '
+      'résultat » ; les films trouvés n\'attendent pas', (tester) async {
+    await pumpApp(
+      tester,
+      openMovies: false,
+      searchChannels: true,
+      overrides: [
+        channelSearchIndexProvider.overrideWithValue(const AsyncLoading()),
+      ],
+    );
+    await typeQuery(tester, 'zzzz', wait: false);
+    expect(find.byKey(const ValueKey('search.loading')), findsOneWidget);
+    expect(find.byKey(const ValueKey('search.none')), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('search.field')),
+      'horizon',
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('search.results')), findsOneWidget);
+    expect(find.byKey(const ValueKey('search.sectionMovies')), findsOneWidget);
+  });
+
   testWidgets('Recherche : chargement tant que les listes arrivent', (
     tester,
   ) async {
@@ -115,9 +185,6 @@ void main() {
       waitForIndex: false,
       overrides: [
         catalogIndexProvider.overrideWith2((kind) => _GatedIndex(kind, gate)),
-        // Ce test porte sur l'index des films et des séries ; la liste des
-        // chaînes (deux requêtes espacées) resterait en vol à la fin.
-        channelSearchIndexProvider.overrideWithValue(const AsyncData([])),
       ],
     );
 
@@ -136,6 +203,7 @@ void main() {
     await pumpApp(
       tester,
       openMovies: false,
+      searchChannels: true,
       overrides: [
         playbackProvider.overrideWithValue(fakePlayback(FakePlayer())),
       ],
@@ -159,6 +227,13 @@ void main() {
       expect(find.byKey(ValueKey('live.channel.$id')), findsOneWidget);
     }
     expect(find.byKey(const ValueKey('live.channel.9020')), findsNothing);
+    // Pas de « en cours » : la recherche ne charge pas le guide.
+    expect(
+      tester
+          .widgetList<ChannelTile>(find.byType(ChannelTile))
+          .map((t) => t.guide),
+      everyElement(isFalse),
+    );
 
     await tester.tap(find.byKey(const ValueKey('live.channel.9006')));
     await tester.pump();

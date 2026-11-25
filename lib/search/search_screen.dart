@@ -71,7 +71,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final movies = ref.watch(catalogIndexProvider(ContentKind.movies));
     final series = ref.watch(catalogIndexProvider(ContentKind.series));
-    final channelsIndex = ref.watch(channelSearchIndexProvider).value;
+    final channels = ref.watch(channelSearchIndexProvider);
     final words = queryWords(_query);
     // Fini : chargé, ou en échec sans rien à montrer.
     bool settled(AsyncValue<Object?> index) =>
@@ -85,6 +85,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: Text(text, textAlign: TextAlign.center),
       ),
     );
+    final loading = Center(
+      key: const ValueKey('search.loading'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 16,
+        children: [
+          const CircularProgressIndicator(),
+          Text('Chargement du catalogue…', style: theme.textTheme.bodyMedium),
+        ],
+      ),
+    );
 
     final Widget body;
     if (words.isEmpty) {
@@ -93,10 +104,35 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         'Tape quelques lettres d\'un film, d\'une série ou d\'une chaîne.',
       );
     } else if (settled(movies) && settled(series)) {
-      // Un type en échec n'empêche pas de chercher dans l'autre.
+      // Une source en échec n'empêche pas de chercher dans les autres ; les
+      // chaînes ne retiennent pas les films et les séries.
       final moviesIndex = movies.value?.value;
       final seriesIndex = series.value?.value;
-      if (moviesIndex == null && seriesIndex == null) {
+      final channelsIndex = channels.value;
+      if (!identical(moviesIndex, _moviesIndex) ||
+          !identical(seriesIndex, _seriesIndex) ||
+          !identical(channelsIndex, _channelsIndex) ||
+          _query != _searched) {
+        _moviesIndex = moviesIndex;
+        _seriesIndex = seriesIndex;
+        _channelsIndex = channelsIndex;
+        _searched = _query;
+        _movies = search(moviesIndex?.entries ?? const [], _query);
+        _series = search(seriesIndex?.entries ?? const [], _query);
+        _channels = searchChannels(channelsIndex ?? const [], _query);
+      }
+      if (_movies.isNotEmpty || _series.isNotEmpty || _channels.isNotEmpty) {
+        // Clé par recherche : une nouvelle recherche repart en haut.
+        body = _Results(
+          key: ValueKey(_query),
+          channels: _channels,
+          movies: _movies,
+          series: _series,
+        );
+      } else if (!settled(channels)) {
+        // Rien encore : les chaînes peuvent encore répondre.
+        body = loading;
+      } else if (moviesIndex == null && seriesIndex == null) {
         body = ErrorView(
           key: const ValueKey('search.error'),
           error: movies.error ?? series.error!,
@@ -106,43 +142,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           },
         );
       } else {
-        if (!identical(moviesIndex, _moviesIndex) ||
-            !identical(seriesIndex, _seriesIndex) ||
-            !identical(channelsIndex, _channelsIndex) ||
-            _query != _searched) {
-          _moviesIndex = moviesIndex;
-          _seriesIndex = seriesIndex;
-          _channelsIndex = channelsIndex;
-          _searched = _query;
-          _movies = search(moviesIndex?.entries ?? const [], _query);
-          _series = search(seriesIndex?.entries ?? const [], _query);
-          _channels = searchChannels(channelsIndex ?? const [], _query);
-        }
-        body = _movies.isEmpty && _series.isEmpty && _channels.isEmpty
-            ? message(
-                const ValueKey('search.none'),
-                'Aucun résultat pour « ${_query.trim()} ».',
-              )
-            // Clé par recherche : une nouvelle recherche repart en haut.
-            : _Results(
-                key: ValueKey(_query),
-                channels: _channels,
-                movies: _movies,
-                series: _series,
-              );
+        body = message(
+          const ValueKey('search.none'),
+          'Aucun résultat pour « ${_query.trim()} ».',
+        );
       }
     } else {
-      body = Center(
-        key: const ValueKey('search.loading'),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 16,
-          children: [
-            const CircularProgressIndicator(),
-            Text('Chargement du catalogue…', style: theme.textTheme.bodyMedium),
-          ],
-        ),
-      );
+      body = loading;
     }
 
     return Scaffold(
@@ -251,6 +257,7 @@ class _Results extends StatelessWidget {
                     itemBuilder: (context, i) => ChannelTile(
                       key: ObjectKey(channels[i]),
                       channel: channels[i],
+                      guide: false,
                       onOpen: () =>
                           openLivePlayer(context, channels[i], channels),
                     ),

@@ -16,6 +16,7 @@ import 'package:couchplay/server/server_client.dart';
 import 'package:couchplay/update/updater.dart';
 import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/live_providers.dart';
+import 'package:couchplay/search/search_index.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,6 +65,7 @@ Future<void> pumpApp(
   Size size = const Size(1280, 800),
   bool openMovies = true,
   bool waitForIndex = true,
+  bool searchChannels = false,
   List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = size;
@@ -109,6 +111,11 @@ Future<void> pumpApp(
         // Guide vide par défaut : le vrai (30 Mo, 3e requête) est prouvé par
         // `test/live/guide_*_test.dart` ; il resterait en vol à la fin des tests.
         guideProvider.overrideWith(() => FixedGuide(Guide.empty)),
+        // Aucune chaîne dans la recherche par défaut : la liste des chaînes
+        // (deux requêtes espacées) resterait en vol à la fin des tests qui
+        // ouvrent la recherche ; prouvée par `searchChannels: true`.
+        if (!searchChannels)
+          channelSearchIndexProvider.overrideWithValue(const AsyncData([])),
         ...overrides,
       ],
       child: const CouchPlayApp(home: HomeGate()),

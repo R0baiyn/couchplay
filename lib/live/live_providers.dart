@@ -149,6 +149,8 @@ const favoritesCategory = Category(id: 'favorites', name: 'Favorites');
 /// l'ordre d'ajout). Une chaîne encore au catalogue en garde toutes les
 /// données (guide, catégorie), même masquée par le filtre ; une chaîne qui
 /// n'y est plus reste affichée telle qu'enregistrée, pour pouvoir la retirer.
+/// Sans valeur pendant un rechargement ou après un échec (`whenData`) :
+/// jamais les favorites d'un compte complétées par le catalogue de l'ancien.
 final favoriteChannelsProvider =
     Provider.autoDispose<AsyncValue<List<Channel>>>((ref) {
       final saved = ref.watch(

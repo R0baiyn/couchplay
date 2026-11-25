@@ -11,7 +11,9 @@ import 'package:couchplay/catalog/catalog_settings.dart';
 import 'package:couchplay/live/channel.dart';
 import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/guide_repository.dart';
+import 'package:couchplay/library/library_store.dart';
 import 'package:couchplay/live/live_providers.dart';
+import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
@@ -284,6 +286,38 @@ void main() {
     expect(
       File('${root.path}/accounts/b/live/guide.json').existsSync(),
       isFalse,
+    );
+  });
+
+  test('compte B en chargement puis en échec : ni favorites complétées par '
+      'les chaînes de A, ni chaînes de A dans la recherche', () async {
+    final c = await container();
+    c.listen(favoriteChannelsProvider, (_, _) {});
+    c.listen(channelSearchIndexProvider, (_, _) {});
+    expect(c.read(channelSearchIndexProvider).value, isNotEmpty);
+    // B a une favorite de même id qu'une chaîne de A.
+    File('${root.path}/accounts/b/library.json').writeAsStringSync(
+      '{"channels": {"favorites": '
+      '[{"id": "9001", "name": "Favorite de B", "at": "2026-11-25T20:00:00Z"}]}}',
+    );
+    catalogBDown = true;
+
+    final switching = c.read(accountsProvider.notifier).activate('b');
+    await switching;
+    List<String>? names() => [
+      for (final ch in c.read(favoriteChannelsProvider).value ?? const [])
+        ch.name,
+    ];
+    // Chargement de B : rien, pas la liste de A.
+    expect(c.read(channelSearchIndexProvider).value, isNull);
+    expect(names(), isNot(contains('Chaîne 1 HD')));
+    await expectLater(c.read(liveCatalogProvider.future), throwsA(anything));
+    // Échec de B : toujours rien de A.
+    expect(c.read(channelSearchIndexProvider).value, isNull);
+    expect(c.read(favoriteChannelsProvider).value, isNull);
+    expect(
+      c.read(libraryProvider).channelFavorites.single.name,
+      'Favorite de B',
     );
   });
 
