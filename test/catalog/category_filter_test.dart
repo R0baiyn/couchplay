@@ -121,4 +121,80 @@ void main() {
       'VOST',
     ]);
   });
+
+  group('direct', () {
+    test('marqueurs par mot entier : FRANCE et FR isolé', () {
+      for (final name in [
+        'FRANCE HD',
+        'FRANCE H265',
+        'SPORT FR',
+        'DAZN FRANCE',
+        'DISNEY+ SPORT FR',
+        'PRIME SPORTS FRANCE',
+      ]) {
+        expect(categoryTag(name), 'FR', reason: name);
+      }
+      // Collé à d'autres lettres : pas un marqueur.
+      expect(categoryTag('VOSTFR'), isNull);
+      expect(categoryTag('FRÉQUENCES'), isNull);
+      expect(categoryTag('BELGIUM'), isNull);
+      // Le préfixe passe avant les marqueurs.
+      expect(categoryTag('EX-YU'), 'EX');
+      expect(categoryTag('EN - FRANCE'), 'EN');
+    });
+
+    test('pays choisi visible, sans balise ou étrangère masquée', () {
+      const filter = CatalogFilter();
+      expect(filter.isLiveVisible(_c('FRANCE HD')), isTrue);
+      expect(filter.isLiveVisible(_c('SPORT FR')), isTrue);
+      expect(filter.isLiveVisible(_c('BELGIUM')), isFalse);
+      expect(filter.isLiveVisible(_c('Radio')), isFalse);
+      expect(filter.isLiveVisible(_c('EX-YU')), isFalse);
+      // Les films gardent « sans balise = visible ».
+      expect(filter.isVisible(ContentKind.movies, _c('BELGIUM')), isTrue);
+    });
+
+    test('adulte masqué, sauf si demandé', () {
+      expect(const CatalogFilter().isLiveVisible(_c('FRANCE XXX')), isFalse);
+      expect(
+        const CatalogFilter(showAdult: true).isLiveVisible(_c('FRANCE XXX')),
+        isTrue,
+      );
+    });
+
+    test('aucun pays coché : tout le direct est visible', () {
+      expect(
+        const CatalogFilter(tags: {}).isLiveVisible(_c('BELGIUM')),
+        isTrue,
+      );
+    });
+
+    test('exceptions par la clé `live:<id>`, à part des films', () {
+      expect(CatalogFilter.liveKey('60'), 'live:60');
+      final filter = CatalogFilter(
+        overrides: {CatalogFilter.liveKey('60'): true, 'live:104': false},
+      );
+      expect(filter.isLiveVisible(_c('BELGIUM', '60')), isTrue);
+      expect(filter.isLiveVisible(_c('FRANCE HD', '104')), isFalse);
+      // Une exception des films ne touche pas le direct, ni l'inverse.
+      const movies = CatalogFilter(overrides: {'movies:60': true});
+      expect(movies.isLiveVisible(_c('BELGIUM', '60')), isFalse);
+      expect(
+        filter.isVisible(ContentKind.movies, _c('FR · Drame', '104')),
+        isTrue,
+      );
+    });
+
+    test('fixture : les 8 catégories françaises seulement', () {
+      expect(
+        [
+          for (final c in const CatalogFilter().applyLive(
+            _fixture('live_categories'),
+          ))
+            c.id,
+        ],
+        ['104', '1', '105', '543', '12', '1739', '1826', '1811'],
+      );
+    });
+  });
 }
