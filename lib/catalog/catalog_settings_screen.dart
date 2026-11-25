@@ -8,6 +8,11 @@ import 'catalog_settings.dart';
 import 'category_filter.dart';
 import '../server/status_views.dart';
 
+/// Sections de plus, en slivers, après Films et Séries. Posées par la
+/// composition : celle des chaînes vit dans un dossier que `catalog` n'importe
+/// pas.
+final catalogSettingsSectionsProvider = Provider<List<Widget>>((_) => const []);
+
 /// Réglages du catalogue du compte actif : pays affichés, contenu adulte, et
 /// catégories une par une. Appliqués tout de suite aux onglets.
 class CatalogSettingsScreen extends ConsumerWidget {
@@ -95,18 +100,21 @@ class CatalogSettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          _CategoryChoices(
-            title: 'Films',
-            kind: ContentKind.movies,
-            categories: m.value,
-            filter: filter,
-          ),
-          _CategoryChoices(
-            title: 'Séries',
-            kind: ContentKind.series,
-            categories: s.value,
-            filter: filter,
-          ),
+          for (final (title, kind, categories) in [
+            ('Films', ContentKind.movies, m.value),
+            ('Séries', ContentKind.series, s.value),
+          ])
+            CategoryChoices(
+              title: title,
+              categories: categories,
+              isVisible: (category) => filter.isVisible(kind, category),
+              onChanged: (category, shown) =>
+                  notifier.setCategory(kind, category, shown: shown),
+              tileKey: ValueKey('catalog.kindTile.${kind.name}'),
+              checkKey: (id) =>
+                  ValueKey('catalog.categoryCheck.${kind.name}.$id'),
+            ),
+          ...ref.watch(catalogSettingsSectionsProvider),
         ],
       );
     } else {
@@ -124,38 +132,43 @@ class CatalogSettingsScreen extends ConsumerWidget {
 /// déplié : en sliver paresseux plutôt que dans l'`ExpansionTile`, qui les
 /// construirait toutes d'un coup. Mêmes bordures qu'un `ExpansionTile`
 /// déplié : un trait au-dessus de l'en-tête, un sous la dernière catégorie.
-class _CategoryChoices extends ConsumerStatefulWidget {
-  const _CategoryChoices({
+class CategoryChoices extends StatefulWidget {
+  const CategoryChoices({
+    super.key,
     required this.title,
-    required this.kind,
     required this.categories,
-    required this.filter,
+    required this.isVisible,
+    required this.onChanged,
+    required this.tileKey,
+    required this.checkKey,
   });
 
   final String title;
-  final ContentKind kind;
   final List<Category> categories;
-  final CatalogFilter filter;
+  final bool Function(Category category) isVisible;
+  final void Function(Category category, bool shown) onChanged;
+
+  /// Keys de l'en-tête et des cases, données par l'appelant (D-048).
+  final Key tileKey;
+  final Key Function(String id) checkKey;
 
   @override
-  ConsumerState<_CategoryChoices> createState() => _CategoryChoicesState();
+  State<CategoryChoices> createState() => _CategoryChoicesState();
 }
 
-class _CategoryChoicesState extends ConsumerState<_CategoryChoices> {
+class _CategoryChoicesState extends State<CategoryChoices> {
   var _expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final kind = widget.kind;
     final categories = widget.categories;
-    final filter = widget.filter;
-    final visible = filter.apply(kind, categories).length;
+    final visible = categories.where(widget.isVisible).length;
     final divider = BorderSide(color: Theme.of(context).dividerColor);
     return SliverMainAxisGroup(
       slivers: [
         SliverToBoxAdapter(
           child: ExpansionTile(
-            key: ValueKey('catalog.kindTile.${kind.name}'),
+            key: widget.tileKey,
             title: FocusRing(child: Text(widget.title)),
             subtitle: Text('$visible affichées sur ${categories.length}'),
             shape: Border(top: divider),
@@ -169,15 +182,12 @@ class _CategoryChoicesState extends ConsumerState<_CategoryChoices> {
             itemBuilder: (context, i) {
               final category = categories[i];
               final tile = CheckboxListTile(
-                key: ValueKey(
-                  'catalog.categoryCheck.${kind.name}.${category.id}',
-                ),
+                key: widget.checkKey(category.id),
                 dense: true,
                 title: FocusRing(child: Text(category.name)),
-                value: filter.isVisible(kind, category),
-                onChanged: (shown) => ref
-                    .read(catalogFilterProvider.notifier)
-                    .setCategory(kind, category, shown: shown ?? false),
+                value: widget.isVisible(category),
+                onChanged: (shown) =>
+                    widget.onChanged(category, shown ?? false),
               );
               return i < categories.length - 1
                   ? tile

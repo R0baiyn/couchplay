@@ -116,6 +116,23 @@ void main() {
   );
 
   test(
+    'catégorie de chaînes : clé `live:<id>`, effacée au retour à la règle',
+    () async {
+      final c = await container();
+      final notifier = c.read(catalogFilterProvider.notifier);
+      // Sans pays : masquée par défaut pour le direct.
+      const radio = Category(id: '114', name: 'Radio');
+
+      await notifier.setLiveCategory(radio, shown: true);
+      expect(c.read(catalogFilterProvider).overrides, {'live:114': true});
+      expect(c.read(catalogFilterProvider).isLiveVisible(radio), isTrue);
+
+      await notifier.setLiveCategory(radio, shown: false);
+      expect(c.read(catalogFilterProvider).overrides, isEmpty);
+    },
+  );
+
+  test(
     'un fichier de réglages illisible redonne les valeurs par défaut',
     () async {
       final dir = Directory('${root.path}/accounts/a')

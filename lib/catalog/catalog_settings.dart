@@ -56,12 +56,25 @@ final class CatalogFilterNotifier extends Notifier<CatalogFilter> {
     ContentKind kind,
     Category category, {
     required bool shown,
-  }) {
-    final key = CatalogFilter.overrideKey(kind, category.id);
+  }) => _force(
+    CatalogFilter.overrideKey(kind, category.id),
+    shown: shown,
+    byRule: _rule.isVisible(kind, category),
+  );
+
+  /// Comme [setCategory], pour une catégorie de chaînes du direct.
+  Future<void> setLiveCategory(Category category, {required bool shown}) =>
+      _force(
+        CatalogFilter.liveKey(category.id),
+        shown: shown,
+        byRule: _rule.isLiveVisible(category),
+      );
+
+  /// Le filtre sans les choix catégorie par catégorie.
+  CatalogFilter get _rule => state.copyWith(overrides: const {});
+
+  Future<void> _force(String key, {required bool shown, required bool byRule}) {
     final overrides = {...state.overrides}..remove(key);
-    final byRule = state
-        .copyWith(overrides: const {})
-        .isVisible(kind, category);
     if (shown != byRule) overrides[key] = shown;
     return _update(state.copyWith(overrides: overrides));
   }

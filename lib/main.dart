@@ -13,8 +13,10 @@ import 'accounts/account_files.dart';
 import 'accounts/account_store.dart';
 import 'accounts/app_settings.dart';
 import 'app.dart';
+import 'catalog/catalog_settings_screen.dart';
 import 'downloads/downloads.dart';
 import 'downloads/downloads_folder.dart';
+import 'live/live_settings_view.dart';
 import 'logging.dart';
 import 'orientation.dart';
 import 'server/cloudflare_dns.dart';
@@ -116,6 +118,9 @@ ProviderContainer startApp({
       appVersionProvider.overrideWithValue(version),
       televisionProvider.overrideWithValue(television),
       phoneProvider.overrideWithValue(phone),
+      catalogSettingsSectionsProvider.overrideWithValue(const [
+        LiveCategorySettings(),
+      ]),
       if (updater != null) updaterProvider.overrideWithValue(updater),
     ],
   );
