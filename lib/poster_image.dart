@@ -19,11 +19,15 @@ class PosterImage extends StatefulWidget {
     required this.url,
     this.icon = Icons.movie,
     this.deferred = false,
+    this.fit = BoxFit.cover,
   });
 
   final String? url;
   final IconData icon;
   final bool deferred;
+
+  /// `contain` pour une image à montrer entière (logo d'une chaîne).
+  final BoxFit fit;
 
   @override
   State<PosterImage> createState() => _PosterImageState();
@@ -90,7 +94,7 @@ class _PosterImageState extends State<PosterImage> {
             : null;
         return Image.network(
           url,
-          fit: BoxFit.cover,
+          fit: widget.fit,
           cacheWidth: width,
           // Sans errorBuilder, une URL cassée écrirait une erreur en console.
           errorBuilder: (_, _, _) => placeholder,
