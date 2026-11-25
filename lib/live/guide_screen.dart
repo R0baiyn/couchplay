@@ -163,7 +163,8 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     _row = _row.clamp(0, layout.rowCount - 1);
     _slot = layout.slotAt(_row, _anchor ?? _now());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      // Lecteur ou détail par-dessus : rien à reprendre.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
       final focused = FocusManager.instance.primaryFocus;
       // Pas quand le focus est ailleurs (détail ouvert, bouton).
       if (focused == null ||

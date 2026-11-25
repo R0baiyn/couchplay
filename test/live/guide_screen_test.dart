@@ -66,6 +66,7 @@ void main() {
     Size size = const Size(1280, 800),
     Guide? withGuide,
     String? streams,
+    bool open = true,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -118,6 +119,7 @@ void main() {
       ),
     );
     await settle(tester);
+    if (!open) return;
     await tester.tap(find.byKey(const ValueKey('live.guide.open')));
     await settle(tester);
   }
@@ -237,19 +239,20 @@ void main() {
     expect(focused(), cell('9001', -60));
   });
 
-  testWidgets('300 chaînes × 3 jours : seules les cases en vue sont '
-      'construites, aussi après un saut sur chaque axe', (tester) async {
-    final streams = [
-      for (var i = 0; i < 300; i++)
-        {
-          'num': i + 1,
-          'name': 'Chaîne $i',
-          'stream_type': 'live',
-          'stream_id': 20000 + i,
-          'epg_channel_id': 'c$i.test',
-          'category_id': '104',
-        },
-    ];
+  /// 300 chaînes de la catégorie 104, une émission par demi-heure sur
+  /// 3 jours.
+  String bigStreams() => jsonEncode([
+    for (var i = 0; i < 300; i++)
+      {
+        'num': i + 1,
+        'name': 'Chaîne $i',
+        'stream_type': 'live',
+        'stream_id': 20000 + i,
+        'epg_channel_id': 'c$i.test',
+        'category_id': '104',
+      },
+  ]);
+  Guide bigGuide() {
     final programmes = {
       for (var i = 0; i < 300; i++)
         'c$i.test': [
@@ -257,16 +260,83 @@ void main() {
             p(m, m + 30, 'Émission $i $m'),
         ],
     };
+    return Guide(channels: programmes.keys.toSet(), programmes: programmes);
+  }
+
+  int built() => find.byType(GuideCell, skipOffstage: false).evaluate().length;
+
+  testWidgets('focus qui sort de l’écran : la grille défile pour le suivre', (
+    tester,
+  ) async {
     await pump(
       tester,
-      streams: jsonEncode(streams),
-      withGuide: Guide(
-        channels: programmes.keys.toSet(),
-        programmes: programmes,
-      ),
+      size: const Size(960, 540),
+      streams: bigStreams(),
+      withGuide: bigGuide(),
     );
-    int built() =>
-        find.byType(GuideCell, skipOffstage: false).evaluate().length;
+    final grid = tester.getRect(byKey('live.guide.grid'));
+    void expectShown(String key) {
+      expect(focused(), key);
+      final rect = tester.getRect(byKey(key));
+      expect(
+        grid.contains(rect.topLeft) && grid.contains(rect.bottomRight),
+        isTrue,
+        reason: '$rect hors de $grid',
+      );
+    }
+
+    for (var i = 0; i < 25; i++) {
+      await press(tester, LogicalKeyboardKey.arrowDown);
+    }
+    expectShown(cell('20025', 0));
+    for (var i = 1; i <= 15; i++) {
+      await press(tester, LogicalKeyboardKey.arrowRight);
+    }
+    expectShown(cell('20025', 15 * 30));
+    expect(built(), inInclusiveRange(1, 400));
+    // Retour en haut à l'heure tenue.
+    for (var i = 0; i < 25; i++) {
+      await press(tester, LogicalKeyboardKey.arrowUp);
+    }
+    expectShown(cell('20000', 15 * 30));
+  });
+
+  testWidgets('télécommande seule : ouvrir le guide, ↑ vers « Maintenant », '
+      'retour sur le bouton du guide', (tester) async {
+    await pump(tester, open: false);
+    String? key() {
+      final context = FocusManager.instance.primaryFocus?.context;
+      final button = context?.findAncestorWidgetOfExactType<IconButton>();
+      final text = context?.findAncestorWidgetOfExactType<TextButton>();
+      return switch (button?.key ?? text?.key) {
+        ValueKey<String>(:final value) => value,
+        _ => null,
+      };
+    }
+
+    for (var i = 0; key() != 'live.guide.open'; i++) {
+      if (i == 30) fail('bouton du guide jamais atteint au clavier');
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await settle(tester);
+    expect(focused(), cell('9001', -60));
+
+    await press(tester, LogicalKeyboardKey.arrowUp);
+    expect(key(), 'live.guide.now');
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expect(focused(), startsWith('live.guide.9001.'));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(byKey('live.guide'), findsNothing);
+    expect(key(), 'live.guide.open');
+  });
+
+  testWidgets('300 chaînes × 3 jours : seules les cases en vue sont '
+      'construites, aussi après un saut sur chaque axe', (tester) async {
+    await pump(tester, streams: bigStreams(), withGuide: bigGuide());
 
     // 1280 × 800 : une quinzaine de lignes, une dizaine de cases chacune.
     expect(built(), inInclusiveRange(1, 400));
