@@ -38,7 +38,9 @@ class HomeScreen extends ConsumerWidget {
           (entry: entry, next: next),
     ];
     final favorites = library.favoritesByDate;
-    final hasHistory = library.progress.isNotEmpty;
+    // Des chaînes récentes seules : l'historique permet aussi de les effacer.
+    final hasHistory =
+        library.progress.isNotEmpty || library.recentChannels.isNotEmpty;
     final seen = library.seen;
     final theme = Theme.of(context);
 

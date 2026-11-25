@@ -510,4 +510,43 @@ void main() {
     await settle(tester);
     expect(find.byIcon(Icons.favorite), findsOneWidget);
   });
+
+  testWidgets('chaînes récentes seules : « Historique » permet de les '
+      'effacer, les chaînes favorites restent', (tester) async {
+    File('${root.path}/accounts/compte/library.json')
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'channels': {
+            'favorites': [
+              {'id': '9002', 'name': 'Chaîne 2', 'at': '2026-11-25T20:00:00Z'},
+            ],
+            'recent': [
+              {'id': '9001', 'name': 'Chaîne 1', 'at': '2026-11-25T20:00:00Z'},
+            ],
+          },
+        }),
+      );
+    await pumpApp(tester, openMovies: false);
+    expect(find.byKey(const ValueKey('live.recentRow')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('library.historyButton')));
+    await settle(tester);
+    await tester.tap(find.byKey(const ValueKey('library.historyClear')));
+    await settle(tester);
+    expect(find.textContaining('chaînes récentes'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('confirm.action')));
+    await settle(tester);
+    final library = ProviderScope.containerOf(
+      tester.element(find.byType(HistoryScreen)),
+    ).read(libraryProvider);
+    expect(library.recentChannels, isEmpty);
+    expect(library.channelFavorites.single.id, '9002');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.byKey(const ValueKey('live.recentRow')), findsNothing);
+    expect(find.byKey(const ValueKey('library.historyButton')), findsNothing);
+  });
 }

@@ -20,11 +20,15 @@ class HistoryScreen extends ConsumerWidget {
     // ajouté ne refait ni l'écran ni le tri.
     final progress = ref.watch(libraryProvider.select((l) => l.progress));
     final entries = Library(progress: progress).history;
+    // Des chaînes récentes seules s'effacent aussi.
+    final recentChannels = ref.watch(
+      libraryProvider.select((l) => l.recentChannels.isNotEmpty),
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historique'),
         actions: [
-          if (entries.isNotEmpty)
+          if (entries.isNotEmpty || recentChannels)
             TextButton(
               key: const ValueKey('library.historyClear'),
               onPressed: () => _confirmClear(context, ref),
@@ -52,8 +56,8 @@ class HistoryScreen extends ConsumerWidget {
       context,
       title: 'Effacer l\'historique ?',
       content:
-          'Les reprises et les marques « vu » sont perdues. '
-          'Ma liste reste intacte.',
+          'Les reprises, les marques « vu » et les chaînes récentes sont '
+          'perdues. Ma liste et les chaînes favorites restent intactes.',
       action: 'Effacer',
       focusCancel: true,
     );
