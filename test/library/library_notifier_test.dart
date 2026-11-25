@@ -189,4 +189,48 @@ void main() {
     expect(third.read(libraryProvider).progress, isEmpty);
     expect(third.read(libraryProvider).favorites.keys, ['movie:1']);
   });
+
+  test('chaînes favorites et récentes : par compte, gardées au redémarrage, '
+      "récentes effacées avec l'historique", () async {
+    final first = await container();
+    final library = first.read(libraryProvider.notifier);
+    await library.addChannelFavorite(id: '7', name: 'Sept', number: 7);
+    await library.addRecentChannel(id: '8', name: 'Huit');
+    await library.addRecentChannel(id: '9', name: 'Neuf', logo: 'https://x/9');
+    expect(first.read(libraryProvider).isChannelFavorite('7'), isTrue);
+
+    await first.read(accountsProvider.notifier).activate('b');
+    expect(first.read(libraryProvider).channelFavorites, isEmpty);
+    expect(first.read(libraryProvider).recentChannels, isEmpty);
+    await first
+        .read(libraryProvider.notifier)
+        .addRecentChannel(id: '1', name: 'Une de B');
+    await first.read(accountsProvider.notifier).activate('a');
+    expect(first.read(libraryProvider).recentChannels.map((c) => c.id), [
+      '9',
+      '8',
+    ]);
+    first.dispose();
+
+    final second = await container();
+    final state = second.read(libraryProvider);
+    expect(state.channelFavorites.single.number, 7);
+    expect(state.recentChannels.first.logo, 'https://x/9');
+    await second.read(libraryProvider.notifier).removeChannelFavorite('7');
+    await second.read(libraryProvider.notifier).removeRecentChannel('9');
+    expect(second.read(libraryProvider).recentChannels.map((c) => c.id), ['8']);
+    await second
+        .read(libraryProvider.notifier)
+        .addChannelFavorite(id: '2', name: 'Deux');
+    await second.read(libraryProvider.notifier).clearHistory();
+    second.dispose();
+
+    final third = await container();
+    expect(third.read(libraryProvider).recentChannels, isEmpty);
+    expect(third.read(libraryProvider).channelFavorites.map((c) => c.id), [
+      '2',
+    ]);
+    await third.read(accountsProvider.notifier).activate('b');
+    expect(third.read(libraryProvider).recentChannels.map((c) => c.id), ['1']);
+  });
 }

@@ -445,6 +445,179 @@ void main() {
     });
   });
 
+  group('chaînes', () {
+    SavedChannel channel(String id, {int minutesLater = 0}) => SavedChannel(
+      id: id,
+      name: 'Chaîne $id',
+      number: int.parse(id),
+      logo: 'https://x/$id.png',
+      at: _t0.add(Duration(minutes: minutesLater)),
+    );
+
+    test('favorite ajoutée puis retirée ; ajoutée deux fois : une seule', () {
+      final library = const Library()
+          .withChannelFavorite(channel('7'))
+          .withChannelFavorite(channel('3'))
+          .withChannelFavorite(channel('7', minutesLater: 5));
+      expect(library.channelFavorites.map((c) => c.id), ['7', '3']);
+      expect(library.isChannelFavorite('3'), isTrue);
+      final removed = library.withoutChannelFavorite('7');
+      expect(removed.channelFavorites.map((c) => c.id), ['3']);
+      expect(removed.isChannelFavorite('7'), isFalse);
+    });
+
+    test('« Ma liste » ne contient aucune chaîne', () {
+      final library = const Library()
+          .withChannelFavorite(channel('7'))
+          .withRecentChannel(channel('8'));
+      expect(library.favorites, isEmpty);
+      expect(library.favoritesByDate, isEmpty);
+      expect(library.history, isEmpty);
+      expect(library.continueWatching, isEmpty);
+    });
+
+    test('récente en tête, sans doublon, 10 au plus', () {
+      var library = const Library();
+      for (var i = 1; i <= 12; i++) {
+        library = library.withRecentChannel(channel('$i', minutesLater: i));
+      }
+      expect(library.recentChannels.map((c) => c.id), [
+        for (var i = 12; i >= 3; i--) '$i',
+      ]);
+      library = library.withRecentChannel(channel('5', minutesLater: 20));
+      expect(library.recentChannels.map((c) => c.id), [
+        '5',
+        '12',
+        '11',
+        '10',
+        '9',
+        '8',
+        '7',
+        '6',
+        '4',
+        '3',
+      ]);
+      expect(library.recentChannels.first.at, _t0.add(Duration(minutes: 20)));
+      expect(
+        library.withoutRecentChannel('12').recentChannels.map((c) => c.id),
+        isNot(contains('12')),
+      );
+    });
+
+    test("effacer l'historique efface les récentes, pas les favorites", () {
+      final library = const Library()
+          .withChannelFavorite(channel('7'))
+          .withRecentChannel(channel('8'))
+          .withProgress(_progress(_movie))
+          .withoutHistory();
+      expect(library.recentChannels, isEmpty);
+      expect(library.progress, isEmpty);
+      expect(library.channelFavorites.map((c) => c.id), ['7']);
+    });
+
+    test('les autres changements gardent les chaînes', () {
+      final library = const Library()
+          .withChannelFavorite(channel('7'))
+          .withRecentChannel(channel('8'))
+          .withFavorite(Favorite(key: 'movie:1', name: 'Mirage', addedAt: _t0))
+          .withoutFavorite('movie:1')
+          .withProgress(_progress(_movie))
+          .withoutProgress('movie:1');
+      expect(library.channelFavorites.map((c) => c.id), ['7']);
+      expect(library.recentChannels.map((c) => c.id), ['8']);
+    });
+
+    test('aller-retour JSON : section « channels » à part', () {
+      final library = const Library()
+          .withChannelFavorite(channel('7'))
+          .withRecentChannel(
+            SavedChannel(id: '9', name: 'Sans numéro ni logo', at: _t0),
+          );
+      final json = jsonDecode(jsonEncode(library.toJson())) as Map;
+      expect(json['version'], 1);
+      expect((json['favorites'] as Map), isEmpty);
+      expect(json['channels'], {
+        'favorites': [
+          {
+            'id': '7',
+            'name': 'Chaîne 7',
+            'number': 7,
+            'logo': 'https://x/7.png',
+            'at': '2026-11-02T20:00:00.000Z',
+          },
+        ],
+        'recent': [
+          {
+            'id': '9',
+            'name': 'Sans numéro ni logo',
+            'at': '2026-11-02T20:00:00.000Z',
+          },
+        ],
+      });
+      final back = Library.fromJson(json);
+      expect(back.channelFavorites.single.number, 7);
+      expect(back.channelFavorites.single.logo, 'https://x/7.png');
+      expect(back.recentChannels.single.name, 'Sans numéro ni logo');
+      expect(back.toJson(), library.toJson());
+    });
+
+    test('library.json de la version 1.3.4 : favoris et progression intacts, '
+        'aucune chaîne, réécrit sans section « channels »', () {
+      final json = {
+        'version': 1,
+        'favorites': {
+          'series:45': {
+            'name': 'Les Veilleurs',
+            'poster': 'https://x/p.jpg',
+            'addedAt': '2026-11-02T20:00:00.000Z',
+          },
+        },
+        'progress': {
+          'movie:1': {
+            'name': 'Mirage',
+            'extension': 'mkv',
+            'position': 600,
+            'duration': 3000,
+            'watched': false,
+            'hidden': false,
+            'updatedAt': '2026-11-02T20:00:00.000Z',
+          },
+        },
+      };
+      final library = Library.fromJson(json);
+      expect(library.channelFavorites, isEmpty);
+      expect(library.recentChannels, isEmpty);
+      expect(library.favorites['series:45']!.name, 'Les Veilleurs');
+      expect(
+        library.progress['movie:1']!.position,
+        const Duration(seconds: 600),
+      );
+      expect(library.toJson(), json);
+    });
+
+    test('section « channels » abîmée : entrées illisibles ignorées', () {
+      final library = Library.fromJson({
+        'channels': {
+          'favorites': [
+            {'id': '1', 'name': 'Une'},
+            {'id': '1', 'name': 'Doublon'},
+            {'id': '', 'name': 'Sans id'},
+            {'id': '2'},
+            {'id': 3, 'name': 'Id en nombre', 'number': '4', 'logo': 5},
+            'x',
+          ],
+          'recent': {'id': '1', 'name': 'Pas une liste'},
+        },
+      });
+      expect(library.channelFavorites.map((c) => c.id), ['1', '3']);
+      expect(library.channelFavorites.first.name, 'Une');
+      expect(library.channelFavorites.last.number, 4);
+      expect(library.channelFavorites.last.logo, isNull);
+      expect(library.recentChannels, isEmpty);
+      expect(Library.fromJson({'channels': 'x'}).channelFavorites, isEmpty);
+    });
+  });
+
   test('catalogItem : le film, ou la série d’un épisode', () {
     expect(_movie.catalogItem.kind, ContentKind.movies);
     expect(_movie.catalogItem.id, '1');

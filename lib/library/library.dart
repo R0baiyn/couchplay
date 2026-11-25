@@ -248,19 +248,83 @@ final class Progress {
   };
 }
 
-/// Favoris et progression d'un compte : le contenu de `library.json`
-/// (règle 7), valeur immuable.
+/// Une chaîne du direct gardée dans `library.json` : favorite, ou regardée
+/// depuis peu. `library` n'importe pas `live` (D-084) : de quoi l'afficher et
+/// l'ouvrir par son id, sans recharger la liste des chaînes.
+final class SavedChannel {
+  const SavedChannel({
+    required this.id,
+    required this.name,
+    this.number,
+    this.logo,
+    required this.at,
+  });
+
+  /// `stream_id` du serveur.
+  final String id;
+  final String name;
+  final int? number;
+  final String? logo;
+
+  /// Ajoutée aux favorites, ou regardée pour la dernière fois.
+  final DateTime at;
+
+  static SavedChannel? fromJson(Object? json) {
+    final map = asMap(json);
+    final id = asId(map['id']);
+    final name = asString(map['name']);
+    if (id == null || id.isEmpty || name == null) return null;
+    return SavedChannel(
+      id: id,
+      name: name,
+      number: asInt(map['number']),
+      logo: asUrl(map['logo']),
+      at: _date(map['at']),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'number': ?number,
+    'logo': ?logo,
+    'at': at.toUtc().toIso8601String(),
+  };
+}
+
+/// Favoris, progression et chaînes d'un compte : le contenu de
+/// `library.json` (règle 7), valeur immuable.
+///
+/// Les chaînes ont leur section à part, `channels`, jamais dans `favorites` :
+/// « Ma liste » et l'accueil y prendraient une chaîne pour un film. Section
+/// facultative, écrite seulement si elle a quelque chose : `version` reste 1,
+/// une version d'avant la lit sans erreur (D-089).
 final class Library {
-  const Library({this.favorites = const {}, this.progress = const {}});
+  const Library({
+    this.favorites = const {},
+    this.progress = const {},
+    this.channelFavorites = const [],
+    this.recentChannels = const [],
+  });
 
   static const version = 1;
+
+  /// Chaînes récentes gardées.
+  static const maxRecentChannels = 10;
 
   final Map<String, Favorite> favorites;
   final Map<String, Progress> progress;
 
+  /// Chaînes favorites, dans l'ordre d'ajout.
+  final List<SavedChannel> channelFavorites;
+
+  /// Chaînes regardées, la plus récente en premier, sans doublon.
+  final List<SavedChannel> recentChannels;
+
   /// Lit `library.json` ; les entrées illisibles sont ignorées une à une.
   factory Library.fromJson(Object? json) {
     final map = asMap(json);
+    final channels = asMap(map['channels']);
     return Library(
       favorites: {
         for (final MapEntry(:key, :value) in asMap(map['favorites']).entries)
@@ -270,7 +334,22 @@ final class Library {
         for (final MapEntry(:key, :value) in asMap(map['progress']).entries)
           key: ?Progress.fromJson(key, value),
       },
+      channelFavorites: _channels(channels['favorites']),
+      recentChannels: _channels(channels['recent'])
+          .take(maxRecentChannels)
+          .toList(),
     );
+  }
+
+  /// Chaînes lisibles de [json], la première de chaque id seulement.
+  static List<SavedChannel> _channels(Object? json) {
+    final seen = <String>{};
+    return [
+      for (final entry in asList(json))
+        if (SavedChannel.fromJson(entry) case final channel?
+            when seen.add(channel.id))
+          channel,
+    ];
   }
 
   Map<String, Object?> toJson() => {
@@ -283,31 +362,77 @@ final class Library {
       for (final MapEntry(:key, :value) in progress.entries)
         key: value.toJson(),
     },
+    if (channelFavorites.isNotEmpty || recentChannels.isNotEmpty)
+      'channels': {
+        'favorites': [for (final c in channelFavorites) c.toJson()],
+        'recent': [for (final c in recentChannels) c.toJson()],
+      },
   };
+
+  Library _copy({
+    Map<String, Favorite>? favorites,
+    Map<String, Progress>? progress,
+    List<SavedChannel>? channelFavorites,
+    List<SavedChannel>? recentChannels,
+  }) => Library(
+    favorites: favorites ?? this.favorites,
+    progress: progress ?? this.progress,
+    channelFavorites: channelFavorites ?? this.channelFavorites,
+    recentChannels: recentChannels ?? this.recentChannels,
+  );
 
   /// Favoris, le plus récent en premier.
   List<Favorite> get favoritesByDate =>
       favorites.values.toList()..sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
-  Library withFavorite(Favorite favorite) => Library(
-    favorites: {...favorites, favorite.key: favorite},
-    progress: progress,
-  );
+  Library withFavorite(Favorite favorite) =>
+      _copy(favorites: {...favorites, favorite.key: favorite});
 
   Library withoutFavorite(String key) =>
-      Library(favorites: {...favorites}..remove(key), progress: progress);
+      _copy(favorites: {...favorites}..remove(key));
 
-  Library withProgress(Progress entry) => Library(
-    favorites: favorites,
-    progress: {...progress, entry.item.key: entry},
-  );
+  Library withProgress(Progress entry) =>
+      _copy(progress: {...progress, entry.item.key: entry});
 
   /// Sans la progression de [key] : plus de reprise, plus de marque « vu ».
   Library withoutProgress(String key) =>
-      Library(favorites: favorites, progress: {...progress}..remove(key));
+      _copy(progress: {...progress}..remove(key));
 
-  /// Historique vidé, favoris intacts.
-  Library withoutHistory() => Library(favorites: favorites);
+  /// Historique vidé, chaînes récentes comprises ; favoris et chaînes
+  /// favorites intacts.
+  Library withoutHistory() =>
+      _copy(progress: const {}, recentChannels: const []);
+
+  bool isChannelFavorite(String id) => channelFavorites.any((c) => c.id == id);
+
+  /// Ajoutée à la fin ; déjà favorite, elle garde sa place.
+  Library withChannelFavorite(SavedChannel channel) =>
+      isChannelFavorite(channel.id)
+      ? this
+      : _copy(channelFavorites: [...channelFavorites, channel]);
+
+  Library withoutChannelFavorite(String id) => _copy(
+    channelFavorites: [
+      for (final c in channelFavorites)
+        if (c.id != id) c,
+    ],
+  );
+
+  /// [channel] en tête des récentes, son ancienne place retirée, la plus
+  /// ancienne oubliée au-delà de [maxRecentChannels].
+  Library withRecentChannel(SavedChannel channel) => _copy(
+    recentChannels: [
+      channel,
+      ...recentChannels.where((c) => c.id != channel.id),
+    ].take(maxRecentChannels).toList(),
+  );
+
+  Library withoutRecentChannel(String id) => _copy(
+    recentChannels: [
+      for (final c in recentChannels)
+        if (c.id != id) c,
+    ],
+  );
 
   /// Historique : tout ce qui a été lu, retirés de « Continuer à regarder »
   /// et vus compris, du plus récent au plus ancien.

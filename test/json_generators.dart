@@ -135,6 +135,15 @@ final class Gen {
     updatedAt: date(),
   );
 
+  /// Chaîne favorite ou récente ; un logo est toujours une adresse http(s).
+  SavedChannel savedChannel() => SavedChannel(
+    id: safeId(),
+    name: text(),
+    number: chance() ? count() : null,
+    logo: chance() ? 'https://x.test/${safeId()}.png' : null,
+    at: date(),
+  );
+
   Library library() {
     var library = const Library();
     for (var i = 0; i < between(0, 6); i++) {
@@ -142,6 +151,12 @@ final class Gen {
     }
     for (var i = 0; i < between(0, 6); i++) {
       library = library.withProgress(progress());
+    }
+    for (var i = 0; i < between(0, 4); i++) {
+      library = library.withChannelFavorite(savedChannel());
+    }
+    for (var i = 0; i < between(0, 12); i++) {
+      library = library.withRecentChannel(savedChannel());
     }
     return library;
   }

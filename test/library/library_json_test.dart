@@ -31,6 +31,8 @@ void main() {
           expect(_encode(back), first, reason: 'itération $i');
           expect(back.favorites.length, library.favorites.length);
           expect(back.progress.length, library.progress.length);
+          expect(back.channelFavorites.length, library.channelFavorites.length);
+          expect(back.recentChannels.length, library.recentChannels.length);
         }
       },
     );

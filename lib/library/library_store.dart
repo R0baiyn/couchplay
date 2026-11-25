@@ -219,7 +219,43 @@ final class LibraryNotifier extends Notifier<Library> {
   /// « vu » comprises.
   Future<void> removeProgress(String key) => _set(state.withoutProgress(key));
 
-  /// « Effacer l'historique » : la progression entière, les favoris restent.
+  Future<void> addChannelFavorite({
+    required String id,
+    required String name,
+    int? number,
+    String? logo,
+  }) => _set(state.withChannelFavorite(_saved(id, name, number, logo)));
+
+  Future<void> removeChannelFavorite(String id) =>
+      _set(state.withoutChannelFavorite(id));
+
+  /// Une chaîne a vraiment démarré : en tête des chaînes récentes.
+  Future<void> addRecentChannel({
+    required String id,
+    required String name,
+    int? number,
+    String? logo,
+  }) => _set(state.withRecentChannel(_saved(id, name, number, logo)));
+
+  /// « Retirer » de la rangée « Chaînes récentes ».
+  Future<void> removeRecentChannel(String id) =>
+      _set(state.withoutRecentChannel(id));
+
+  static SavedChannel _saved(
+    String id,
+    String name,
+    int? number,
+    String? logo,
+  ) => SavedChannel(
+    id: id,
+    name: name,
+    number: number,
+    logo: logo,
+    at: DateTime.now().toUtc(),
+  );
+
+  /// « Effacer l'historique » : la progression entière et les chaînes
+  /// récentes ; les favoris et les chaînes favorites restent.
   Future<void> clearHistory() => _set(state.withoutHistory());
 
   Future<void> _set(Library next) {
