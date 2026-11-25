@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../focus_ring.dart';
 import 'catalog_index.dart';
 import '../server/models.dart';
 import '../library/library.dart';
@@ -54,14 +53,6 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   String get _title => _kind == ContentKind.movies ? 'Films' : 'Séries';
 
-  /// Bouton de la catégorie sous le titre : 48 de haut, plus la marge.
-  static const _pickerHeight = 56.0;
-
-  static const _progress = PreferredSize(
-    preferredSize: Size.fromHeight(4),
-    child: LinearProgressIndicator(),
-  );
-
   void _select(String id) => setState(() => _selectedId = id);
 
   /// Catégories, puis la liste complète du type, d'où viennent la grille, la
@@ -81,42 +72,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   void _open(CatalogEntry entry) => openDetails(context, entry);
 
-  /// Liste complète des catégories sur écran étroit : un panneau du bas qui
-  /// défile, reste au-dessus des boutons du téléphone, et se ferme sans rien
-  /// changer si on touche à côté ou si on fait retour.
   Future<void> _pickCategory(
     List<Category> categories,
     String selectedId,
   ) async {
-    final id = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        maxChildSize: 0.95,
-        builder: (context, controller) => ListView.builder(
-          controller: controller,
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.paddingOf(context).bottom + 8,
-          ),
-          itemCount: categories.length,
-          itemBuilder: (context, index) {
-            final category = categories[index];
-            final current = category.id == selectedId;
-            return ListTile(
-              key: ValueKey('catalog.categorySheetTile.${category.id}'),
-              autofocus: current,
-              selected: current,
-              title: FocusRing(child: Text(category.name)),
-              trailing: current ? const Icon(Icons.check) : null,
-              onTap: () => Navigator.pop(context, category.id),
-            );
-          },
-        ),
-      ),
+    final id = await pickCategory(
+      context,
+      categories: categories,
+      selectedId: selectedId,
+      tileKey: (id) => ValueKey('catalog.categorySheetTile.$id'),
     );
     if (id != null && id != selectedId && mounted) _select(id);
   }
@@ -151,7 +115,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       appBar: AppBar(
         title: Text(_title),
         actions: _actions(categories),
-        bottom: _refreshing ? _progress : null,
+        bottom: _refreshing ? refreshProgress : null,
       ),
       body: body,
     );
@@ -206,6 +170,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       categories: visible,
                       selectedId: current.id,
                       onSelect: _select,
+                      tileKey: (id) => ValueKey('catalog.categoryTile.$id'),
                     ),
                   ),
                   const VerticalDivider(width: 1),
@@ -233,38 +198,13 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               categoryId: current.id,
               onOpen: _open,
               onRefresh: _refresh,
-              header: SliverAppBar(
-                floating: true,
-                snap: true,
-                title: Text(_title),
+              header: CategoryHeader(
+                title: _title,
                 actions: _actions(categories),
-                bottom: PreferredSize(
-                  preferredSize: Size.fromHeight(
-                    _pickerHeight + (_refreshing ? 4 : 0),
-                  ),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: OutlinedButton.icon(
-                          key: const ValueKey('catalog.categoryPicker'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                            alignment: Alignment.centerLeft,
-                          ),
-                          icon: const Icon(Icons.arrow_drop_down),
-                          label: Text(
-                            current.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onPressed: () => _pickCategory(visible, current.id),
-                        ),
-                      ),
-                      if (_refreshing) _progress,
-                    ],
-                  ),
-                ),
+                category: current,
+                refreshing: _refreshing,
+                pickerKey: const ValueKey('catalog.categoryPicker'),
+                onPick: () => _pickCategory(visible, current.id),
               ),
             ),
           );

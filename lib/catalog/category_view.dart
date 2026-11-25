@@ -16,11 +16,15 @@ class CategoryList extends StatelessWidget {
     required this.categories,
     required this.selectedId,
     required this.onSelect,
+    required this.tileKey,
   });
 
   final List<Category> categories;
   final String selectedId;
   final ValueChanged<String> onSelect;
+
+  /// Key d'une ligne, donnée par l'écran (D-048).
+  final Key Function(String id) tileKey;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +34,7 @@ class CategoryList extends StatelessWidget {
         itemBuilder: (context, index) {
           final category = categories[index];
           return ListTile(
-            key: ValueKey('catalog.categoryTile.${category.id}'),
+            key: tileKey(category.id),
             title: FocusRing(child: Text(category.name)),
             selected: category.id == selectedId,
             onTap: () => onSelect(category.id),
@@ -40,6 +44,110 @@ class CategoryList extends StatelessWidget {
     );
   }
 }
+
+/// Barre de progression d'« Actualiser », sous l'en-tête.
+const refreshProgress = PreferredSize(
+  preferredSize: Size.fromHeight(4),
+  child: LinearProgressIndicator(),
+);
+
+/// En-tête d'un écran étroit : titre, boutons et bouton de la catégorie, qui
+/// se replient quand on descend et reviennent dès qu'on remonte.
+class CategoryHeader extends StatelessWidget {
+  const CategoryHeader({
+    super.key,
+    required this.title,
+    required this.actions,
+    required this.category,
+    required this.refreshing,
+    required this.pickerKey,
+    required this.onPick,
+  });
+
+  final String title;
+  final List<Widget> actions;
+
+  /// Catégorie affichée.
+  final Category category;
+  final bool refreshing;
+  final Key pickerKey;
+  final VoidCallback onPick;
+
+  /// Bouton de la catégorie sous le titre : 48 de haut, plus la marge.
+  static const _pickerHeight = 56.0;
+
+  @override
+  Widget build(BuildContext context) => SliverAppBar(
+    floating: true,
+    snap: true,
+    title: Text(title),
+    actions: actions,
+    bottom: PreferredSize(
+      preferredSize: Size.fromHeight(_pickerHeight + (refreshing ? 4 : 0)),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: OutlinedButton.icon(
+              key: pickerKey,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                alignment: Alignment.centerLeft,
+              ),
+              icon: const Icon(Icons.arrow_drop_down),
+              label: Text(
+                category.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onPressed: onPick,
+            ),
+          ),
+          if (refreshing) refreshProgress,
+        ],
+      ),
+    ),
+  );
+}
+
+/// Liste complète des catégories sur écran étroit : un panneau du bas qui
+/// défile, reste au-dessus des boutons du téléphone, et se ferme sans rien
+/// changer (`null`) si on touche à côté ou si on fait retour.
+Future<String?> pickCategory(
+  BuildContext context, {
+  required List<Category> categories,
+  required String selectedId,
+  required Key Function(String id) tileKey,
+}) => showModalBottomSheet<String>(
+  context: context,
+  useSafeArea: true,
+  isScrollControlled: true,
+  showDragHandle: true,
+  builder: (context) => DraggableScrollableSheet(
+    expand: false,
+    initialChildSize: 0.6,
+    maxChildSize: 0.95,
+    builder: (context, controller) => ListView.builder(
+      controller: controller,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 8,
+      ),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        final current = category.id == selectedId;
+        return ListTile(
+          key: tileKey(category.id),
+          autofocus: current,
+          selected: current,
+          title: FocusRing(child: Text(category.name)),
+          trailing: current ? const Icon(Icons.check) : null,
+          onTap: () => Navigator.pop(context, category.id),
+        );
+      },
+    ),
+  ),
+);
 
 /// Grille d'une catégorie, avec son éventuel en-tête repliable. La tirer
 /// vers le bas l'actualise (toucher) ; « Actualiser » fait de même à la
