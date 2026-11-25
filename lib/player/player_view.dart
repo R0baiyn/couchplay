@@ -71,13 +71,7 @@ class PlayerView extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Video(
-            controller: playback.controller,
-            controls: NoVideoControls,
-            fit: fill ? BoxFit.cover : BoxFit.contain,
-            // Le lecteur gère lui-même l'arrière-plan (voir `_onHide`).
-            pauseUponEnteringBackgroundMode: false,
-          ),
+          PlayerVideo(playback: playback, fill: fill),
           if (error != null)
             CallbackShortcuts(
               bindings: escape,
@@ -130,4 +124,22 @@ class PlayerView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// L'image de [playback], sans contrôles de media_kit ; [fill] : remplit
+/// l'écran, quitte à rogner. Partagée avec le lecteur du direct.
+class PlayerVideo extends StatelessWidget {
+  const PlayerVideo({super.key, required this.playback, required this.fill});
+
+  final Playback playback;
+  final bool fill;
+
+  @override
+  Widget build(BuildContext context) => Video(
+    controller: playback.controller,
+    controls: NoVideoControls,
+    fit: fill ? BoxFit.cover : BoxFit.contain,
+    // Le lecteur gère lui-même l'arrière-plan (`_onHide` des écrans).
+    pauseUponEnteringBackgroundMode: false,
+  );
 }

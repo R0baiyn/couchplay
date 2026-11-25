@@ -7,11 +7,15 @@ import '../accounts/server_session.dart';
 import '../library/library.dart';
 import '../server/cloudflare_dns.dart';
 import '../server/models.dart';
+import '../server/server_client.dart';
 import 'playback.dart';
 
 /// Cloudflare ne connaît pas le nom du serveur.
 final class NameNotResolved implements Exception {
   const NameNotResolved();
+
+  String get message =>
+      'Serveur introuvable : Cloudflare ne connaît pas son nom.';
 }
 
 /// Flux d'un contenu sur le compte actif, ou `null` sans compte. Le nom du
@@ -23,11 +27,35 @@ Future<PlayRequest?> requestFor(
   String? audioLanguage,
   String? subtitleLanguage,
   Duration? start,
+}) => streamRequest(
+  ref,
+  title: item.title,
+  uri: (client) => client.streamUri(
+    item.isEpisode ? ContentKind.series : ContentKind.movies,
+    item.id,
+    item.extension,
+  ),
+  audioLanguage: audioLanguage,
+  subtitleLanguage: subtitleLanguage,
+  start: start,
+);
+
+/// Comme [requestFor], pour l'adresse [uri] d'un flux du compte actif (une
+/// chaîne du direct par exemple) : User-Agent, identifiants à masquer et
+/// nom résolu par Cloudflare.
+Future<PlayRequest?> streamRequest(
+  WidgetRef ref, {
+  required String title,
+  required Uri Function(ServerClient client) uri,
+  String? audioLanguage,
+  String? subtitleLanguage,
+  Duration? start,
 }) async {
   try {
-    return await _requestFor(
+    return await _streamRequest(
       ref,
-      item,
+      title: title,
+      uri: uri,
       audioLanguage: audioLanguage,
       subtitleLanguage: subtitleLanguage,
       start: start,
@@ -37,9 +65,10 @@ Future<PlayRequest?> requestFor(
   }
 }
 
-Future<PlayRequest?> _requestFor(
-  WidgetRef ref,
-  PlayItem item, {
+Future<PlayRequest?> _streamRequest(
+  WidgetRef ref, {
+  required String title,
+  required Uri Function(ServerClient client) uri,
   String? audioLanguage,
   String? subtitleLanguage,
   Duration? start,
@@ -47,15 +76,9 @@ Future<PlayRequest?> _requestFor(
   final account = ref.read(activeAccountProvider);
   final client = ref.read(serverClientProvider);
   if (account == null || client == null) return null;
-  final (url, headers) = await resolveForPlayer(
-    client.streamUri(
-      item.isEpisode ? ContentKind.series : ContentKind.movies,
-      item.id,
-      item.extension,
-    ),
-  );
+  final (url, headers) = await resolveForPlayer(uri(client));
   return PlayRequest(
-    title: item.title,
+    title: title,
     url: url,
     headers: headers,
     userAgent: account.userAgent,

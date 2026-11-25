@@ -19,6 +19,7 @@ import 'player_session.dart';
 import 'player_track_memory.dart';
 import 'mobile_fullscreen.dart';
 import 'player_view.dart';
+import 'stream_holds.dart';
 
 export 'player_request.dart' show endedEarly, localRequest;
 
@@ -87,7 +88,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _session = PlayerSession(
       playback: _playback,
       library: ref.read(libraryProvider.notifier),
-      holds: _holds,
+      holds: StreamHolds(_downloads, _holds),
       item: () => _item,
       // Pas pendant le chargement ni après un échec ; pas si un autre
       // lecteur a déjà pris le flux (sa position n'est pas la nôtre).
@@ -230,12 +231,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (current()) _tracks.matchByTitle();
     } on PlaybackAbandoned {
       return;
-    } on NameNotResolved {
+    } on NameNotResolved catch (e) {
       if (mounted && (ticket == null || current())) {
-        setState(
-          () => _error =
-              'Serveur introuvable : Cloudflare ne connaît pas son nom.',
-        );
+        setState(() => _error = e.message);
       }
     } on PlaybackFailed catch (e) {
       if (current()) setState(() => _error = e.message);

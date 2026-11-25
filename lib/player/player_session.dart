@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import '../downloads/downloads.dart';
 import '../library/library.dart';
 import '../library/library_store.dart';
 import 'audio_focus.dart';
 import 'playback.dart';
+import 'stream_holds.dart';
 
 /// Ce que le lecteur écrit hors de l'écran : la position (toutes les 10 s, à
 /// la pause et à la sortie) et l'arrêt du flux ; il tient aussi le focus
@@ -35,7 +35,7 @@ class PlayerSession {
 
   final Playback playback;
   final LibraryNotifier _library;
-  final DownloadHoldsNotifier _holds;
+  final StreamHolds _holds;
   final PlayItem Function() _item;
 
   /// Vrai quand ce flux est le nôtre et bien démarré.
@@ -63,19 +63,8 @@ class PlayerSession {
     );
   }
 
-  /// Arrête notre flux, s'il l'est encore (pas déjà arrêté, pas remplacé
-  /// par un autre lecteur). Une fois fermé, le téléchargement peut repartir
-  /// (D-036), sauf si un autre lecteur a ouvert un flux entre-temps.
-  Future<void> stopStream(int ticket) {
-    if (ticket != playback.ticket) return Future.value();
-    final holds = _holds;
-    final stopping = playback.stop(ticket);
-    // Lu juste après l'arrêt : une ouverture plus récente le change.
-    final after = playback.ticket;
-    return stopping.whenComplete(() {
-      if (playback.ticket == after) holds.streaming = false;
-    });
-  }
+  /// Arrête notre flux ([StreamHolds.stop]).
+  Future<void> stopStream(int ticket) => _holds.stop(playback, ticket);
 
   void dispose() {
     _timer.cancel();

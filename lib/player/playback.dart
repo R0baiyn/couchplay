@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -188,6 +189,27 @@ Future<PlaySource?> openContent({
   }
   final request = await stream();
   if (request == null) return null;
+  await openStream(
+    request,
+    open: open,
+    streaming: streaming,
+    downloading: downloading,
+    pauseDownloads: pauseDownloads,
+  );
+  if (broken) await dropFile();
+  return PlaySource.stream;
+}
+
+/// Ouvre le flux [request] par [open] (D-036) : [streaming] passe à `true`
+/// avant ; refusé par le serveur alors que [downloading] : [pauseDownloads]
+/// puis une seule nouvelle ouverture.
+Future<void> openStream(
+  PlayRequest request, {
+  required Future<void> Function(PlayRequest) open,
+  required void Function(bool) streaming,
+  required bool Function() downloading,
+  required void Function() pauseDownloads,
+}) async {
   streaming(true);
   try {
     await open(request);
@@ -197,8 +219,6 @@ Future<PlaySource?> openContent({
     pauseDownloads();
     await open(request);
   }
-  if (broken) await dropFile();
-  return PlaySource.stream;
 }
 
 /// Propriétés mpv des pistes pour [request], dans l'ordre où les poser :
@@ -276,6 +296,10 @@ final class Playback {
       configuration: videoConfiguration(television: television, direct: direct),
     );
   }
+
+  /// Lecteur et contrôleur fournis (tests : sans libmpv).
+  @visibleForTesting
+  Playback.withPlayer(this.player, this.controller);
 
   final Player player;
   late final VideoController controller;
