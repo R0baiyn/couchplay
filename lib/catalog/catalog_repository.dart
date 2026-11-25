@@ -85,42 +85,62 @@ final class CatalogRepository {
         maxAge: maxAge,
       )).value;
 
-  /// [parse] doit être une fonction de premier niveau, ou une fermeture
-  /// créée par l'une d'elles : elle part dans un isolate, et une fermeture
-  /// déclarée ici emporterait le dépôt, son client http et ses connexions,
-  /// impossibles à y envoyer.
   Future<Loaded<T>> _load<T>(
     String name,
     Future<String> Function() fetch,
     T Function(String) parse, {
     bool refresh = false,
-    Duration? maxAge,
-  }) async {
-    final path = _cache.path(name);
-    final savedAt = path == null ? null : await _cache.savedAt(path);
-    final fresh =
-        savedAt != null &&
-        _now().difference(savedAt) < (maxAge ?? CatalogRepository.maxAge);
-    if (path != null && fresh && !refresh) {
-      if (await _readCached(path, parse) case final value?) {
-        return Loaded(value, savedAt: savedAt);
-      }
-    }
+    Duration maxAge = CatalogRepository.maxAge,
+  }) => loadCached(
+    _cache,
+    name,
+    fetch,
+    parse,
+    refresh: refresh,
+    maxAge: maxAge,
+    now: _now,
+  );
+}
 
-    final String text;
-    try {
-      text = await fetch();
-    } on ServerException catch (e) {
-      final offline = e is ServerUnreachable || e is ServerTimeout;
-      if (offline && path != null && savedAt != null) {
-        if (await _readCached(path, parse) case final value?) {
-          return Loaded(value, offline: true, savedAt: savedAt);
-        }
-      }
-      rethrow;
+/// Charge [name] depuis [cache] s'il a moins de [maxAge], sinon depuis le
+/// serveur ([fetch]), puis le met en cache ; sert pour le catalogue et le
+/// direct.
+///
+/// [parse] doit être une fonction de premier niveau, ou une fermeture créée
+/// par l'une d'elles : elle part dans un isolate, et une fermeture déclarée
+/// dans un dépôt emporterait le dépôt, son client http et ses connexions,
+/// impossibles à y envoyer.
+Future<Loaded<T>> loadCached<T>(
+  CatalogCache cache,
+  String name,
+  Future<String> Function() fetch,
+  T Function(String) parse, {
+  bool refresh = false,
+  Duration maxAge = CatalogRepository.maxAge,
+  DateTime Function() now = DateTime.now,
+}) async {
+  final path = cache.path(name);
+  final savedAt = path == null ? null : await cache.savedAt(path);
+  final fresh = savedAt != null && now().difference(savedAt) < maxAge;
+  if (path != null && fresh && !refresh) {
+    if (await _readCached(path, parse) case final value?) {
+      return Loaded(value, savedAt: savedAt);
     }
-    return Loaded(await _decodeAndStore(text, parse, path));
   }
+
+  final String text;
+  try {
+    text = await fetch();
+  } on ServerException catch (e) {
+    final offline = e is ServerUnreachable || e is ServerTimeout;
+    if (offline && path != null && savedAt != null) {
+      if (await _readCached(path, parse) case final value?) {
+        return Loaded(value, offline: true, savedAt: savedAt);
+      }
+    }
+    rethrow;
+  }
+  return Loaded(await _decodeAndStore(text, parse, path));
 }
 
 // Fonctions de premier niveau : ce qu'elles envoient à l'isolate se limite
