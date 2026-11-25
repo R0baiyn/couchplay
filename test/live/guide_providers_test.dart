@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:couchplay/accounts/account.dart';
@@ -37,6 +38,7 @@ void main() {
   late Directory root;
   late String? xml;
   late int downloads;
+  late int downloadsB;
 
   final fixtures = {
     'get_live_categories': File('test/fixtures/live_categories.json')
@@ -55,11 +57,37 @@ void main() {
       'chaine8.test',
     ], DateTime.now());
     downloads = 0;
+    downloadsB = 0;
   });
   tearDown(() => root.deleteSync(recursive: true));
 
   final routes = FakeAdapter.routes(fixtures);
+  // Compte b : une chaîne, dans une catégorie de même id que chez a.
+  final routesB = FakeAdapter.routes({
+    'get_live_categories': jsonEncode([
+      {'category_id': '104', 'category_name': 'FRANCE B'},
+    ]),
+    'get_live_streams': jsonEncode([
+      {
+        'stream_id': 7777,
+        'name': 'Chaîne B',
+        'category_id': '104',
+        'epg_channel_id': 'b.test',
+      },
+    ]),
+  });
   final server = FakeAdapter((options) async {
+    if (options.uri.host == 'b.example.com') {
+      if (options.uri.path != '/xmltv.php') {
+        return routesB.fetch(options, null, null);
+      }
+      downloadsB++;
+      final now = DateTime.now();
+      return ResponseBody.fromString(
+        _guide(['b.test', 'chaine1.test'], now),
+        200,
+      );
+    }
     if (options.uri.path != '/xmltv.php') {
       return routes.fetch(options, null, null);
     }
@@ -72,20 +100,22 @@ void main() {
 
   Future<ProviderContainer> container() async {
     final store = await AccountStore.open();
-    await store.save(
-      const AccountsState().withAccount(
+    var accounts = const AccountsState();
+    for (final id in ['a', 'b']) {
+      accounts = accounts.withAccount(
         Account(
-          id: 'a',
-          name: 'a',
-          host: 'http://a.example.com',
+          id: id,
+          name: id,
+          host: 'http://$id.example.com',
           username: 'u',
           password: 'p',
           userAgent: defaultUserAgent,
         ),
-      ),
-    );
+      );
+    }
+    await store.save(accounts);
     final files = AccountFiles(Directory('${root.path}/accounts'));
-    await files.sync({'a'});
+    await files.sync({'a', 'b'});
     final c = ProviderContainer.test(
       overrides: [
         accountStoreProvider.overrideWithValue(store),
@@ -165,6 +195,44 @@ void main() {
     await filter.setLiveCategory(belgium, shown: false);
     await guide(c);
     expect(downloads, 2);
+  });
+
+  test(
+    'par compte : chacun son guide, son cache, un seul téléchargement',
+    () async {
+      final c = await container();
+      expect((await guide(c)).programmes.keys, contains('chaine1.test'));
+
+      await c.read(accountsProvider.notifier).activate('b');
+      await c.read(liveCatalogProvider.future);
+      final b = await guide(c);
+      expect(b.channels, {'b.test'});
+      expect(b.programmes.keys, ['b.test']);
+      // Jamais demandé à b avec les chaînes de a.
+      expect(downloadsB, 1);
+      final cached = File('${root.path}/accounts/b/live/guide.json')
+          .readAsStringSync();
+      expect(cached, isNot(contains('chaine1.test')));
+
+      await c.read(accountsProvider.notifier).activate('a');
+      await c.read(liveCatalogProvider.future);
+      final a = await guide(c);
+      expect(a.programmes.keys, isNot(contains('b.test')));
+      // Le cache de a sert encore.
+      expect(downloads, 1);
+    },
+  );
+
+  test('« Actualiser » qui échoue : le guide affiché reste', () async {
+    final c = await container();
+    await guide(c);
+    xml = null;
+    await c.read(guideProvider.notifier).refresh();
+    expect(downloads, 2);
+    expect(
+      c.read(guideProvider).requireValue.value.programmes.keys,
+      contains('chaine1.test'),
+    );
   });
 
   test('« Actualiser » retélécharge malgré le cache', () async {

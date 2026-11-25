@@ -184,25 +184,27 @@ final guideProvider =
 
 class GuideNotifier extends AsyncNotifier<Loaded<Guide>> {
   @override
-  Future<Loaded<Guide>> build() {
+  Future<Loaded<Guide>> build() async {
     final channels = ref.watch(_guideChannelsProvider);
-    if (channels == null) return Future.value(const Loaded(Guide.empty));
-    return _loadGuide(ref.watch(guideRepositoryProvider), channels.ids);
+    if (channels == null) return const Loaded(Guide.empty);
+    final repository = ref.watch(guideRepositoryProvider);
+    return await _loadGuide(repository, channels.ids) ??
+        const Loaded(Guide.empty);
   }
 
-  /// « Actualiser » : retélécharge, même avec un cache récent.
+  /// « Actualiser » : retélécharge, même avec un cache récent. En cas
+  /// d'échec, le guide affiché reste.
   Future<void> refresh() async {
     final channels = ref.read(_guideChannelsProvider);
     if (channels == null) return;
     final repository = ref.read(guideRepositoryProvider);
-    final result = await AsyncValue.guard(
-      () => _loadGuide(repository, channels.ids, refresh: true),
-    );
-    if (ref.mounted) state = result;
+    final loaded = await _loadGuide(repository, channels.ids, refresh: true);
+    if (loaded != null && ref.mounted) state = AsyncData(loaded);
   }
 }
 
-Future<Loaded<Guide>> _loadGuide(
+/// `null` si le guide n'a pas pu être lu (une ligne de journal).
+Future<Loaded<Guide>?> _loadGuide(
   GuideRepository repository,
   Set<String> channels, {
   bool refresh = false,
@@ -216,7 +218,7 @@ Future<Loaded<Guide>> _loadGuide(
       'Guide des programmes indisponible',
       error: e is ServerException ? e.message : e.runtimeType,
     );
-    return const Loaded(Guide.empty);
+    return null;
   }
 }
 

@@ -5,16 +5,19 @@ import 'package:couchplay/live/live_providers.dart';
 /// Guide donné tel quel, sans serveur ni fichier :
 /// `guideProvider.overrideWith(() => FixedGuide(guide))`.
 final class FixedGuide extends GuideNotifier {
-  FixedGuide(this.guide);
+  FixedGuide(this.guide, {this.onRefresh});
 
   final Guide guide;
+
+  /// Appelé à chaque « Actualiser ».
+  final void Function()? onRefresh;
 
   @override
   Future<Loaded<Guide>> build() async => Loaded(guide);
 
-  /// « Actualiser » : rien à retélécharger.
+  /// « Actualiser » : rien à retélécharger, seulement compté.
   @override
-  Future<void> refresh() async {}
+  Future<void> refresh() async => onRefresh?.call();
 }
 
 /// Programme de [from] à [to] secondes après [origin].

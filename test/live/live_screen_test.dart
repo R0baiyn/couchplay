@@ -52,6 +52,7 @@ void main() {
     String? settings,
     List<Override> overrides = const [],
     Guide guide = Guide.empty,
+    void Function()? onGuideRefresh,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -101,7 +102,9 @@ void main() {
           ),
           // Guide vide par défaut : le vrai (30 Mo, 3e requête) est prouvé par
           // `test/live/guide_*_test.dart` ; il resterait en vol à la fin des tests.
-          guideProvider.overrideWith(() => FixedGuide(guide)),
+          guideProvider.overrideWith(
+            () => FixedGuide(guide, onRefresh: onGuideRefresh),
+          ),
           ...overrides,
         ],
         child: const CouchPlayApp(home: LiveScreen()),
@@ -265,6 +268,13 @@ void main() {
     await tap(tester, 'live.refresh');
     expect(byKey('live.offlineBanner'), findsOneWidget);
     expect(byKey('live.channel.9001'), findsOneWidget);
+  });
+
+  testWidgets('« Actualiser » recharge aussi le guide', (tester) async {
+    var refreshes = 0;
+    await pump(tester, onGuideRefresh: () => refreshes++);
+    await tap(tester, 'live.refresh');
+    expect(refreshes, 1);
   });
 
   testWidgets('aucune catégorie visible : renvoi vers les réglages', (
