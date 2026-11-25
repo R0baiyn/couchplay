@@ -48,6 +48,16 @@ String? asString(Object? value) => switch (value) {
   _ => null,
 };
 
+/// URL http(s) seulement, sans espaces autour : les serveurs renvoient parfois
+/// un texte vide ou un chemin relatif inutilisable.
+String? asUrl(Object? value) {
+  final text = asString(value)?.trim();
+  if (text == null) return null;
+  return text.startsWith('http://') || text.startsWith('https://')
+      ? text
+      : null;
+}
+
 /// Identifiant du serveur, toujours sous forme de chaîne : il arrive tantôt en
 /// nombre, tantôt en texte.
 String? asId(Object? value) => asString(value)?.trim();

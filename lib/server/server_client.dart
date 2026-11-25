@@ -228,10 +228,18 @@ final class ServerClient {
       ContentKind.movies => 'movie',
       ContentKind.series => 'series',
     };
+    return _stream(path, '$id.$extension');
+  }
+
+  /// Adresse d'une chaîne du direct : `/live/U/P/<id>.ts` (flux sans fin).
+  /// Mêmes précautions que [streamUri].
+  Uri liveStreamUri(String id) => _stream('live', '$id.ts');
+
+  Uri _stream(String path, String file) {
     final segments = [
       username,
       password,
-      '$id.$extension',
+      file,
     ].map(Uri.encodeComponent).join('/');
     return Uri.parse('$host/$path/$segments');
   }

@@ -191,7 +191,7 @@ CatalogItem? _item(Map<String, Object?> map, ContentKind kind) {
     kind: kind,
     id: id,
     name: name,
-    poster: _url(map[movie ? 'stream_icon' : 'cover']),
+    poster: asUrl(map[movie ? 'stream_icon' : 'cover']),
     categoryId: asId(map['category_id']),
     tmdbId: _tmdb(map['tmdb_id'] ?? map['tmdb']),
     extension: movie ? asString(map['container_extension'])?.trim() : null,
@@ -271,7 +271,7 @@ Episode? _episode(Map<String, Object?> map) {
     extension: asString(map['container_extension'])?.trim(),
     plot: asString(info['plot'])?.trim(),
     duration: _duration(info),
-    image: _url(info['movie_image']),
+    image: asUrl(info['movie_image']),
   );
 }
 
@@ -283,13 +283,13 @@ Details _details(Map<String, Object?> info, {String? fallbackName}) {
   return Details(
     name: name,
     poster:
-        _url(info['movie_image']) ??
-        _url(info['cover_big']) ??
-        _url(info['cover']),
+        asUrl(info['movie_image']) ??
+        asUrl(info['cover_big']) ??
+        asUrl(info['cover']),
     // Liste d'URL en général, parfois une seule chaîne.
     backdrop:
-        _url(asList(info['backdrop_path']).firstOrNull) ??
-        _url(info['backdrop_path']),
+        asUrl(asList(info['backdrop_path']).firstOrNull) ??
+        asUrl(info['backdrop_path']),
     year: _year(release) ?? _year(yearInParentheses.firstMatch(name)?[1]),
     duration: _duration(info),
     genre: asString(info['genre'])?.trim(),
@@ -298,16 +298,6 @@ Details _details(Map<String, Object?> info, {String? fallbackName}) {
     director: asString(info['director'])?.trim(),
     cast: (asString(info['cast']) ?? asString(info['actors']))?.trim(),
   );
-}
-
-/// URL http(s) seulement : les serveurs renvoient parfois un texte vide ou un
-/// chemin relatif inutilisable.
-String? _url(Object? value) {
-  final text = asString(value)?.trim();
-  if (text == null) return null;
-  return text.startsWith('http://') || text.startsWith('https://')
-      ? text
-      : null;
 }
 
 String? _tmdb(Object? value) {

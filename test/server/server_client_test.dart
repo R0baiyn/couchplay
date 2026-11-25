@@ -235,5 +235,34 @@ void main() {
       final masked = redact(url, secrets: [_user, _pass]);
       expect(masked, 'http://***/movie/***/***/1.mp4');
     });
+
+    test('chaîne du direct : `/live/U/P/<id>.ts`, segments encodés', () {
+      final client = _client(FakeAdapter.replying(''));
+      expect(
+        client.liveStreamUri('9001').toString(),
+        'http://example.com/live/jean%20dupont/p%26s%231/9001.ts', // pre-push:allow : valeur de test fictive
+      );
+      expect(client.liveStreamUri('a/b').path, endsWith('/a%2Fb.ts'));
+    });
+
+    test('adresse du direct masquée, même sans liste de secrets', () {
+      final url = _client(FakeAdapter.replying(''))
+          .liveStreamUri('9001')
+          .toString();
+      // Le motif `live` de `redact` suffit pour le chemin…
+      final byPattern = redact(url);
+      for (final secret in [
+        Uri.encodeComponent(_user),
+        Uri.encodeComponent(_pass),
+      ]) {
+        expect(byPattern, isNot(contains(secret)));
+      }
+      expect(byPattern, endsWith('/live/***/***/9001.ts'));
+      // … et l'hôte part avec les secrets, comme pour les films.
+      expect(
+        redact(url, secrets: [_user, _pass]),
+        'http://***/live/***/***/9001.ts',
+      );
+    });
   });
 }
