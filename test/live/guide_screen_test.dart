@@ -264,6 +264,14 @@ void main() {
     return Guide(channels: programmes.keys.toSet(), programmes: programmes);
   }
 
+  /// La case [key] a le focus et se voit dans la grille.
+  void expectShown(WidgetTester tester, String key) {
+    expect(focused(), key);
+    final grid = tester.getRect(byKey('live.guide.grid'));
+    final rect = tester.getRect(byKey(key));
+    expect(grid.overlaps(rect), isTrue, reason: '$rect hors de $grid');
+  }
+
   int built() => find.byType(GuideCell, skipOffstage: false).evaluate().length;
 
   testWidgets('focus qui sort de l’écran : la grille défile pour le suivre', (
@@ -338,6 +346,64 @@ void main() {
     expect(byKey('live.guide.nowLine'), findsOneWidget);
     await press(tester, LogicalKeyboardKey.arrowDown);
     expectShown(cell('20004', 24 * 60));
+  });
+
+  testWidgets('guide relu 24 h plus tard pendant le détail : après Retour, '
+      'le focus est sur une case visible et ↓ répond', (tester) async {
+    var at = now;
+    await pump(
+      tester,
+      size: const Size(960, 540),
+      streams: bigStreams(),
+      withGuide: bigGuide(),
+      clock: () => at,
+    );
+    await press(tester, LogicalKeyboardKey.arrowRight);
+    expect(focused(), cell('20000', 30));
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await settle(tester);
+    expect(byKey('live.guide.detail'), findsOneWidget);
+
+    at = now.add(const Duration(hours: 24));
+    ProviderScope.containerOf(tester.element(byKey('live.guide')))
+        .invalidate(guideProvider);
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    await tester.pumpAndSettle();
+
+    expect(byKey('live.guide.detail'), findsNothing);
+    expectShown(tester, cell('20000', 24 * 60));
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expectShown(tester, cell('20001', 24 * 60));
+  });
+
+  testWidgets('téléphone, axe avancé de 45 min : heure tenue sortie de l’axe, '
+      'le focus va sur une case visible et ↓ répond', (tester) async {
+    var at = now;
+    await pump(
+      tester,
+      size: const Size(360, 740),
+      streams: bigStreams(),
+      withGuide: bigGuide(),
+      clock: () => at,
+    );
+    // Case de 18:10, dans la 1re heure de l'axe (18:00).
+    for (var i = 0; i < 4; i++) {
+      await press(tester, LogicalKeyboardKey.arrowLeft);
+    }
+    expect(focused(), cell('20000', -120));
+
+    // L'axe repart de 18:30 : 18:10 n'y est plus.
+    at = now.add(const Duration(minutes: 45));
+    ProviderScope.containerOf(tester.element(byKey('live.guide')))
+        .invalidate(guideProvider);
+    await settle(tester);
+    await tester.pumpAndSettle();
+
+    expectShown(tester, cell('20000', 30));
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expectShown(tester, cell('20001', 30));
   });
 
   testWidgets('télécommande seule : ouvrir le guide, ↑ vers « Maintenant », '

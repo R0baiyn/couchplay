@@ -45,8 +45,9 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
   /// ← →, jamais par ↑ ↓ (sinon le focus glisserait de ligne en ligne).
   DateTime? _anchor;
 
-  /// Heure que `_refocus` va mettre au milieu de l'écran, à l'image suivante.
-  DateTime? _shown;
+  /// Mise en page changée pendant qu'une autre route était au premier plan :
+  /// `_restore` au retour.
+  var _pending = false;
 
   String get _categoryId => widget.category.id;
   GuideLayout get _layout => ref.read(guideLayoutProvider(_categoryId));
@@ -56,7 +57,7 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _goNow(animate: false);
+      if (mounted) _goNow();
     });
   }
 
@@ -67,20 +68,56 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     super.dispose();
   }
 
-  /// « Maintenant » : la case en cours de la ligne tenue, l'heure au milieu.
-  void _goNow({bool animate = true}) {
+  /// « Maintenant » (et l'ouverture) : la case en cours de la ligne tenue.
+  void _goNow() {
+    _anchor = null;
+    _restore(force: true);
+  }
+
+  bool get _onTop => ModalRoute.of(context)?.isCurrent ?? true;
+
+  /// Seul point d'entrée qui replace la grille après un changement : depuis
+  /// la ligne et l'heure tenues seulement, jamais depuis un ancien décalage
+  /// en pixels (l'axe a pu repartir d'une autre heure). L'heure tenue sortie
+  /// de l'axe (ou aucune) devient maintenant ; la case qui la couvre est mise
+  /// au milieu de l'écran et prend le focus à l'image suivante, si le focus
+  /// était dans la grille ou perdu, ou si [force].
+  void _restore({bool force = false}) {
     final layout = _layout;
     if (layout.rowCount == 0 || !_horizontal.hasClients) return;
-    final now = _now();
-    _anchor = now;
+    _pending = false;
+    final anchor = switch (_anchor) {
+      final at? when layout.shows(at) => at,
+      _ => _now(),
+    };
+    _anchor = anchor;
     final row = _row.clamp(0, layout.rowCount - 1);
-    final extent = _horizontal.position.viewportDimension;
+    final slot = layout.slotAt(row, anchor);
+    final x = layout
+        .x(anchor)
+        .clamp(layout.left(row, slot), layout.right(row, slot));
+    final focused = FocusManager.instance.primaryFocus;
     _moveTo(
       row,
-      layout.slotAt(row, now),
-      horizontal: layout.x(now) - extent / 2,
-      animate: animate,
+      slot,
+      horizontal: x - _horizontal.position.viewportDimension / 2,
+      animate: false,
+      focus:
+          force ||
+          focused == null ||
+          focused is FocusScopeNode ||
+          focused.context == null ||
+          _nodes.containsValue(focused),
     );
+  }
+
+  /// Nouvelle mise en page (guide relu, chaînes changées) : la grille est
+  /// replacée à l'image suivante, ou au retour si une route la couvre.
+  void _layoutChanged() {
+    _pending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pending && _onTop) _restore();
+    });
   }
 
   /// Focus sur la case [slot] de [row], la grille défilée pour la montrer
@@ -91,6 +128,7 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     double? horizontal,
     bool keepAnchor = true,
     bool animate = true,
+    bool focus = true,
   }) {
     final layout = _layout;
     final h = _horizontal.position;
@@ -114,6 +152,11 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     _row = row;
     _slot = slot;
     final node = _nodes[(row, slot)];
+    if (!focus) {
+      h.jumpTo(dx);
+      v.jumpTo(dy);
+      return;
+    }
     if (animate && node != null) {
       node.requestFocus();
       for (final (position, to) in [(h, dx), (v, dy)]) {
@@ -159,43 +202,6 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     return KeyEventResult.handled;
   }
 
-  /// Guide rechargé ou chaînes changées, écran ouvert : l'axe a pu
-  /// repartir d'une autre heure (rechargement des 24 h). On garde à l'écran
-  /// l'heure qui y était, ou maintenant si elle n'est plus sur l'axe ; l'heure
-  /// tenue passe aussi à maintenant si elle en est sortie. La même ligne
-  /// reprend le focus, sur la case de cette heure.
-  void _refocus(GuideLayout? previous, GuideLayout layout) {
-    if (layout.rowCount == 0 || !_horizontal.hasClients) return;
-    final now = _now();
-    final h = _horizontal.position;
-    // Deux recalculs de suite (chargement, puis guide lu) : le second part
-    // de l'heure visée par le premier, pas encore appliquée à l'écran.
-    final center =
-        _shown ?? previous?.timeAt(h.pixels + h.viewportDimension / 2);
-    final shown = center != null && layout.shows(center) ? center : now;
-    _shown = shown;
-    if (!(_anchor != null && layout.shows(_anchor!))) _anchor = now;
-    _row = _row.clamp(0, layout.rowCount - 1);
-    _slot = layout.slotAt(_row, _anchor!);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _shown = null;
-      // Lecteur ou détail par-dessus : au retour, `_open` replace la grille.
-      if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
-      final dx = layout.x(shown) - h.viewportDimension / 2;
-      final focused = FocusManager.instance.primaryFocus;
-      // Le focus n'est repris que s'il était dans la grille (ou perdu).
-      if (focused == null ||
-          focused is FocusScopeNode ||
-          focused.context == null ||
-          _nodes.containsValue(focused)) {
-        _moveTo(_row, _slot, horizontal: dx, animate: false);
-      } else {
-        h.jumpTo(dx.clamp(h.minScrollExtent, h.maxScrollExtent));
-      }
-    });
-  }
-
   /// Toucher ou OK : la chaîne si le programme passe (ou rien d'annoncé),
   /// sinon son détail.
   Future<void> _open(int row, int slot, List<Channel> channels) async {
@@ -207,22 +213,29 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     final s = layout.slots(row)[slot];
     final programme = s.programme;
     if (programme != null && !s.playsAt(_now())) {
-      if (!await showProgrammeDetail(context, channel, programme)) return;
+      final watch = await showProgrammeDetail(context, channel, programme);
       if (!mounted) return;
+      if (!watch) {
+        // « Fermer » ou Retour : la grille telle quelle, sauf si le guide a
+        // changé pendant le détail. Le focus est encore dans le détail qui se
+        // ferme : on le reprend (la grille l'avait avant).
+        if (_pending) _restore(force: true);
+        return;
+      }
     }
     final last = await openLivePlayer(context, channel, channels);
+    if (!mounted) return;
     // Retour du lecteur : la dernière chaîne regardée, à l'heure qu'il est.
     final index = last == null
         ? -1
         : channels.indexWhere((c) => c.id == last.id);
-    if (index < 0 || !mounted) return;
-    _row = index;
-    _goNow(animate: false);
+    if (index >= 0) _row = index;
+    _goNow();
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(guideLayoutProvider(_categoryId), _refocus);
+    ref.listen(guideLayoutProvider(_categoryId), (_, _) => _layoutChanged());
     final layout = ref.watch(guideLayoutProvider(_categoryId));
     final channels =
         ref.watch(liveChannelsProvider(_categoryId)).value ?? const <Channel>[];
