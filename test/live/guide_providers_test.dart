@@ -318,22 +318,6 @@ void main() {
     expect(downloads, 2);
   });
 
-  test('programmes d’une chaîne sur une plage', () async {
-    final c = await container();
-    await guide(c);
-    final now = DateTime.now();
-    final range = (
-      channel: 'chaine1.test',
-      from: now.subtract(const Duration(hours: 2)),
-      to: now.add(const Duration(hours: 2)),
-    );
-    c.listen(guideRangeProvider(range), (_, _) {});
-    expect(
-      [for (final p in c.read(guideRangeProvider(range))) p.title],
-      ['Sur chaine1.test'],
-    );
-  });
-
   group('minuterie', () {
     final start = DateTime.utc(2026, 11, 24, 12);
     Programme programme(int from, int to, String title) =>

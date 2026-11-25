@@ -328,18 +328,6 @@ final onAirProvider = Provider.autoDispose.family<OnAir?, String>((
   return (current: current, progress: current?.progress(at) ?? 0, next: next);
 });
 
-/// Programmes d'une chaîne sur une plage (grille).
-final guideRangeProvider = Provider.autoDispose
-    .family<List<Programme>, ({String channel, DateTime from, DateTime to})>(
-      (ref, range) =>
-          ref
-              .watch(guideProvider)
-              .value
-              ?.value
-              .between(range.channel, range.from, range.to) ??
-          const [],
-    );
-
 /// Mise en page de la grille des programmes d'une catégorie. L'axe part de
 /// l'heure de la première lecture (maintenant − 2 h) : il ne glisse pas à
 /// chaque minute, seulement quand le guide ou les chaînes changent.
