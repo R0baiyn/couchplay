@@ -158,6 +158,7 @@ def direct_plein(port):
     premier.close()
     c1.close()
     c2.close()
+    attendre(lambda: faux.flux_ouverts['plein'] == 0, 'compteur de plein rendu')
 
 
 def direct_deuxieme_connexion(port):

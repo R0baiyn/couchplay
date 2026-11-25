@@ -102,7 +102,11 @@ def blocs_direct(mire: Path):
         commande = [ffmpeg, '-v', 'error', '-stream_loop', '-1', '-i',
                     str(mire), '-c', 'copy', '-f', 'mpegts', 'pipe:1']
         with subprocess.Popen(
-            commande, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE
+            commande,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            # Sans console (banc d'intégration), pas de fenêtre par flux.
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
         ) as processus:
             try:
                 while bloc := processus.stdout.read(1 << 15):
