@@ -17,7 +17,7 @@ import 'guide.dart';
 /// chaînes demandées sert sans appel réseau ; sinon, ou à la demande
 /// (`refresh`), le guide est retéléchargé ; serveur injoignable, le cache sert
 /// quand même, marqué hors ligne.
-final class GuideRepository {
+class GuideRepository {
   GuideRepository(this._client, this._cache, {this._now = DateTime.now});
 
   final ServerClient _client;

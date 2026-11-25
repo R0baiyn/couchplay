@@ -188,13 +188,24 @@ final guideProvider =
     );
 
 class GuideNotifier extends AsyncNotifier<Loaded<Guide>> {
+  /// Écart minimal entre deux rechargements automatiques : hors ligne, un
+  /// cache vieux de plusieurs jours ne relance pas un essai à chaque instant.
+  static const _minReload = Duration(hours: 1);
+
+  /// Relit le guide quand il a 24 h, même si l'écran reste ouvert (une TV
+  /// laissée allumée).
+  Timer? _reload;
+
   @override
   Future<Loaded<Guide>> build() async {
+    ref.onDispose(() => _reload?.cancel());
     final channels = ref.watch(_guideChannelsProvider);
     if (channels == null) return const Loaded(Guide.empty);
     final repository = ref.watch(guideRepositoryProvider);
-    return await _loadGuide(repository, channels.ids) ??
-        const Loaded(Guide.empty);
+    final loaded = await _loadGuide(repository, channels.ids);
+    if (loaded == null) return const Loaded(Guide.empty);
+    if (ref.mounted) _scheduleReload(loaded);
+    return loaded;
   }
 
   /// « Actualiser » : retélécharge, même avec un cache récent. En cas
@@ -204,7 +215,21 @@ class GuideNotifier extends AsyncNotifier<Loaded<Guide>> {
     if (channels == null) return;
     final repository = ref.read(guideRepositoryProvider);
     final loaded = await _loadGuide(repository, channels.ids, refresh: true);
-    if (loaded != null && ref.mounted) state = AsyncData(loaded);
+    if (loaded == null || !ref.mounted) return;
+    state = AsyncData(loaded);
+    _scheduleReload(loaded);
+  }
+
+  /// Rechargement quand le guide aura l'âge du cache (24 h depuis son
+  /// téléchargement), au plus tôt dans [_minReload].
+  void _scheduleReload(Loaded<Guide> loaded) {
+    final now = ref.read(guideNowProvider)();
+    var delay = (loaded.savedAt ?? now)
+        .add(CatalogRepository.maxAge)
+        .difference(now);
+    if (delay < _minReload) delay = _minReload;
+    _reload?.cancel();
+    _reload = Timer(delay, ref.invalidateSelf);
   }
 }
 

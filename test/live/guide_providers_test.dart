@@ -5,8 +5,12 @@ import 'package:couchplay/accounts/account.dart';
 import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/accounts/server_session.dart';
+import 'package:couchplay/catalog/catalog_cache.dart';
+import 'package:couchplay/catalog/catalog_repository.dart';
 import 'package:couchplay/catalog/catalog_settings.dart';
+import 'package:couchplay/live/channel.dart';
 import 'package:couchplay/live/guide.dart';
+import 'package:couchplay/live/guide_repository.dart';
 import 'package:couchplay/live/live_providers.dart';
 import 'package:couchplay/server/models.dart';
 import 'package:couchplay/server/server_client.dart';
@@ -32,6 +36,28 @@ String _guide(List<String> ids, DateTime now) {
   final stop = _date(now.add(const Duration(minutes: 30)));
   return '<tv>${[for (final id in ids) '<programme start="$start" stop="$stop" channel="$id">'
         '<title>Sur $id</title></programme>'].join()}</tv>';
+}
+
+/// Dépôt sans réseau ni fichier : répond [_answer] tout de suite.
+final class _FakeRepository extends GuideRepository {
+  _FakeRepository(this._answer)
+    : super(
+        ServerClient(
+          host: 'http://f.example.com',
+          username: 'u',
+          password: 'p',
+          userAgent: 't',
+        ),
+        CatalogCache(Directory('inutilise'), serverKey: 'k'),
+      );
+
+  final Loaded<Guide> Function(Set<String> channels, bool refresh) _answer;
+
+  @override
+  Future<Loaded<Guide>> guide(
+    Set<String> channels, {
+    bool refresh = false,
+  }) async => _answer(channels, refresh);
 }
 
 void main() {
@@ -349,5 +375,98 @@ void main() {
         empty.dispose();
       });
     });
+  });
+
+  group('rechargement quotidien', () {
+    final start = DateTime.utc(2026, 11, 24, 12);
+    final fixed = Guide(
+      channels: const {'a.fr'},
+      programmes: {
+        'a.fr': [programmeAt(start, -600, 600, 'A')],
+      },
+    );
+
+    /// Conteneur sous horloge factice, dépôt qui répond [answer] sans réseau
+    /// ni fichier ; rend le nombre de chargements.
+    (ProviderContainer, List<DateTime>) fake(
+      FakeAsync async,
+      Loaded<Guide> Function(DateTime now) answer,
+    ) {
+      final calls = <DateTime>[];
+      DateTime now() => start.add(async.elapsed);
+      final c = ProviderContainer.test(
+        overrides: [
+          guideNowProvider.overrideWithValue(now),
+          liveCatalogProvider.overrideWithBuild(
+            (ref, notifier) async => Loaded(
+              LiveCatalog(const [], const [
+                Channel(id: '1', name: 'A', epgChannelId: 'a.fr'),
+              ]),
+            ),
+          ),
+          guideRepositoryProvider.overrideWithValue(
+            _FakeRepository((ids, refresh) {
+              calls.add(now());
+              return answer(now());
+            }),
+          ),
+        ],
+      );
+      c.listen(guideProvider, (_, _) {});
+      async.elapse(Duration.zero);
+      return (c, calls);
+    }
+
+    test('guide téléchargé : relu 24 h plus tard, pas avant', () {
+      fakeAsync((async) {
+        final (c, calls) = fake(async, (_) => Loaded(fixed));
+        expect(calls, hasLength(1));
+        async.elapse(const Duration(hours: 23, minutes: 59));
+        expect(calls, hasLength(1));
+        async.elapse(const Duration(minutes: 1));
+        expect(calls, hasLength(2));
+        c.dispose();
+      });
+    });
+
+    test('cache de 20 h : relu 4 h plus tard', () {
+      fakeAsync((async) {
+        final (c, calls) = fake(
+          async,
+          (now) =>
+              Loaded(fixed, savedAt: now.subtract(const Duration(hours: 20))),
+        );
+        async.elapse(const Duration(hours: 3, minutes: 59));
+        expect(calls, hasLength(1));
+        async.elapse(const Duration(minutes: 1));
+        expect(calls, hasLength(2));
+        c.dispose();
+      });
+    });
+
+    test(
+      'hors ligne avec un vieux cache : un essai par heure, pas de boucle',
+      () {
+        fakeAsync((async) {
+          final (c, calls) = fake(
+            async,
+            (now) => Loaded(
+              fixed,
+              offline: true,
+              savedAt: now.subtract(const Duration(days: 3)),
+            ),
+          );
+          expect(calls, hasLength(1));
+          async.elapse(const Duration(minutes: 59));
+          expect(calls, hasLength(1));
+          async.elapse(const Duration(minutes: 1));
+          expect(calls, hasLength(2));
+          async.elapse(const Duration(hours: 3));
+          expect(calls, hasLength(5));
+          c.dispose();
+          expect(async.pendingTimers, isEmpty);
+        });
+      },
+    );
   });
 }
