@@ -82,13 +82,15 @@ class _LivePlayerScreenState extends ConsumerState<LivePlayerScreen> {
     _tuner.start();
   }
 
-  Future<void> _open(Channel channel) async {
+  Future<void> _open(Channel channel, bool Function() current) async {
     final request = await streamRequest(
       ref,
       title: channel.name,
       uri: (client) => client.liveStreamUri(channel.id),
     );
-    if (!mounted) throw const PlaybackAbandoned();
+    // La résolution de l'adresse peut durer plus que l'attente du zapping :
+    // une chaîne quittée entre-temps n'ouvre plus rien.
+    if (!mounted || !current()) throw const PlaybackAbandoned();
     if (request == null) {
       _exit();
       throw const PlaybackAbandoned();

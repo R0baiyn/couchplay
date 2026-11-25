@@ -26,7 +26,7 @@ void main() {
   LiveTuner tuner(List<Channel> channels, Channel start) => LiveTuner(
     channels: channels,
     start: start,
-    open: (channel) async {
+    open: (channel, _) async {
       opened.add(channel.id);
       if (fail?.call(channel) case final Object error) throw error;
     },
@@ -135,7 +135,7 @@ void main() {
         final t = LiveTuner(
           channels: twelve,
           start: twelve[0],
-          open: (channel) {
+          open: (channel, _) {
             opened.add(channel.id);
             // La 1re ouverture finit en échec après la 2e : son message ne
             // doit pas s'afficher.
@@ -154,13 +154,93 @@ void main() {
       });
     });
 
-    test('une ouverture abandonnée ne dit rien', () {
+    test('une ouverture abandonnée car remplacée ne dit rien', () {
+      fakeAsync((async) {
+        final first = Completer<void>();
+        final t = LiveTuner(
+          channels: twelve,
+          start: twelve[0],
+          open: (channel, _) {
+            opened.add(channel.id);
+            return channel.id == '9001' ? first.future : Future.value();
+          },
+          onWatched: (channel) => watched.add(channel.id),
+        )..start();
+        t.zap(1);
+        async.elapse(LiveTuner.zapDelay);
+        first.completeError(const PlaybackAbandoned());
+        async.flushMicrotasks();
+        expect(t.error, isNull);
+        expect(watched, ['9002']);
+      });
+    });
+  });
+
+  group('course au zapping (adresse lente à résoudre)', () {
+    /// Comme l'écran : résout l'adresse (lente, [requests]), puis n'ouvre le
+    /// flux que si l'ouverture est encore la bonne.
+    LiveTuner slow(Map<String, Completer<void>> requests) => LiveTuner(
+      channels: twelve,
+      start: twelve[0],
+      open: (channel, current) async {
+        await requests[channel.id]!.future;
+        if (!current()) throw const PlaybackAbandoned();
+        opened.add(channel.id);
+      },
+      onWatched: (channel) => watched.add(channel.id),
+    )..start();
+
+    test('A lente, zapping sur B : B ouvert en dernier, A jamais', () {
+      fakeAsync((async) {
+        final requests = {'9001': Completer<void>(), '9002': Completer<void>()};
+        final t = slow(requests);
+        t.zap(1);
+        async.elapse(LiveTuner.zapDelay);
+        requests['9002']!.complete();
+        async.flushMicrotasks();
+        requests['9001']!.complete();
+        async.flushMicrotasks();
+
+        expect(opened, ['9002']);
+        expect(watched, ['9002']);
+        expect(t.channel.id, '9002');
+        expect(t.opening, isFalse);
+        expect(t.error, isNull);
+      });
+    });
+
+    test('A lente, B encore en cours : A ne s\'ouvre pas, B finit', () {
+      fakeAsync((async) {
+        final requests = {'9001': Completer<void>(), '9002': Completer<void>()};
+        final t = slow(requests);
+        t.zap(1);
+        async.elapse(LiveTuner.zapDelay);
+        requests['9001']!.complete();
+        async.flushMicrotasks();
+        expect(opened, isEmpty);
+        expect(t.opening, isTrue);
+        requests['9002']!.complete();
+        async.flushMicrotasks();
+
+        expect(opened, ['9002']);
+        expect(t.opening, isFalse);
+      });
+    });
+
+    test('ouverture courante abandonnée (lecteur pris ailleurs) : pas de '
+        'roue sans fin, message et « Réessayer »', () {
       fakeAsync((async) {
         fail = (_) => const PlaybackAbandoned();
         final t = tuner(twelve, twelve[0]);
         async.flushMicrotasks();
+
+        expect(t.opening, isFalse);
+        expect(t.error, const PlaybackFailed().message);
+        fail = null;
+        t.retry();
+        async.flushMicrotasks();
         expect(t.error, isNull);
-        expect(watched, isEmpty);
+        expect(opened, ['9001', '9001']);
       });
     });
   });
@@ -284,7 +364,7 @@ void main() {
         final t = LiveTuner(
           channels: twelve,
           start: twelve[0],
-          open: (channel) {
+          open: (channel, _) {
             opened.add(channel.id);
             return pending.future;
           },

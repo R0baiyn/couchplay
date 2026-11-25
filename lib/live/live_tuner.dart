@@ -43,7 +43,10 @@ final class LiveTuner extends ChangeNotifier {
       'La chaîne s\'est coupée : le réseau a lâché, ou un autre appareil '
       'utilise peut-être ton abonnement.';
 
-  final Future<void> Function(Channel) _open;
+  /// Ouvre le flux de la chaîne. Après chaque attente (adresse à résoudre),
+  /// `current()` faux : un zapping ou un arrêt est passé, ne rien ouvrir
+  /// (lever `PlaybackAbandoned`).
+  final Future<void> Function(Channel channel, bool Function() current) _open;
   final void Function(Channel)? _onWatched;
   late final List<Channel> _channels;
   late int _index;
@@ -130,16 +133,21 @@ final class LiveTuner extends ChangeNotifier {
     _opening = true;
     _error = null;
     notifyListeners();
+    bool current() => generation == _generation && !_stopped;
     try {
-      await _open(channel);
-      if (generation != _generation || _stopped) return;
+      await _open(channel, current);
+      if (!current()) return;
       _opening = false;
       notifyListeners();
       _onWatched?.call(channel);
     } on PlaybackAbandoned {
-      return;
+      // Remplacée (zapping, arrêt) : rien à dire. Encore la nôtre (lecteur
+      // pris par un autre écran) : pas de roue sans fin.
+      if (!current()) return;
+      _tuned = null;
+      _setError(const PlaybackFailed().message);
     } on Exception catch (e) {
-      if (generation != _generation || _stopped) return;
+      if (!current()) return;
       _tuned = null;
       _setError(switch (e) {
         PlaybackFailed() => e.message,
