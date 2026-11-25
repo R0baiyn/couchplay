@@ -55,10 +55,10 @@ int _compareNumbers(int? a, int? b) => switch ((a, b)) {
 };
 
 Channel? _channel(Map<String, Object?> map) {
-  // Les radios (`radio_streams`) ne sont pas des chaînes de télévision. Sans
-  // `stream_type`, l'entrée est prise pour une chaîne.
-  final type = asString(map['stream_type'])?.trim();
-  if (type != null && type != 'live') return null;
+  // Les radios (`radio_streams`) ne sont pas des chaînes de télévision. Tout
+  // autre type est gardé : selon le serveur, une chaîne peut être `live`,
+  // `created_live` ou sans `stream_type`.
+  if (asString(map['stream_type'])?.trim() == 'radio_streams') return null;
   final id = asId(map['stream_id']);
   final name = asString(map['name'])?.trim();
   if (id == null || name == null) return null;

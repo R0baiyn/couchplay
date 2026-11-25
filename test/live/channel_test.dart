@@ -84,6 +84,15 @@ void main() {
       expect([for (final c in channels) c.id], ['3']);
     });
 
+    test('seules les radios sont écartées : `created_live` gardée', () {
+      final channels = parse([
+        {'stream_id': 1, 'name': 'A', 'stream_type': 'live'},
+        {'stream_id': 2, 'name': 'B', 'stream_type': 'created_live'},
+        {'stream_id': 3, 'name': 'C', 'stream_type': 'radio_streams'},
+      ]);
+      expect([for (final c in channels) c.id], ['1', '2']);
+    });
+
     test('ordre par num, stable, sans num à la fin', () {
       final channels = parse([
         {'stream_id': 'a', 'name': 'A', 'num': 3},
