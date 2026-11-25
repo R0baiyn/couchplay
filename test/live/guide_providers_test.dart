@@ -65,6 +65,8 @@ void main() {
   late String? xml;
   late int downloads;
   late int downloadsB;
+  late bool catalogBDown;
+  late bool guideBDown;
 
   final fixtures = {
     'get_live_categories': File('test/fixtures/live_categories.json')
@@ -84,6 +86,8 @@ void main() {
     ], DateTime.now());
     downloads = 0;
     downloadsB = 0;
+    catalogBDown = false;
+    guideBDown = false;
   });
   tearDown(() => root.deleteSync(recursive: true));
 
@@ -105,9 +109,12 @@ void main() {
   final server = FakeAdapter((options) async {
     if (options.uri.host == 'b.example.com') {
       if (options.uri.path != '/xmltv.php') {
-        return routesB.fetch(options, null, null);
+        return catalogBDown
+            ? ResponseBody.fromString('', 500)
+            : routesB.fetch(options, null, null);
       }
       downloadsB++;
+      if (guideBDown) return ResponseBody.fromString('', 500);
       final now = DateTime.now();
       return ResponseBody.fromString(
         _guide(['b.test', 'chaine1.test'], now),
@@ -261,6 +268,36 @@ void main() {
       expect(downloads, 1);
     },
   );
+
+  test('compte B dont le catalogue échoue, sans cache : aucun guide de B '
+      'demandé avec les chaînes de A', () async {
+    final c = await container();
+    expect((await guide(c)).programmes, isNotEmpty);
+    catalogBDown = true;
+
+    await c.read(accountsProvider.notifier).activate('b');
+    await expectLater(c.read(liveCatalogProvider.future), throwsA(anything));
+    final loaded = (await c.read(guideProvider.future)).value;
+    expect(downloadsB, 0);
+    // Rien de A sous B.
+    expect(loaded.programmes, isEmpty);
+    expect(
+      File('${root.path}/accounts/b/live/guide.json').existsSync(),
+      isFalse,
+    );
+  });
+
+  test('compte B dont le guide échoue : rien du guide de A sous B', () async {
+    final c = await container();
+    expect((await guide(c)).programmes, isNotEmpty);
+    guideBDown = true;
+
+    await c.read(accountsProvider.notifier).activate('b');
+    await c.read(liveCatalogProvider.future);
+    final loaded = await guide(c);
+    expect(downloadsB, 1);
+    expect(loaded.programmes, isEmpty);
+  });
 
   test('« Actualiser » qui échoue : le guide affiché reste', () async {
     final c = await container();
@@ -441,6 +478,43 @@ void main() {
         async.elapse(const Duration(minutes: 1));
         expect(calls, hasLength(2));
         c.dispose();
+      });
+    });
+
+    test(
+      'échec au rechargement des 24 h : le guide reste, réessai dans 1 h',
+      () {
+        fakeAsync((async) {
+          var fail = false;
+          final (c, calls) = fake(async, (_) {
+            if (fail) throw const InvalidResponse('HTTP 500');
+            return Loaded(fixed);
+          });
+          fail = true;
+          async.elapse(const Duration(hours: 24));
+          expect(calls, hasLength(2));
+          expect(c.read(guideProvider).value?.value.programmes, isNotEmpty);
+          async.elapse(const Duration(minutes: 59));
+          expect(calls, hasLength(2));
+          async.elapse(const Duration(minutes: 1));
+          expect(calls, hasLength(3));
+          expect(c.read(guideProvider).value?.value.programmes, isNotEmpty);
+          c.dispose();
+        });
+      },
+    );
+
+    test('1er chargement raté : un essai par heure, pas plus', () {
+      fakeAsync((async) {
+        final (c, calls) = fake(async, (_) => throw const ServerUnreachable());
+        expect(calls, hasLength(1));
+        expect(c.read(guideProvider).value?.value.programmes, isEmpty);
+        async.elapse(const Duration(minutes: 59));
+        expect(calls, hasLength(1));
+        async.elapse(const Duration(hours: 3, minutes: 1));
+        expect(calls, hasLength(5));
+        c.dispose();
+        expect(async.pendingTimers, isEmpty);
       });
     });
 

@@ -165,13 +165,18 @@ final class _GuideChannels {
 /// catégories ne fait que choisir quoi afficher, sans jamais retélécharger
 /// le guide (un guide entier par case cochée, chez un fournisseur qui peut
 /// bannir). Mesuré sur un vrai guide : 2 711 ids, cache de 7,4 Mo, lu en
-/// 1 s. `null` tant que les chaînes ne sont pas chargées, ou rechargées
-/// après un changement de compte : le guide du nouveau compte n'est pas
-/// demandé avec les chaînes de l'ancien.
+/// 1 s. `null` tant que les chaînes du compte ne sont pas là (chargement ou
+/// erreur) : riverpod y garde la valeur d'avant, celle de l'ancien compte
+/// après un changement de compte, et le guide du nouveau serait demandé
+/// avec les chaînes de l'ancien.
 final _guideChannelsProvider = Provider.autoDispose<_GuideChannels?>((ref) {
-  final catalog = ref.watch(liveCatalogProvider);
-  final channels = catalog.value?.value.channels;
-  if (catalog.isLoading || channels == null) return null;
+  final channels = ref
+      .watch(liveCatalogProvider)
+      .unwrapPrevious()
+      .value
+      ?.value
+      .channels;
+  if (channels == null) return null;
   return _GuideChannels({
     for (final channel in channels) ?channel.epgChannelId,
   });
@@ -193,19 +198,27 @@ class GuideNotifier extends AsyncNotifier<Loaded<Guide>> {
   static const _minReload = Duration(hours: 1);
 
   /// Relit le guide quand il a 24 h, même si l'écran reste ouvert (une TV
-  /// laissée allumée).
+  /// laissée allumée), ou réessaie après un échec.
   Timer? _reload;
 
   @override
   Future<Loaded<Guide>> build() async {
     ref.onDispose(() => _reload?.cancel());
+    final shown = state.value;
     final channels = ref.watch(_guideChannelsProvider);
     if (channels == null) return const Loaded(Guide.empty);
     final repository = ref.watch(guideRepositoryProvider);
     final loaded = await _loadGuide(repository, channels.ids);
-    if (loaded == null) return const Loaded(Guide.empty);
-    if (ref.mounted) _scheduleReload(loaded);
-    return loaded;
+    if (loaded != null) {
+      if (ref.mounted) _scheduleReload(loaded);
+      return loaded;
+    }
+    // Échec (1er chargement, rechargement des 24 h) : le guide affiché
+    // reste, et un nouvel essai part dans une heure. Jamais celui d'un autre
+    // compte : au changement de compte, les chaînes passent par `null`, qui
+    // vide le guide avant le chargement du nouveau.
+    if (ref.mounted) _arm(_minReload);
+    return shown ?? const Loaded(Guide.empty);
   }
 
   /// « Actualiser » : retélécharge, même avec un cache récent. En cas
@@ -224,10 +237,13 @@ class GuideNotifier extends AsyncNotifier<Loaded<Guide>> {
   /// téléchargement), au plus tôt dans [_minReload].
   void _scheduleReload(Loaded<Guide> loaded) {
     final now = ref.read(guideNowProvider)();
-    var delay = (loaded.savedAt ?? now)
+    final delay = (loaded.savedAt ?? now)
         .add(CatalogRepository.maxAge)
         .difference(now);
-    if (delay < _minReload) delay = _minReload;
+    _arm(delay < _minReload ? _minReload : delay);
+  }
+
+  void _arm(Duration delay) {
     _reload?.cancel();
     _reload = Timer(delay, ref.invalidateSelf);
   }
