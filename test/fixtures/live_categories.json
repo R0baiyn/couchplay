@@ -1,0 +1,67 @@
+[
+ {
+  "category_id": "104",
+  "category_name": "FRANCE HD",
+  "parent_id": 0
+ },
+ {
+  "category_id": "1",
+  "category_name": "FRANCE FHD",
+  "parent_id": 0
+ },
+ {
+  "category_id": "105",
+  "category_name": "FRANCE SD",
+  "parent_id": 0
+ },
+ {
+  "category_id": "543",
+  "category_name": "FRANCE H265",
+  "parent_id": 0
+ },
+ {
+  "category_id": "12",
+  "category_name": "SPORT FR",
+  "parent_id": 0
+ },
+ {
+  "category_id": "60",
+  "category_name": "BELGIUM",
+  "parent_id": 0
+ },
+ {
+  "category_id": "7",
+  "category_name": "UK",
+  "parent_id": 0
+ },
+ {
+  "category_id": "1739",
+  "category_name": "DAZN FRANCE",
+  "parent_id": 0
+ },
+ {
+  "category_id": "1826",
+  "category_name": "DISNEY+ SPORT FR",
+  "parent_id": 0
+ },
+ {
+  "category_id": "1811",
+  "category_name": "PRIME SPORTS FRANCE",
+  "parent_id": 0
+ },
+ {
+  "category_id": "747",
+  "category_name": "TSN+ |  SPORTSNET+",
+  "parent_id": 0
+ },
+ {
+  "category_id": "70",
+  "category_name": "EX-YU",
+  "parent_id": 0
+ },
+ {
+  "category_id": "114",
+  "category_name": "Radio",
+  "parent_id": 0
+ }
+]
