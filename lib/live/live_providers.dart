@@ -145,8 +145,8 @@ final visibleChannelsProvider = Provider.autoDispose<AsyncValue<List<Channel>>>(
   },
 );
 
-/// Ids du guide (`epg_channel_id`) des chaînes visibles ; égaux si les ids le
-/// sont : un catalogue rechargé à l'identique ne relit pas le guide.
+/// Ids du guide (`epg_channel_id`) des chaînes ; égaux si les ids le sont :
+/// un catalogue rechargé à l'identique ne relit pas le guide.
 @immutable
 final class _GuideChannels {
   const _GuideChannels(this.ids);
@@ -161,20 +161,25 @@ final class _GuideChannels {
   int get hashCode => Object.hashAllUnordered(ids);
 }
 
-/// `null` tant que les chaînes ne sont pas chargées.
+/// Toutes les chaînes du catalogue, visibles ou non : le filtre des
+/// catégories ne fait que choisir quoi afficher, sans jamais retélécharger
+/// le guide (un guide entier par case cochée, chez un fournisseur qui peut
+/// bannir). Mesuré sur un vrai guide : 2 711 ids, cache de 7,4 Mo, lu en
+/// 1 s. `null` tant que les chaînes ne sont pas chargées, ou rechargées
+/// après un changement de compte : le guide du nouveau compte n'est pas
+/// demandé avec les chaînes de l'ancien.
 final _guideChannelsProvider = Provider.autoDispose<_GuideChannels?>((ref) {
-  final channels = ref.watch(visibleChannelsProvider).value;
-  if (channels == null) return null;
+  final catalog = ref.watch(liveCatalogProvider);
+  final channels = catalog.value?.value.channels;
+  if (catalog.isLoading || channels == null) return null;
   return _GuideChannels({
     for (final channel in channels) ?channel.epgChannelId,
   });
 });
 
-/// Guide des chaînes visibles. Ne finit jamais en erreur : sans guide
+/// Guide des chaînes du catalogue. Ne finit jamais en erreur : sans guide
 /// (serveur muet, pas de guide, guide illisible), une ligne de journal et un
-/// guide vide ; les chaînes restent utilisables. Un filtre qui ajoute des
-/// chaînes absentes du cache relance un téléchargement, un filtre qui en
-/// retire, non.
+/// guide vide ; les chaînes restent utilisables.
 final guideProvider =
     AsyncNotifierProvider.autoDispose<GuideNotifier, Loaded<Guide>>(
       GuideNotifier.new,

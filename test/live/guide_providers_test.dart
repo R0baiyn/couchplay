@@ -132,6 +132,8 @@ void main() {
       ],
     );
     c.listen(guideProvider, (_, _) {});
+    // Comme l'écran : le filtre et les chaînes visibles restent écoutés.
+    c.listen(visibleChannelsProvider, (_, _) {});
     await c.read(accountsProvider.notifier).activate('a');
     await c.read(liveCatalogProvider.future);
     return c;
@@ -143,31 +145,36 @@ void main() {
     return (await c.read(guideProvider.future)).value;
   }
 
-  test('seules les chaînes visibles sont cherchées dans le guide', () async {
-    final c = await container();
-    final loaded = await guide(c);
-    // D-081 : sans le filtre des chaînes visibles, BELGIUM et UK y seraient.
-    expect(loaded.channels, {
-      'chaine1.test',
-      'chaine2.test',
-      'absente.test',
-      'sansprogramme.test',
-      '12345',
-      'chaine7.test',
-      'sport1.test',
-      'sport3.test',
-    });
-    expect(
-      loaded.programmes.keys,
-      unorderedEquals(['chaine1.test', 'chaine7.test']),
-    );
-    expect(
-      c.read(onAirProvider('chaine1.test'))?.current?.title,
-      'Sur chaine1.test',
-    );
-    expect(c.read(onAirProvider('chaine8.test')), isNull);
-    expect(c.read(onAirProvider('chaine2.test')), isNull);
-  });
+  test(
+    'toutes les chaînes du catalogue sont cherchées, visibles ou non',
+    () async {
+      final c = await container();
+      final loaded = await guide(c);
+      // BELGIUM (chaine8) et UK (channel9) sont masquées, mais cherchées : le
+      // filtre ne relit jamais le guide. Pas la radio, ni les chaînes sans id.
+      expect(loaded.channels, {
+        'chaine1.test',
+        'chaine2.test',
+        'absente.test',
+        'sansprogramme.test',
+        '12345',
+        'chaine7.test',
+        'sport1.test',
+        'sport3.test',
+        'chaine8.test',
+        'channel9.test',
+      });
+      expect(
+        loaded.programmes.keys,
+        unorderedEquals(['chaine1.test', 'chaine7.test', 'chaine8.test']),
+      );
+      expect(
+        c.read(onAirProvider('chaine1.test'))?.current?.title,
+        'Sur chaine1.test',
+      );
+      expect(c.read(onAirProvider('chaine2.test')), isNull);
+    },
+  );
 
   test('pas de guide (serveur sans guide) : guide vide, sans erreur, les '
       'chaînes restent', () async {
@@ -180,22 +187,28 @@ void main() {
     expect(c.read(onAirProvider('chaine1.test')), isNull);
   });
 
-  test('filtre : une chaîne de plus retélécharge, une de moins non', () async {
-    final c = await container();
-    await guide(c);
-    expect(downloads, 1);
-    const belgium = Category(id: '60', name: 'BELGIUM');
-    final filter = c.read(catalogFilterProvider.notifier);
+  test(
+    'filtre : cocher ou décocher une catégorie ne retélécharge rien',
+    () async {
+      final c = await container();
+      await guide(c);
+      expect(downloads, 1);
+      const belgium = Category(id: '60', name: 'BELGIUM');
+      final filter = c.read(catalogFilterProvider.notifier);
 
-    await filter.setLiveCategory(belgium, shown: true);
-    final more = await guide(c);
-    expect(downloads, 2);
-    expect(more.programmes.keys, contains('chaine8.test'));
+      await filter.setLiveCategory(belgium, shown: true);
+      final more = await guide(c);
+      expect(more.programmes.keys, contains('chaine8.test'));
+      expect(
+        c.read(onAirProvider('chaine8.test'))?.current?.title,
+        'Sur chaine8.test',
+      );
 
-    await filter.setLiveCategory(belgium, shown: false);
-    await guide(c);
-    expect(downloads, 2);
-  });
+      await filter.setLiveCategory(belgium, shown: false);
+      await guide(c);
+      expect(downloads, 1);
+    },
+  );
 
   test(
     'par compte : chacun son guide, son cache, un seul téléchargement',
