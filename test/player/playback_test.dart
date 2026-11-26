@@ -260,4 +260,66 @@ void main() {
       );
     }
   });
+
+  group('playedLine', () {
+    test('décodeur, cadence et images perdues de la lecture', () {
+      expect(
+        playedLine(
+          const Duration(seconds: 42, milliseconds: 700),
+          {
+            'hwdec-current': 'd3d11va-copy',
+            'video-format': 'hevc',
+            'container-fps': '50.000000',
+            'estimated-vf-fps': '49.951220',
+            'frame-drop-count': '3',
+            'decoder-frame-drop-count': '0',
+            'vo-delayed-frame-count': '12',
+          },
+          stalls: 2,
+          stalled: const Duration(milliseconds: 3450),
+        ),
+        'Fin de lecture : 42 s, décodage d3d11va-copy, hevc 50 i/s '
+        '(décodées 50,0), images perdues : 3 à l\'affichage, 0 au décodage, '
+        '12 en retard, attentes du cache : 2 (3,5 s)',
+      );
+    });
+
+    test('décodage logiciel et valeurs absentes (flux sans image)', () {
+      expect(
+        playedLine(
+          const Duration(minutes: 2),
+          {'hwdec-current': 'no', 'video-format': ''},
+          stalls: 0,
+          stalled: Duration.zero,
+        ),
+        'Fin de lecture : 120 s, décodage logiciel, ? ? i/s (décodées ?), '
+        'images perdues : ? à l\'affichage, ? au décodage, ? en retard, '
+        'attentes du cache : 0 (0,0 s)',
+      );
+    });
+  });
+
+  group('CacheStalls', () {
+    test('chaque attente compte une fois, avec sa durée', () {
+      var now = DateTime(2026, 11, 27, 20);
+      void wait(int ms) => now = now.add(Duration(milliseconds: ms));
+      final stalls = CacheStalls(() => now);
+      stalls.update(false);
+      wait(1000);
+      stalls.update(true);
+      wait(1500);
+      stalls.update(true); // même attente, redite par mpv
+      wait(500);
+      stalls.update(false);
+      wait(4000);
+      stalls.update(true);
+      wait(250);
+      expect(stalls.count, 2);
+      // Attente encore en cours : comptée jusqu'à maintenant.
+      expect(stalls.total, const Duration(milliseconds: 2250));
+      stalls.update(false);
+      wait(1000);
+      expect(stalls.total, const Duration(milliseconds: 2250));
+    });
+  });
 }
