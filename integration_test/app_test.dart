@@ -10,6 +10,7 @@ import 'journey_1.dart' as journey_1;
 import 'journey_2.dart' as journey_2;
 import 'journey_3.dart' as journey_3;
 import 'journey_4.dart' as journey_4;
+import 'journey_5.dart' as journey_5;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -17,4 +18,5 @@ void main() {
   group('parcours 2', journey_2.main);
   group('parcours 3', journey_3.main);
   group('parcours 4', journey_4.main);
+  group('parcours 5', journey_5.main);
 }

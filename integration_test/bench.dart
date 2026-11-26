@@ -125,13 +125,17 @@ Future<TestGesture> showPlayerControls(WidgetTester tester) async {
 }
 
 /// Sans compte : remplit le formulaire avec le compte « Salon » du faux
-/// serveur et attend l'Accueil.
-Future<void> addBenchAccount(WidgetTester tester, FakeServer server) async {
+/// serveur et attend l'Accueil. [user] choisit son comportement.
+Future<void> addBenchAccount(
+  WidgetTester tester,
+  FakeServer server, {
+  String user = benchUser,
+}) async {
   await waitFor(tester, byKey('accounts.name'));
   expect(find.text('Ajouter un compte'), findsOneWidget);
   await tester.enterText(byKey('accounts.name'), 'Salon');
   await tester.enterText(byKey('accounts.host'), server.host);
-  await tester.enterText(byKey('accounts.username'), benchUser);
+  await tester.enterText(byKey('accounts.username'), user);
   await tester.enterText(byKey('accounts.password'), benchPassword);
   await tester.tap(byKey('accounts.submit'));
   // L'onglet choisi perd sa Key (icône choisie sans Key) : l'Accueil se
@@ -267,25 +271,39 @@ typedef IsolatedApp = ({
 
 /// Le faux serveur Python (`tools/faux-serveur.py`), lancé pour le banc.
 final class FakeServer {
-  FakeServer._(this._process, this.port);
+  FakeServer._(this._process, this.port, this._output);
 
   final Process _process;
   final int port;
+
+  /// Sortie du serveur : une ligne par requête reçue.
+  final StringBuffer _output;
+
+  /// Nombre de requêtes `GET` reçues pour [path].
+  int requests(String path) => 'GET $path '.allMatches('$_output').length;
 
   /// Adresse à saisir dans le formulaire de compte : jamais de nom à
   /// résoudre, donc jamais de sortie sur le réseau.
   String get host => 'http://${InternetAddress.loopbackIPv4.address}:$port';
 
-  static Future<FakeServer> start({int port = benchPort}) async {
+  /// [live] : catalogue des fixtures (chaînes 9001 et suivantes), mire du
+  /// direct et ancien flux coupé 2 s après une 2e connexion du compte.
+  static Future<FakeServer> start({
+    int port = benchPort,
+    bool live = false,
+  }) async {
     final root = _repositoryRoot();
-    final video = File(
-      [root.path, 'probe', 'mire-720p.mkv'].join(Platform.pathSeparator),
-    );
-    if (!video.existsSync()) {
-      throw StateError(
-        'Vidéo du banc absente : ${video.path}. Fichier local ignoré par git : '
-        'ces parcours ne tournent que sur le PC qui l’a.',
-      );
+    String inRepository(String folder, String name) =>
+        [root.path, folder, name].join(Platform.pathSeparator);
+    final video = File(inRepository('probe', 'mire-720p.mkv'));
+    final mire = File(inRepository('probe', 'mire-720p.ts'));
+    for (final file in [video, if (live) mire]) {
+      if (!file.existsSync()) {
+        throw StateError(
+          'Vidéo du banc absente : ${file.path}. Fichier local ignoré par '
+          'git : ces parcours ne tournent que sur le PC qui l’a.',
+        );
+      }
     }
     if (await _listening(port)) {
       throw StateError(
@@ -296,20 +314,31 @@ final class FakeServer {
     // Sans shell : `kill` atteint python lui-même, pas un cmd.exe.
     final process = await Process.start('python', [
       '-I',
-      [root.path, 'tools', 'faux-serveur.py'].join(Platform.pathSeparator),
+      inRepository('tools', 'faux-serveur.py'),
       '--port',
       '$port',
       '--video',
       video.path,
       '--max-par-categorie',
       '20',
+      // Banc tué avant `stop` : le serveur voit son entrée se fermer et
+      // libère le port.
+      '--arret-fin-entree',
+      if (live) ...[
+        '--donnees',
+        inRepository('test', 'fixtures'),
+        '--direct',
+        mire.path,
+        '--delai-coupure',
+        '2',
+      ],
     ], workingDirectory: root.path);
     final output = StringBuffer();
     process.stdout.transform(utf8.decoder).listen(output.write);
     process.stderr.transform(utf8.decoder).listen(output.write);
     int? exited;
     unawaited(process.exitCode.then((code) => exited = code));
-    final server = FakeServer._(process, port);
+    final server = FakeServer._(process, port, output);
     final clock = Stopwatch()..start();
     while (!await server._answers()) {
       if (exited != null) {
