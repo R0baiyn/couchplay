@@ -490,38 +490,53 @@ void main() {
       );
     });
 
-    testWidgets('OK maintenu que le clavier répète en appuis successifs : '
-        'favorite, jamais de lancement ; un OK court ensuite ouvre', (
-      tester,
-    ) async {
-      await pump(tester);
-      for (var i = 0; focused() == null; i++) {
-        if (i == 20) fail('aucune chaîne atteinte au clavier');
-        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-        await tester.pump();
-      }
-      final id = focused()!;
-
-      // La répétition d'Android ouvre le menu, puis le clavier répète par
-      // des paires relâchement et appui très rapprochées.
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
-      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.select);
-      for (var i = 0; i < 3; i++) {
-        await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+    /// Les deux formes d'un OK maintenu : celle d'une télécommande ou d'un
+    /// clavier USB, et celle du clavier d'un ordinateur, où la répétition
+    /// d'Android ouvre le menu puis la touche revient par paires relâchement
+    /// et appui très rapprochées. Chacune finit par un relâchement.
+    final holds = <String, Future<void> Function(WidgetTester)>{
+      'appui, répétitions, un relâchement': (tester) async {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
-        await tester.pump(const Duration(milliseconds: 33));
-      }
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
-      await settle(tester);
-      expect(library(tester).isChannelFavorite(id), isTrue);
-      expect(byKey('live.player'), findsNothing);
-      expect(opened(), isEmpty);
+        for (var i = 0; i < 5; i++) {
+          await tester.sendKeyRepeatEvent(LogicalKeyboardKey.select);
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      },
+      'paires relâchement et appui': (tester) async {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.select);
+        for (var i = 0; i < 20; i++) {
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+          await tester.pump(const Duration(milliseconds: 33));
+        }
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      },
+    };
+    for (final MapEntry(key: form, value: hold) in holds.entries) {
+      testWidgets('OK maintenu ($form) : favorite, jamais de lancement ; un '
+          'OK court et isolé ensuite ouvre', (tester) async {
+        await pump(tester);
+        for (var i = 0; focused() == null; i++) {
+          if (i == 20) fail('aucune chaîne atteinte au clavier');
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        final id = focused()!;
 
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.sendKeyEvent(LogicalKeyboardKey.select);
-      await settle(tester);
-      expect(opened(), [id]);
-    });
+        await hold(tester);
+        await settle(tester);
+        expect(library(tester).isChannelFavorite(id), isTrue);
+        expect(byKey('live.player'), findsNothing);
+        expect(opened(), isEmpty);
+
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await settle(tester);
+        expect(opened(), [id]);
+      });
+    }
   });
 
   group('guide des programmes', () {
