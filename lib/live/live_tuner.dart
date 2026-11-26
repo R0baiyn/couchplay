@@ -9,14 +9,19 @@ import 'channel.dart';
 
 /// Chaîne regardée, zapping et reconnexion du lecteur du direct, sans
 /// widget ni minuterie dans l'écran (D-087) :
-/// - zapping dans [channels] (la liste d'où l'on vient), en boucle : la
-///   chaîne affichée change tout de suite, son flux ne s'ouvre qu'après
-///   [zapDelay] sans nouvel appui (dix appuis rapides = une ouverture) ;
+/// - zapping dans [channels] (la liste d'où l'on vient), en boucle, en
+///   aperçu ([previewing]) : la chaîne affichée change tout de suite, celle
+///   en cours continue de jouer ; la chaîne affichée ne s'ouvre qu'après
+///   [zapDelay] sans nouvel appui (dix appuis rapides = une ouverture), ou
+///   tout de suite par [confirm] ; revenir sur la chaîne en cours finit
+///   l'aperçu sans rien ouvrir ;
 /// - flux coupé ([lost]) : une seule reconnexion, après 1 s, puis
 ///   [lostMessage]. Le droit à une reconnexion ne revient qu'avec un zapping
-///   ou [retry] : un flux coupé toutes les 15 s ne boucle pas ;
+///   ou [retry] : un flux coupé toutes les 15 s ne boucle pas ; coupé
+///   pendant l'aperçu : pas de reconnexion, la chaîne affichée s'ouvrira à la
+///   fin de l'attente (même si c'est celle qui s'est coupée) ;
 /// - refus du serveur : son message, sans autre essai que ceux de
-///   `Playback.open` (comme un film).
+///   `Playback.open` (comme un film) ; pendant l'aperçu, aucun message.
 final class LiveTuner extends ChangeNotifier {
   LiveTuner({
     required List<Channel> channels,
@@ -29,9 +34,9 @@ final class LiveTuner extends ChangeNotifier {
     _index = index < 0 ? 0 : index;
   }
 
-  /// Attente sans nouvel appui avant d'ouvrir la chaîne choisie : 500 ms à
-  /// 1 s suffisent (`Docs/DIRECT.md`, point 6).
-  static const zapDelay = Duration(milliseconds: 700);
+  /// Attente sans nouvel appui avant d'ouvrir la chaîne choisie : de quoi
+  /// parcourir les chaînes au bandeau sans ouvrir chacune (D-090).
+  static const zapDelay = Duration(seconds: 2);
 
   /// Durée d'affichage du bandeau de la chaîne.
   static const bannerFor = Duration(seconds: 4);
@@ -75,6 +80,10 @@ final class LiveTuner extends ChangeNotifier {
   String? get error => _error;
   String? _error;
 
+  /// Aperçu : la chaîne affichée n'est pas celle qui joue, elle s'ouvrira à
+  /// la fin de l'attente.
+  bool get previewing => _zap?.isActive ?? false;
+
   /// Ouvre la chaîne de départ.
   void start() {
     banner.show();
@@ -85,12 +94,33 @@ final class LiveTuner extends ChangeNotifier {
   void zap(int step) {
     if (_channels.length < 2) return;
     _index = (_index + step) % _channels.length;
-    _reconnect?.cancel();
-    _reconnected = false;
     _zap?.cancel();
-    _zap = Timer(zapDelay, () => unawaited(_tune()));
+    // De retour sur la chaîne qui joue : l'aperçu finit, rien à ouvrir. Une
+    // reconnexion attendue n'a pas de chaîne qui joue (`_tuned` nul).
+    if (!_playing) {
+      _reconnect?.cancel();
+      _zap = Timer(zapDelay, _tuneChoice);
+    }
     banner.show();
     notifyListeners();
+  }
+
+  /// Pendant l'aperçu (OK, toucher du bandeau) : ouvre tout de suite la
+  /// chaîne affichée. Faux hors de l'aperçu : rien n'est fait.
+  bool confirm() {
+    if (!previewing) return false;
+    _tuneChoice();
+    return true;
+  }
+
+  /// La chaîne affichée est celle dont le flux est ouvert (ou s'ouvre).
+  bool get _playing => identical(_tuned, channel) && _error == null;
+
+  /// Ouvre la chaîne choisie au zapping : nouvelle chaîne, nouveau droit à
+  /// une reconnexion.
+  void _tuneChoice() {
+    _reconnected = false;
+    unawaited(_tune());
   }
 
   /// Après un message : rouvre la chaîne affichée.
@@ -103,14 +133,15 @@ final class LiveTuner extends ChangeNotifier {
   /// Le flux en cours s'est terminé (un direct ne finit pas : il a été
   /// coupé). Ignoré pendant une ouverture, une attente ou après un message.
   void lost() {
-    if (_stopped ||
-        _opening ||
-        _error != null ||
-        (_zap?.isActive ?? false) ||
-        _tuned == null) {
+    if (_stopped || _opening || _error != null || _tuned == null) return;
+    _tuned = null;
+    if (previewing) {
+      log(
+        'Direct : flux coupé pendant l\'aperçu, ouverture à la fin de '
+        'l\'attente',
+      );
       return;
     }
-    _tuned = null;
     if (_reconnected) {
       log('Direct : flux coupé de nouveau, pas d\'autre reconnexion');
       _setError(lostMessage);
@@ -127,7 +158,7 @@ final class LiveTuner extends ChangeNotifier {
     _zap?.cancel();
     _reconnect?.cancel();
     final channel = this.channel;
-    if (_stopped || (identical(_tuned, channel) && _error == null)) return;
+    if (_stopped || _playing) return;
     final generation = ++_generation;
     _tuned = channel;
     _opening = true;
@@ -144,17 +175,25 @@ final class LiveTuner extends ChangeNotifier {
       // Remplacée (zapping, arrêt) : rien à dire. Encore la nôtre (lecteur
       // pris par un autre écran) : pas de roue sans fin.
       if (!current()) return;
-      _tuned = null;
-      _setError(const PlaybackFailed().message);
+      _failed(const PlaybackFailed().message);
     } on Exception catch (e) {
       if (!current()) return;
-      _tuned = null;
-      _setError(switch (e) {
+      _failed(switch (e) {
         PlaybackFailed() => e.message,
         NameNotResolved() => e.message,
         _ => const PlaybackFailed().message,
       });
     }
+  }
+
+  /// La chaîne en cours n'a pas pu s'ouvrir. Pendant l'aperçu, pas de
+  /// message (il porterait le nom de la chaîne affichée) : celle-ci s'ouvre
+  /// à la fin de l'attente.
+  void _failed(String message) {
+    _tuned = null;
+    if (!previewing) return _setError(message);
+    _opening = false;
+    notifyListeners();
   }
 
   void _setError(String message) {

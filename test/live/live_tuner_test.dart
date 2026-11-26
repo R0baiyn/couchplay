@@ -85,7 +85,7 @@ void main() {
         t.zap(1);
         expect(t.channel.id, '9001');
         t.zap(1);
-        async.elapse(const Duration(seconds: 1));
+        async.elapse(LiveTuner.zapDelay);
         expect(opened, ['9001', '9002']);
       });
     });
@@ -172,6 +172,130 @@ void main() {
         async.flushMicrotasks();
         expect(t.error, isNull);
         expect(watched, ['9002']);
+      });
+    });
+  });
+
+  group('aperçu', () {
+    test('5 appuis ↓ rapides : une seule ouverture, 2 s après le dernier, '
+        'sans toucher au flux en cours avant', () {
+      fakeAsync((async) {
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        for (var i = 0; i < 5; i++) {
+          t.zap(1);
+          expect(t.previewing, isTrue);
+          async.elapse(const Duration(milliseconds: 300));
+        }
+        expect(t.channel.id, '9006');
+        // Pendant l'aperçu, le flux en cours n'est ni rouvert ni remplacé.
+        async.elapse(
+          const Duration(seconds: 2) -
+              const Duration(milliseconds: 300) -
+              const Duration(milliseconds: 1),
+        );
+        expect(opened, ['9001']);
+        expect(t.opening, isFalse);
+        async.elapse(const Duration(milliseconds: 1));
+        expect(opened, ['9001', '9006']);
+        expect(t.previewing, isFalse);
+      });
+    });
+
+    test('retour sur la chaîne en cours : l\'aperçu finit, rien ne '
+        's\'ouvre', () {
+      fakeAsync((async) {
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        t
+          ..zap(1)
+          ..zap(1)
+          ..zap(-1)
+          ..zap(-1);
+        expect(t.previewing, isFalse);
+        async.elapse(const Duration(seconds: 5));
+        expect(opened, ['9001']);
+      });
+    });
+
+    test('OK pendant l\'aperçu : la chaîne affichée s\'ouvre tout de '
+        'suite, une seule fois', () {
+      fakeAsync((async) {
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        expect(t.confirm(), isFalse, reason: 'pas d\'aperçu');
+        t
+          ..zap(1)
+          ..zap(1);
+        expect(t.confirm(), isTrue);
+        async.flushMicrotasks();
+        expect(opened, ['9001', '9003']);
+        expect(t.previewing, isFalse);
+        async.elapse(const Duration(seconds: 5));
+        expect(opened, ['9001', '9003']);
+      });
+    });
+
+    test('coupure pendant l\'aperçu, puis retour sur la chaîne coupée : '
+        'elle se rouvre après l\'attente', () {
+      fakeAsync((async) {
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        t
+          ..zap(1)
+          ..lost();
+        async.elapse(const Duration(seconds: 1));
+        expect(opened, [
+          '9001',
+        ], reason: 'aucune reconnexion pendant l\'aperçu');
+        t.zap(-1);
+        expect(t.previewing, isTrue);
+        async.elapse(LiveTuner.zapDelay);
+        expect(opened, ['9001', '9001']);
+        expect(t.error, isNull);
+      });
+    });
+
+    test('échec de la chaîne en cours pendant l\'aperçu : pas de message, '
+        'la chaîne affichée s\'ouvre à la fin de l\'attente', () {
+      fakeAsync((async) {
+        final first = Completer<void>();
+        final t = LiveTuner(
+          channels: twelve,
+          start: twelve[0],
+          open: (channel, _) {
+            opened.add(channel.id);
+            return channel.id == '9001' ? first.future : Future.value();
+          },
+        )..start();
+        t.zap(1);
+        first.completeError(const PlaybackFailed());
+        async.flushMicrotasks();
+        expect(t.error, isNull, reason: 'message de 9001 sous le nom de 9002');
+        expect(t.opening, isFalse);
+        expect(t.previewing, isTrue);
+        async.elapse(LiveTuner.zapDelay);
+        expect(opened, ['9001', '9002']);
+        expect(t.error, isNull);
+      });
+    });
+
+    test('coupure pendant l\'aperçu : la chaîne affichée s\'ouvre à la fin '
+        'de l\'attente, avec son droit à une reconnexion', () {
+      fakeAsync((async) {
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        t.lost();
+        async.elapse(LiveTuner.reconnectDelay);
+        t
+          ..zap(1)
+          ..lost();
+        async.elapse(LiveTuner.zapDelay);
+        expect(opened, ['9001', '9001', '9002']);
+        t.lost();
+        async.elapse(LiveTuner.reconnectDelay);
+        expect(opened, ['9001', '9001', '9002', '9002']);
+        expect(t.error, isNull);
       });
     });
   });
