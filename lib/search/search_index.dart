@@ -75,3 +75,31 @@ List<Channel> searchChannels(List<SearchableChannel> index, String query) => [
   for (final (:channel, text: _) in _rank(index, (c) => [c.text], query))
     channel,
 ];
+
+/// Puces des résultats ; leurs noms sont ceux des Keys `search.filter.*`.
+enum SearchFilter { all, movies, series, live }
+
+/// Sections à afficher sous les puces, dans l'ordre : Films, Séries, puis TV.
+/// Une puce choisie ne garde que la sienne ; liste vide si elle n'a rien.
+/// `null` : rien à montrer encore, les chaînes chargent toujours
+/// ([channelsPending]).
+List<SearchFilter>? searchSections(
+  SearchFilter filter, {
+  required bool movies,
+  required bool series,
+  required bool channels,
+  required bool channelsPending,
+}) {
+  final shown = [
+    for (final (section, found) in [
+      (SearchFilter.movies, movies),
+      (SearchFilter.series, series),
+      (SearchFilter.live, channels),
+    ])
+      if (found && (filter == SearchFilter.all || filter == section)) section,
+  ];
+  final waiting =
+      channelsPending &&
+      (filter == SearchFilter.all || filter == SearchFilter.live);
+  return shown.isEmpty && waiting ? null : shown;
+}

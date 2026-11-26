@@ -206,4 +206,63 @@ void main() {
       ]);
     });
   });
+
+  group('sections des résultats', () {
+    List<SearchFilter>? sections(
+      SearchFilter filter, {
+      bool movies = true,
+      bool series = true,
+      bool channels = true,
+      bool channelsPending = false,
+    }) => searchSections(
+      filter,
+      movies: movies,
+      series: series,
+      channels: channels,
+      channelsPending: channelsPending,
+    );
+    const m = SearchFilter.movies;
+    const s = SearchFilter.series;
+    const tv = SearchFilter.live;
+
+    test('les puces et leurs noms', () {
+      expect(SearchFilter.values.map((f) => f.name), [
+        'all',
+        'movies',
+        'series',
+        'live',
+      ]);
+    });
+
+    test('« Tout » : Films, Séries puis TV, sans les types vides', () {
+      expect(sections(SearchFilter.all), [m, s, tv]);
+      expect(sections(SearchFilter.all, series: false), [m, tv]);
+      expect(sections(SearchFilter.all, movies: false, series: false), [tv]);
+    });
+
+    test('une puce ne garde que son type, vide s\'il n\'a rien', () {
+      expect(sections(m), [m]);
+      expect(sections(s), [s]);
+      expect(sections(tv), [tv]);
+      expect(sections(s, series: false), isEmpty);
+    });
+
+    test('chaînes en chargement : on attend pour TV, et pour « Tout » sans '
+        'rien d\'autre', () {
+      List<SearchFilter>? pending(SearchFilter filter, {bool others = true}) =>
+          sections(
+            filter,
+            movies: others,
+            series: others,
+            channels: false,
+            channelsPending: true,
+          );
+      expect(pending(tv), isNull);
+      expect(pending(SearchFilter.all, others: false), isNull);
+      expect(pending(SearchFilter.all), [m, s]);
+      expect(pending(m), [m]);
+      // Films déjà connus : « rien de ce type » sans attendre les chaînes.
+      expect(pending(m, others: false), isEmpty);
+    });
+  });
 }

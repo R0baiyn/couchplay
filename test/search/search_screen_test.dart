@@ -6,11 +6,14 @@ import 'package:couchplay/live/channel.dart';
 import 'package:couchplay/live/channel_list_view.dart';
 import 'package:couchplay/live/live_player_screen.dart';
 import 'package:couchplay/player/playback.dart';
+import 'package:couchplay/poster_tile.dart';
 import 'package:couchplay/search/search_index.dart';
 import 'package:couchplay/server/item_name.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/catalog_app.dart';
@@ -20,6 +23,7 @@ import '../support/settle.dart';
 
 void main() {
   setUpCatalogApp();
+  _chipTests();
 
   testWidgets('Recherche : champ, résultats, rien trouvé, effacer', (
     tester,
@@ -245,6 +249,162 @@ void main() {
     expect([for (final c in player.channels) c.id], ['9001', '9006', '9008']);
     await tester.pumpWidget(const SizedBox.shrink());
     await settle(tester);
+  });
+}
+
+// Les deux listes du compte et cette chaîne contiennent « le » : un film,
+// une série, une chaîne.
+final _soleil = channelSearchIndexProvider.overrideWithValue(
+  AsyncData([
+    (
+      channel: const Channel(id: '9011', name: 'Soleil'),
+      text: normalize('Soleil'),
+    ),
+  ]),
+);
+
+Finder _byKey(String key) => find.byKey(ValueKey(key));
+
+Finder _chip(String name) => _byKey('search.filter.$name');
+
+bool _selected(WidgetTester tester, String name) =>
+    tester.widget<ChoiceChip>(_chip(name)).selected;
+
+/// Sections affichées, de haut en bas.
+List<String> _sections(WidgetTester tester) {
+  final shown = {
+    for (final name in ['Channels', 'Movies', 'Series'])
+      if (_byKey('search.section$name').evaluate().isNotEmpty)
+        name: tester.getTopLeft(_byKey('search.section$name')).dy,
+  };
+  return shown.keys.toList()..sort((a, b) => shown[a]!.compareTo(shown[b]!));
+}
+
+/// Assez haut pour que les trois sections soient construites.
+Future<void> _searchFor(
+  WidgetTester tester,
+  String query, {
+  List<Override>? overrides,
+  bool wait = true,
+}) async {
+  await pumpApp(
+    tester,
+    size: const Size(1280, 2400),
+    openMovies: false,
+    searchChannels: true,
+    overrides: overrides ?? [_soleil],
+  );
+  await tester.tap(_byKey('shell.tabSearch'));
+  await settle(tester);
+  await tester.enterText(_byKey('search.field'), query);
+  await tester.pump(const Duration(milliseconds: 300));
+  wait ? await settle(tester) : await tester.pump();
+}
+
+Future<void> _tapChip(WidgetTester tester, String name) async {
+  await tester.tap(_chip(name));
+  await settle(tester);
+}
+
+void _chipTests() {
+  testWidgets('puces : « Tout » au départ, Films, Séries puis TV ; chacune '
+      'ne garde que son type', (tester) async {
+    await _searchFor(tester, 'le');
+    expect(_selected(tester, 'all'), isTrue);
+    expect(_sections(tester), ['Movies', 'Series', 'Channels']);
+
+    await _tapChip(tester, 'movies');
+    expect(_selected(tester, 'movies'), isTrue);
+    expect(_sections(tester), ['Movies']);
+    await _tapChip(tester, 'series');
+    expect(_sections(tester), ['Series']);
+    await _tapChip(tester, 'live');
+    expect(_sections(tester), ['Channels']);
+    expect(_byKey('live.channel.9011'), findsOneWidget);
+    await _tapChip(tester, 'all');
+    expect(_sections(tester), ['Movies', 'Series', 'Channels']);
+  });
+
+  testWidgets('puce gardée quand le texte change ; type sans résultat : les '
+      'puces restent', (tester) async {
+    await _searchFor(tester, 'le');
+    await _tapChip(tester, 'series');
+
+    // « horizon » : des films seulement.
+    await tester.enterText(_byKey('search.field'), 'horizon');
+    await tester.pump(const Duration(milliseconds: 300));
+    await settle(tester);
+    expect(_selected(tester, 'series'), isTrue);
+    expect(_byKey('search.noneOfType'), findsOneWidget);
+    expect(_sections(tester), isEmpty);
+
+    await _tapChip(tester, 'all');
+    expect(_byKey('search.noneOfType'), findsNothing);
+    expect(_sections(tester), ['Movies']);
+  });
+
+  testWidgets('puce TV pendant le chargement des chaînes : la roue', (
+    tester,
+  ) async {
+    await _searchFor(
+      tester,
+      'horizon',
+      overrides: [
+        channelSearchIndexProvider.overrideWithValue(const AsyncLoading()),
+      ],
+      wait: false,
+    );
+    await tester.tap(_chip('live'));
+    await tester.pump();
+    expect(_byKey('search.loading'), findsOneWidget);
+    expect(_byKey('search.noneOfType'), findsNothing);
+  });
+
+  testWidgets('puces au clavier et à la télécommande : ↑ depuis les '
+      'résultats, ← → entre elles, OK choisit', (tester) async {
+    await _searchFor(tester, 'le');
+
+    /// Puce qui a le focus, ou null.
+    String? focusedChip() {
+      final key = FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<ChoiceChip>()
+          ?.key;
+      return key is ValueKey<String> ? key.value.split('.').last : null;
+    }
+
+    Future<void> press(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await settle(tester);
+    }
+
+    // Une affiche a le focus : ↑ remonte aux puces.
+    Focus.of(
+      tester.element(
+        find
+            .descendant(
+              of: find.byType(PosterTile),
+              matching: find.byType(Column),
+            )
+            .first,
+      ),
+    ).requestFocus();
+    await tester.pump();
+    await press(LogicalKeyboardKey.arrowUp);
+    expect(focusedChip(), isNotNull);
+    for (var i = 0; focusedChip() != 'all'; i++) {
+      if (i == 4) fail('« Tout » jamais atteinte par ←');
+      await press(LogicalKeyboardKey.arrowLeft);
+    }
+    await press(LogicalKeyboardKey.arrowRight);
+    await press(LogicalKeyboardKey.arrowRight);
+    expect(focusedChip(), 'series');
+    await press(LogicalKeyboardKey.select);
+    expect(_selected(tester, 'series'), isTrue);
+    expect(_sections(tester), ['Series']);
+    expect(focusedChip(), 'series');
+    // ↓ redescend dans les résultats.
+    await press(LogicalKeyboardKey.arrowDown);
+    expect(focusedChip(), isNull);
   });
 }
 

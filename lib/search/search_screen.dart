@@ -1,12 +1,8 @@
-import '../focus_scroll.dart';
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../catalog/catalog_screen.dart';
-import '../catalog/poster_grid.dart';
 import '../server/status_views.dart';
 import '../catalog/versions.dart';
 import '../server/models.dart';
@@ -14,13 +10,12 @@ import '../settings/settings_screen.dart';
 import '../text_entry.dart';
 import '../catalog/catalog_index.dart';
 import '../live/channel.dart';
-import '../live/channel_list_view.dart';
-import '../live/live_player_screen.dart';
 import 'search_index.dart';
+import 'search_results_view.dart';
 
-/// Onglet Recherche : tout le catalogue visible, chaînes, films puis séries.
-/// Les chaînes ne retiennent pas les résultats : elles s'ajoutent quand leur
-/// liste est chargée.
+/// Onglet Recherche : tout le catalogue visible, films, séries puis chaînes,
+/// avec une puce pour n'en voir qu'un type. Les chaînes ne retiennent pas les
+/// résultats : elles s'ajoutent quand leur liste est chargée.
 ///
 /// La recherche part 300 ms après la dernière frappe (tout de suite avec
 /// Entrée). Si l'index charge encore, elle attend qu'il soit prêt.
@@ -40,6 +35,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   Timer? _timer;
   var _query = '';
+
+  /// Puce choisie : gardée quand le texte change.
+  var _filter = SearchFilter.all;
 
   // Derniers résultats, refaits seulement si un index ou la recherche change.
   KindIndex? _moviesIndex;
@@ -122,12 +120,37 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _channels = searchChannels(channelsIndex ?? const [], _query);
       }
       if (_movies.isNotEmpty || _series.isNotEmpty || _channels.isNotEmpty) {
-        // Clé par recherche : une nouvelle recherche repart en haut.
-        body = _Results(
-          key: ValueKey(_query),
-          channels: _channels,
-          movies: _movies,
-          series: _series,
+        final sections = searchSections(
+          _filter,
+          movies: _movies.isNotEmpty,
+          series: _series.isNotEmpty,
+          channels: _channels.isNotEmpty,
+          channelsPending: !settled(channels),
+        );
+        body = Column(
+          children: [
+            SearchFilterBar(
+              selected: _filter,
+              onSelected: (filter) => setState(() => _filter = filter),
+            ),
+            Expanded(
+              child: switch (sections) {
+                null => loading,
+                [] => message(
+                  const ValueKey('search.noneOfType'),
+                  'Rien de ce type pour « ${_query.trim()} ».',
+                ),
+                // Clé par recherche et par puce : on repart en haut.
+                _ => SearchResults(
+                  key: ValueKey((_query, _filter)),
+                  sections: sections,
+                  movies: _movies,
+                  series: _series,
+                  channels: _channels,
+                ),
+              },
+            ),
+          ],
         );
       } else if (!settled(channels)) {
         // Rien encore : les chaînes peuvent encore répondre.
@@ -194,83 +217,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
       ),
       body: body,
-    );
-  }
-}
-
-/// Résultats en sections, Chaînes (courte, en tête), Films puis Séries, dans
-/// une seule liste qui défile ; les affiches et les rangées ne sont
-/// construites qu'à l'écran. Une chaîne ouvre le lecteur, zapping dans les
-/// chaînes trouvées.
-class _Results extends StatelessWidget {
-  const _Results({
-    super.key,
-    required this.channels,
-    required this.movies,
-    required this.series,
-  });
-
-  final List<Channel> channels;
-  final List<CatalogEntry> movies;
-  final List<CatalogEntry> series;
-
-  @override
-  Widget build(BuildContext context) {
-    void open(CatalogEntry entry) => openDetails(context, entry);
-    Widget title(Key key, String title, int count) => SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: Text(
-          key: key,
-          '$title ($count)',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-      ),
-    );
-    Widget section(Key key, String name, List<CatalogEntry> entries) =>
-        SliverMainAxisGroup(
-          slivers: [
-            title(key, name, entries.length),
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverPosterGrid(entries: entries, onOpen: open),
-            ),
-          ],
-        );
-    return SmoothFocusGroup(
-      child: CustomScrollView(
-        key: const ValueKey('search.results'),
-        slivers: [
-          if (channels.isNotEmpty)
-            SliverMainAxisGroup(
-              slivers: [
-                title(
-                  const ValueKey('search.sectionChannels'),
-                  'Chaînes',
-                  channels.length,
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  sliver: SliverFixedExtentList.builder(
-                    itemExtent: ChannelTile.height,
-                    itemCount: channels.length,
-                    itemBuilder: (context, i) => ChannelTile(
-                      key: ObjectKey(channels[i]),
-                      channel: channels[i],
-                      guide: false,
-                      onOpen: () =>
-                          openLivePlayer(context, channels[i], channels),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          if (movies.isNotEmpty)
-            section(const ValueKey('search.sectionMovies'), 'Films', movies),
-          if (series.isNotEmpty)
-            section(const ValueKey('search.sectionSeries'), 'Séries', series),
-        ],
-      ),
     );
   }
 }
