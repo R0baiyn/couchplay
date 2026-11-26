@@ -5,23 +5,27 @@ import 'package:media_kit/media_kit.dart';
 
 import '../player/player_bars.dart';
 import '../player/player_tracks.dart';
+import 'channel.dart';
 import 'channel_favorite.dart';
 import 'live_banner.dart';
 import 'live_tuner.dart';
 
 /// Contrôles du lecteur du direct, par-dessus l'image : ni barre de temps ni
-/// ±10 s, un bandeau de la chaîne et le zapping.
+/// ±10 s, un bandeau de la chaîne (seul, ou dans les barres chaque fois
+/// qu'elles s'affichent) et le zapping en aperçu (`LiveTuner`).
 ///
 /// - ↑ ↓ : chaîne précédente ou suivante ; CH+ CH− aussi, où que soit le
-///   focus. Sur TV, barres affichées, ↑ ↓ vont aux boutons (les flèches y
-///   passent de l'un à l'autre) ; un zapping n'affiche pas les barres, sinon
-///   le 2e appui irait aux boutons.
-/// - OK, Entrée, Espace, ← → : affichent les barres, le focus sur le premier
+///   focus. Pendant l'aperçu, OK, Entrée ou un toucher du bandeau ouvrent
+///   tout de suite la chaîne affichée. Sur TV, barres affichées, ↑ ↓ vont
+///   aux boutons (les flèches y passent de l'un à l'autre) ; un zapping
+///   n'affiche pas les barres, sinon le 2e appui irait aux boutons.
+/// - Hors aperçu, OK et Entrée ; Espace, ← → : affichent les barres, le focus sur le premier
 ///   bouton (lecture / pause : une autre app qui prend le son met en pause,
 ///   D-071). Touches média : lecture, pause.
 /// - Souris : survol = barres ; double-clic = plein écran. Toucher : affiche
 ///   ou masque les barres.
-/// - F : plein écran ; Échap : quitte le plein écran, puis le lecteur.
+/// - F : plein écran ; Échap : quitte le plein écran, puis le lecteur ; la
+///   flèche retour des barres quitte le lecteur, même en plein écran.
 class LiveControls extends StatefulWidget {
   const LiveControls({
     super.key,
@@ -102,9 +106,10 @@ class _LiveControlsState extends State<LiveControls> {
           ? _focusButtons()
           : _tuner.zap(down ? 1 : -1);
     } else if (onVideo &&
-        (key == LogicalKeyboardKey.select ||
-            key == LogicalKeyboardKey.enter ||
-            key == LogicalKeyboardKey.space ||
+        (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter)) {
+      if (!repeat && !_tuner.confirm()) _focusButtons();
+    } else if (onVideo &&
+        (key == LogicalKeyboardKey.space ||
             key == LogicalKeyboardKey.arrowLeft ||
             key == LogicalKeyboardKey.arrowRight)) {
       if (!repeat) _focusButtons();
@@ -132,6 +137,16 @@ class _LiveControlsState extends State<LiveControls> {
     return KeyEventResult.handled;
   }
 
+  void _toggleBars() => _bars.visible ? _bars.hide() : _bars.show();
+
+  /// Pendant l'aperçu, ouvre la chaîne affichée ; sinon comme l'image.
+  Widget _banner(Channel channel) => GestureDetector(
+    onTap: () {
+      if (!_tuner.confirm()) _toggleBars();
+    },
+    child: LiveBanner(channel: channel),
+  );
+
   void _onDoubleTapDown(TapDownDetails details) {
     if (details.kind == PointerDeviceKind.mouse && widget.fullscreen != null) {
       widget.onToggleFullscreen();
@@ -158,7 +173,7 @@ class _LiveControlsState extends State<LiveControls> {
             GestureDetector(
               key: const ValueKey('live.player.video'),
               behavior: HitTestBehavior.opaque,
-              onTap: () => visible ? _bars.hide() : _bars.show(),
+              onTap: _toggleBars,
               onDoubleTapDown: _onDoubleTapDown,
               // Requis pour que onDoubleTapDown soit appelé.
               onDoubleTap: () {},
@@ -173,16 +188,26 @@ class _LiveControlsState extends State<LiveControls> {
                   title: channelLabel(channel),
                   onExit: widget.onExit,
                   onOver: (over) => _bars.hold = over,
-                  bottom: _buttons(),
+                  bottom: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Construit seulement barres affichées : pas de
+                      // bandeau caché sous l'opacité 0.
+                      if (visible) _banner(channel),
+                      _buttons(),
+                    ],
+                  ),
                 ),
               ),
             ),
+            // Barres masquées : le bandeau seul, à l'ouverture et au zapping.
             ListenableBuilder(
               listenable: _tuner.banner,
               builder: (context, _) => _tuner.banner.visible && !visible
                   ? Align(
                       alignment: Alignment.bottomLeft,
-                      child: SafeArea(child: LiveBanner(channel: channel)),
+                      child: SafeArea(child: _banner(channel)),
                     )
                   : const SizedBox.shrink(),
             ),

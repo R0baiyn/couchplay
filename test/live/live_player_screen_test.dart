@@ -6,7 +6,9 @@ import 'package:couchplay/accounts/account_store.dart';
 import 'package:couchplay/app.dart';
 import 'package:couchplay/downloads/downloads.dart';
 import 'package:couchplay/live/channel.dart';
+import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/live_player_screen.dart';
+import 'package:couchplay/live/live_providers.dart';
 import 'package:couchplay/live/live_tuner.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/television.dart';
@@ -18,11 +20,27 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_downloads.dart';
 import '../support/fake_playback.dart';
+import '../support/fixed_guide.dart';
 
 final _channels = [
   for (var i = 1; i <= 6; i++)
-    Channel(id: '${9000 + i}', name: 'Chaîne $i', number: i),
+    Channel(
+      id: '${9000 + i}',
+      name: 'Chaîne $i',
+      number: i,
+      epgChannelId: 'c$i.fr',
+    ),
 ];
+
+final _now = DateTime.utc(2026, 11, 26, 20);
+
+/// Programme en cours de la 2e chaîne, celle de l'ouverture.
+final _guide = Guide(
+  channels: const {'c2.fr'},
+  programmes: {
+    'c2.fr': [programmeAt(_now, -600, 1800, 'Journal')],
+  },
+);
 
 /// Adresse du flux d'une chaîne sur le compte d'essai.
 String _url(String id) => 'http://127.0.0.1:9/live/u/p/$id.ts';
@@ -116,6 +134,8 @@ void main() {
           playbackProvider.overrideWithValue(playback),
           downloadsProvider.overrideWith(FakeDownloads.new),
           televisionProvider.overrideWithValue(television),
+          guideProvider.overrideWith(() => FixedGuide(_guide)),
+          guideNowProvider.overrideWithValue(() => _now),
         ],
         child: CouchPlayApp(
           home: Builder(
@@ -167,13 +187,54 @@ void main() {
       await key(tester, LogicalKeyboardKey.arrowDown);
       await tester.pump(const Duration(milliseconds: 150));
     }
-    // Le bandeau suit chaque appui, le flux attend.
+    // Le bandeau suit chaque appui ; le flux en cours joue toujours, ni
+    // arrêté ni rouvert.
     expect(banner('5 · Chaîne 5'), findsOneWidget);
+    await run(tester, const Duration(milliseconds: 1500));
     expect(player.urls, [_url('9002')]);
+    expect(player.stops, stops);
 
     await afterZap(tester);
     expect(player.urls, [_url('9002'), _url('9005')]);
     expect(player.stops, stops + 1);
+    await close(tester);
+  });
+
+  testWidgets('aperçu : OK ouvre tout de suite la chaîne affichée, un '
+      'toucher du bandeau aussi', (tester) async {
+    await open(tester);
+
+    await key(tester, LogicalKeyboardKey.arrowDown);
+    await key(tester, LogicalKeyboardKey.select);
+    await run(tester);
+    expect(player.urls, [_url('9002'), _url('9003')]);
+
+    await key(tester, LogicalKeyboardKey.arrowDown);
+    await tester.tap(byKey('live.player.banner'));
+    await run(tester);
+    expect(player.urls, [_url('9002'), _url('9003'), _url('9004')]);
+    // Plus d'aperçu : rien d'autre ne s'ouvre à la fin de l'attente.
+    await afterZap(tester);
+    expect(player.urls, hasLength(3));
+    await close(tester);
+  });
+
+  testWidgets('barres affichées (toucher, touche) : le bandeau aussi, avec '
+      'le programme', (tester) async {
+    await open(tester);
+    await run(tester, LiveTuner.bannerFor);
+    expect(byKey('live.player.banner'), findsNothing);
+
+    await tester.tap(byKey('live.player.video'));
+    await run(tester, const Duration(milliseconds: 400));
+    expect(banner('2 · Chaîne 2'), findsOneWidget);
+    expect(banner('Journal'), findsOneWidget);
+
+    // Barres masquées, puis rappelées par une touche.
+    await run(tester, const Duration(seconds: 4));
+    expect(byKey('live.player.banner'), findsNothing);
+    await key(tester, LogicalKeyboardKey.arrowRight);
+    expect(banner('2 · Chaîne 2'), findsOneWidget);
     await close(tester);
   });
 
@@ -250,7 +311,11 @@ void main() {
     expect(byKey('live.player'), findsNothing);
     expect(player.stops, stops + 1);
     expect(container.read(downloadHoldsProvider).streaming, isFalse);
+    // Fermé pendant l'aperçu : la chaîne affichée est rendue, rien ne
+    // s'ouvre ensuite.
     expect(returned?.id, '9003');
+    await run(tester, LiveTuner.zapDelay);
+    expect(player.urls, [_url('9002')]);
   });
 
   testWidgets('coupure : reconnexion à la même chaîne après 1 s, puis '
