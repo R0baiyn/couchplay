@@ -167,6 +167,8 @@ void main() {
     journal = journalFile!.readAsStringSync();
     expect(journal, isNot(contains('/live/$benchUser/')));
     expect(journal, isNot(contains(benchPassword)));
+    // Chaque chaîne quittée laisse sa ligne de fin de lecture (D-090).
+    expect(journal, contains(RegExp(r'Fin de lecture : \d+ s, décodage ')));
   }, timeout: const Timeout(Duration(minutes: 4)));
 
   testWidgets('parcours 5 : direct refusé, adresse masquée au journal', (

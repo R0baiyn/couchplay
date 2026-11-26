@@ -246,6 +246,41 @@ bool isStreamFailure(String level, String prefix) =>
 bool isDecoderRefusal(String prefix, String text) =>
     prefix == 'ffmpeg' && text.startsWith('amediacodec:');
 
+/// Propriétés de mpv lues à la fin d'une lecture, pour [playedLine].
+const playedProperties = [
+  'hwdec-current',
+  'video-format',
+  'container-fps',
+  'estimated-vf-fps',
+  'frame-drop-count',
+  'decoder-frame-drop-count',
+  'vo-delayed-frame-count',
+];
+
+/// Ligne du journal à la fin d'une lecture de [played] : décodeur, cadence
+/// du flux et cadence en sortie du décodage, images perdues (D-090 : l'image
+/// ralentit parfois sur un PC, jamais sur le banc). Valeur absente ou
+/// illisible : `?`.
+String playedLine(Duration played, Map<String, String> values) {
+  String text(String name) => switch (values[name]) {
+    final v? when v.isNotEmpty => v,
+    _ => '?',
+  };
+  String number(String name, int digits) =>
+      switch (double.tryParse(values[name] ?? '')) {
+        final v? => v.toStringAsFixed(digits).replaceAll('.', ','),
+        null => '?',
+      };
+  final hwdec = text('hwdec-current');
+  return 'Fin de lecture : ${played.inSeconds} s, '
+      'décodage ${hwdec == 'no' ? 'logiciel' : hwdec}, '
+      '${text('video-format')} ${number('container-fps', 0)} i/s '
+      '(décodées ${number('estimated-vf-fps', 1)}), images perdues : '
+      '${number('frame-drop-count', 0)} à l\'affichage, '
+      '${number('decoder-frame-drop-count', 0)} au décodage, '
+      '${number('vo-delayed-frame-count', 0)} en retard';
+}
+
 /// Rendu vidéo : sur TV avec la lecture directe, MediaCodec affiche
 /// directement sur la surface, sans copie ni rendu OpenGL (trop lourds pour
 /// les SoC faibles : saccades sur un projecteur, D-065). Réglage éteint par
@@ -311,6 +346,9 @@ final class Playback {
   var _generation = 0;
   Completer<void>? _starting;
 
+  /// Temps de lecture du flux démarré, jusqu'à son arrêt ([_logPlayed]).
+  Stopwatch? _played;
+
   /// Ticket de l'ouverture en cours, à lire juste après l'appel à [open] :
   /// [stop] avec un ticket périmé ne fait rien. Ainsi l'arrêt tardif d'un
   /// écran qu'on quitte (fin de son animation) ne coupe pas le film suivant,
@@ -324,6 +362,9 @@ final class Playback {
   Future<void> open(PlayRequest request) async {
     final generation = ++_generation;
     _abandonStart();
+    await _logPlayed();
+    // Une ouverture plus récente a pris la main pendant la lecture du bilan.
+    if (generation != _generation) throw const PlaybackAbandoned();
     await player.stop();
     await _tracks(request);
     final media = Media(
@@ -337,6 +378,7 @@ final class Playback {
         if (generation != _generation) throw const PlaybackAbandoned();
         await _start(media, request.secrets);
       });
+      if (generation == _generation) _played = Stopwatch()..start();
     } on Exception catch (e) {
       if (generation != _generation) throw const PlaybackAbandoned();
       // mpv peut encore être en train de se connecter : on coupe, pour ne
@@ -422,11 +464,34 @@ final class Playback {
 
   /// Arrête le flux : plus aucun trafic réseau. Avec [ticket] (voir
   /// [ticket]), ne fait rien si une autre ouverture a eu lieu depuis.
-  Future<void> stop([int? ticket]) {
-    if (ticket != null && ticket != _generation) return Future.value();
-    _generation++;
+  Future<void> stop([int? ticket]) async {
+    if (ticket != null && ticket != _generation) return;
+    final generation = ++_generation;
     _abandonStart();
-    return player.stop();
+    await _logPlayed();
+    // Une ouverture lancée entre-temps a déjà arrêté l'ancien flux : arrêter
+    // maintenant couperait le nouveau.
+    if (generation != _generation) return;
+    await player.stop();
+  }
+
+  /// Une ligne du journal pour la lecture qui finit, film ou direct
+  /// ([playedLine]) ; rien si aucun flux n'avait démarré.
+  Future<void> _logPlayed() async {
+    final played = _played;
+    _played = null;
+    final native = player.platform;
+    if (played == null || native is! NativePlayer) return;
+    // Un diagnostic : son échec (lecteur déjà libéré) n'empêche pas l'arrêt.
+    try {
+      final values = {
+        for (final name in playedProperties)
+          name: await native.getProperty(name),
+      };
+      log(playedLine(played.elapsed, values));
+    } on Object catch (e) {
+      log('Fin de lecture', error: e);
+    }
   }
 
   Future<void> dispose() => player.dispose();

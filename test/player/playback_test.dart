@@ -260,4 +260,34 @@ void main() {
       );
     }
   });
+
+  group('playedLine', () {
+    test('décodeur, cadence et images perdues de la lecture', () {
+      expect(
+        playedLine(const Duration(seconds: 42, milliseconds: 700), {
+          'hwdec-current': 'd3d11va-copy',
+          'video-format': 'hevc',
+          'container-fps': '50.000000',
+          'estimated-vf-fps': '49.951220',
+          'frame-drop-count': '3',
+          'decoder-frame-drop-count': '0',
+          'vo-delayed-frame-count': '12',
+        }),
+        'Fin de lecture : 42 s, décodage d3d11va-copy, hevc 50 i/s '
+        '(décodées 50,0), images perdues : 3 à l\'affichage, 0 au décodage, '
+        '12 en retard',
+      );
+    });
+
+    test('décodage logiciel et valeurs absentes (flux sans image)', () {
+      expect(
+        playedLine(const Duration(minutes: 2), {
+          'hwdec-current': 'no',
+          'video-format': '',
+        }),
+        'Fin de lecture : 120 s, décodage logiciel, ? ? i/s (décodées ?), '
+        'images perdues : ? à l\'affichage, ? au décodage, ? en retard',
+      );
+    });
+  });
 }
