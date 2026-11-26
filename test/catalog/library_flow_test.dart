@@ -529,7 +529,9 @@ void main() {
         }),
       );
     await pumpApp(tester, openMovies: false);
-    expect(find.byKey(const ValueKey('live.recentRow')), findsOneWidget);
+    // Les récentes sont dans l'onglet TV : rien d'elles sur l'accueil.
+    expect(find.text('Chaînes récentes'), findsNothing);
+    expect(find.text('Chaîne 1'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('library.historyButton')));
     await settle(tester);
@@ -546,7 +548,6 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
-    expect(find.byKey(const ValueKey('live.recentRow')), findsNothing);
     expect(find.byKey(const ValueKey('library.historyButton')), findsNothing);
   });
 }

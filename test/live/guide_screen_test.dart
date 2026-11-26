@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -190,6 +191,33 @@ void main() {
       tester.element(find.byKey(const ValueKey('live.player'))),
     ).read(libraryProvider);
     expect(library.recentChannels.map((c) => c.id), ['9002', '9001']);
+  });
+
+  testWidgets('guide des récentes : au retour, le focus sur la chaîne '
+      'regardée, montée en tête', (tester) async {
+    await pump(tester, open: false);
+    final library = ProviderScope.containerOf(
+      tester.element(find.byType(LiveScreen)),
+    ).read(libraryProvider.notifier);
+    // Sans attendre l'écriture du fichier : hors de l'horloge factice.
+    unawaited(library.addRecentChannel(id: '9002', name: 'Chaîne 2 HD'));
+    unawaited(library.addRecentChannel(id: '9001', name: 'Chaîne 1 HD'));
+    await settle(tester);
+    await tester.tap(byKey('live.categoryTile.recent'));
+    await settle(tester);
+    await tester.tap(byKey('live.guide.open'));
+    await settle(tester);
+    expect(focused(), cell('9001', -60));
+    await press(tester, LogicalKeyboardKey.arrowDown);
+    expect(focused(), cell('9002', -60));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await settle(tester);
+    expect(opened(), ['9002']);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+
+    expect(focused(), cell('9002', -60));
   });
 
   testWidgets('← → changent de programme sur la même chaîne', (tester) async {

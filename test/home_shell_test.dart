@@ -20,9 +20,8 @@ void main() {
   // Vraies largeurs de lettres : les libellés des onglets doivent tenir.
   setUpAll(loadRoboto);
 
-  testWidgets("l'accueil de l'app a la rangée « Chaînes récentes »", (
-    tester,
-  ) async {
+  testWidgets("les chaînes récentes sont dans l'onglet TV, pas sur "
+      "l'accueil", (tester) async {
     File('${root.path}/accounts/compte/library.json')
       ..createSync(recursive: true)
       ..writeAsStringSync(
@@ -30,8 +29,15 @@ void main() {
         '[{"id": "9001", "name": "Chaîne 1", "at": "2026-11-25T20:00:00Z"}]}}',
       );
     await pumpApp(tester, openMovies: false);
-    expect(find.text('Chaînes récentes'), findsOneWidget);
-    expect(find.byKey(const ValueKey('live.recentTile.9001')), findsOneWidget);
+    expect(find.text('Chaînes récentes'), findsNothing);
+    expect(find.text('Chaîne 1'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('shell.tabLive')));
+    await settle(tester);
+    expect(
+      find.byKey(const ValueKey('live.categoryTile.recent')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('rail peu haut : Réglages ne recouvre aucun onglet', (

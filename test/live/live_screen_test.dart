@@ -14,7 +14,6 @@ import 'package:couchplay/live/guide.dart';
 import 'package:couchplay/live/live_providers.dart';
 import 'package:couchplay/live/live_screen.dart';
 import 'package:couchplay/live/live_tuner.dart';
-import 'package:couchplay/live/recent_channels_row.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/server/server_client.dart';
 import 'package:dio/dio.dart';
@@ -358,12 +357,15 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
 
-      // Retirer la dernière : l'entrée disparaît, la 1re catégorie revient.
+      // Retirer la dernière : l'entrée disparaît, la suivante la remplace,
+      // « Récentes » (9001 et 9003 viennent d'être regardées).
       for (final id in ['9001', '9003', '777']) {
         await tap(tester, 'live.favorite.$id');
       }
       expect(byKey('live.categoryTile.favorites'), findsNothing);
-      expect(byKey('live.channel.9002'), findsOneWidget);
+      expect(byKey('live.channel.9001'), findsOneWidget);
+      expect(byKey('live.channel.9003'), findsOneWidget);
+      expect(byKey('live.channel.9002'), findsNothing);
     });
 
     testWidgets('OK maintenu : favorite ajoutée puis retirée, avec un '
@@ -410,50 +412,83 @@ void main() {
       expect(library(tester).isChannelFavorite('9002'), isTrue);
       expect(byKey('live.player'), findsOneWidget);
     });
-  });
 
-  testWidgets('rangée des chaînes récentes : la plus récente en premier, OK '
-      'ouvre le lecteur, zapping dans les récentes ; retirer une chaîne', (
-    tester,
-  ) async {
-    await pump(tester, home: const Scaffold(body: RecentChannelsRow()));
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(RecentChannelsRow)),
-    );
-    expect(byKey('live.recentRow'), findsNothing);
-    final library = container.read(libraryProvider.notifier);
-    // Sans attendre l'écriture du fichier : hors de l'horloge factice.
-    unawaited(library.addRecentChannel(id: '9001', name: 'Chaîne 1 HD'));
-    unawaited(library.addRecentChannel(id: '9003', name: 'Chaîne 3'));
-    await settle(tester);
-    expect(
-      tester.getTopLeft(byKey('live.recentTile.9003')).dx,
-      lessThan(tester.getTopLeft(byKey('live.recentTile.9001')).dx),
-    );
-    // Sans logo : l'icône de télé.
-    expect(
-      find.descendant(
-        of: byKey('live.recentTile.9003'),
-        matching: find.byIcon(Icons.live_tv),
-      ),
-      findsOneWidget,
-    );
+    /// Récentes enregistrées sans attendre l'écriture du fichier : hors de
+    /// l'horloge factice. La dernière donnée est la plus récente.
+    Future<void> watched(WidgetTester tester, List<String> ids) async {
+      for (final id in ids) {
+        unawaited(
+          container(tester)
+              .read(libraryProvider.notifier)
+              .addRecentChannel(id: id, name: 'Récente $id'),
+        );
+      }
+      await settle(tester);
+    }
 
-    await tap(tester, 'live.recentTile.9001');
-    expect(byKey('live.player'), findsOneWidget);
-    // Après 9001 dans les récentes : 9003 (dans la catégorie, ce serait 9002).
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-    await tester.pump(LiveTuner.zapDelay);
-    await settle(tester);
-    expect(opened(), ['9001', '9003']);
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await settle(tester);
+    /// Entrées du choix de catégorie, de haut en bas.
+    List<String> categories(WidgetTester tester) => [
+      for (final tile in tester.widgetList<ListTile>(find.byType(ListTile)))
+        if (tile.key case ValueKey<String>(:final value)
+            when value.startsWith('live.categoryTile.'))
+          value.substring('live.categoryTile.'.length),
+    ];
 
-    await tester.longPress(byKey('live.recentTile.9001'));
-    await settle(tester);
-    await tap(tester, 'confirm.action');
-    expect(byKey('live.recentTile.9001'), findsNothing);
-    expect(byKey('live.recentTile.9003'), findsOneWidget);
+    testWidgets('« Récentes » : seulement s\'il y en a, juste après '
+        '« Favorites », la plus récente en premier', (tester) async {
+      await pump(tester);
+      expect(byKey('live.categoryTile.recent'), findsNothing);
+
+      await watched(tester, ['9001', '9003']);
+      expect(categories(tester).first, 'recent');
+      unawaited(
+        container(tester)
+            .read(libraryProvider.notifier)
+            .addChannelFavorite(id: '9002', name: 'Chaîne 2 HD'),
+      );
+      await settle(tester);
+      expect(categories(tester).take(2), ['favorites', 'recent']);
+
+      await tap(tester, 'live.categoryTile.recent');
+      expect(byKey('live.channel.9002'), findsNothing);
+      expect(
+        tester.getTopLeft(byKey('live.channel.9003')).dy,
+        lessThan(tester.getTopLeft(byKey('live.channel.9001')).dy),
+      );
+      // Les données du catalogue, pas le nom enregistré.
+      expect(inChannel('9001', find.text('Chaîne 1 HD')), findsOneWidget);
+
+      // « Effacer l'historique » : l'entrée disparaît.
+      unawaited(
+        container(tester).read(libraryProvider.notifier).clearHistory(),
+      );
+      await settle(tester);
+      expect(byKey('live.categoryTile.recent'), findsNothing);
+      expect(byKey('live.categoryTile.favorites'), findsOneWidget);
+    });
+
+    testWidgets('« Récentes » : zapping dans la liste ouverte ; au retour, la '
+        'chaîne regardée, montée en tête, a le focus', (tester) async {
+      await pump(tester);
+      await watched(tester, ['9001', '9003']);
+      await tap(tester, 'live.categoryTile.recent');
+
+      await tap(tester, 'live.channel.9003');
+      // Après 9003 dans les récentes : 9001 (dans la catégorie, ce serait
+      // 9004).
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump(LiveTuner.zapDelay);
+      await settle(tester);
+      expect(opened(), ['9003', '9001']);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+
+      expect(focused(), '9001');
+      expect(
+        tester.getTopLeft(byKey('live.channel.9001')).dy,
+        lessThan(tester.getTopLeft(byKey('live.channel.9003')).dy),
+      );
+    });
   });
 
   group('guide des programmes', () {

@@ -217,8 +217,6 @@ void main() {
     expect(state.channelFavorites.single.number, 7);
     expect(state.recentChannels.first.logo, 'https://x/9');
     await second.read(libraryProvider.notifier).removeChannelFavorite('7');
-    await second.read(libraryProvider.notifier).removeRecentChannel('9');
-    expect(second.read(libraryProvider).recentChannels.map((c) => c.id), ['8']);
     await second
         .read(libraryProvider.notifier)
         .addChannelFavorite(id: '2', name: 'Deux');

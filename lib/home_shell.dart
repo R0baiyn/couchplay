@@ -9,7 +9,6 @@ import 'catalog/catalog_screen.dart';
 import 'catalog/downloads_screen.dart';
 import 'home_shell_nav.dart';
 import 'live/live_screen.dart';
-import 'live/recent_channels_row.dart';
 import 'catalog/home_screen.dart';
 import 'search/search_screen.dart';
 import 'server/models.dart';
@@ -188,10 +187,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   final _built = <ShellTab, Widget>{};
 
   Widget _view(ShellTab tab) => switch (tab) {
-    ShellTab.home => const HomeScreen(
-      headerActions: ShellHeaderActions(),
-      channelsRow: RecentChannelsRow(),
-    ),
+    ShellTab.home => const HomeScreen(headerActions: ShellHeaderActions()),
     ShellTab.movies => const CatalogScreen(
       kind: ContentKind.movies,
       headerActions: ShellHeaderActions(),

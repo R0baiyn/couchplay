@@ -237,10 +237,6 @@ final class LibraryNotifier extends Notifier<Library> {
     String? logo,
   }) => _set(state.withRecentChannel(_saved(id, name, number, logo)));
 
-  /// « Retirer » de la rangée « Chaînes récentes ».
-  Future<void> removeRecentChannel(String id) =>
-      _set(state.withoutRecentChannel(id));
-
   static SavedChannel _saved(
     String id,
     String name,

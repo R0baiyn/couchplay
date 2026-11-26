@@ -225,10 +225,12 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     }
     final last = await openLivePlayer(context, channel, channels);
     if (!mounted) return;
-    // Retour du lecteur : la dernière chaîne regardée, à l'heure qu'il est.
+    // Retour du lecteur : la dernière chaîne regardée, à l'heure qu'il est,
+    // cherchée dans la liste d'à présent (les récentes se réordonnent).
+    final shown = ref.read(liveChannelsProvider(_categoryId)).value;
     final index = last == null
         ? -1
-        : channels.indexWhere((c) => c.id == last.id);
+        : shown?.indexWhere((c) => c.id == last.id) ?? -1;
     if (index >= 0) _row = index;
     _goNow();
   }

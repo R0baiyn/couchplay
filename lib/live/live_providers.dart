@@ -127,12 +127,15 @@ final visibleLiveCategoriesProvider =
     });
 
 /// Chaînes d'une catégorie, triées par `num` ; vide pour une catégorie
-/// inconnue. [favoritesCategory] : les chaînes favorites (liste, grille et
-/// zapping restent dans les favorites).
+/// inconnue. [favoritesCategory] et [recentCategory] : les chaînes favorites
+/// ou récentes (liste, grille et zapping restent dedans).
 final liveChannelsProvider = Provider.autoDispose
     .family<AsyncValue<List<Channel>>, String>((ref, categoryId) {
       if (categoryId == favoritesCategory.id) {
         return ref.watch(favoriteChannelsProvider);
+      }
+      if (categoryId == recentCategory.id) {
+        return ref.watch(recentChannelsProvider);
       }
       return ref
           .watch(liveCatalogProvider)
@@ -141,50 +144,71 @@ final liveChannelsProvider = Provider.autoDispose
           );
     });
 
-/// Entrée « Favorites » en tête du choix de catégorie de l'onglet TV. Son id
-/// n'est pas un nombre : aucune catégorie du serveur ne le prend.
+/// Entrées « Favorites » puis « Récentes » en tête du choix de catégorie de
+/// l'onglet TV. Leurs id ne sont pas des nombres : aucune catégorie du serveur
+/// ne les prend.
 const favoritesCategory = Category(id: 'favorites', name: 'Favorites');
+const recentCategory = Category(id: 'recent', name: 'Récentes');
 
 /// Chaînes favorites du compte, triées par `num` (sans numéro à la fin, dans
-/// l'ordre d'ajout). Une chaîne encore au catalogue en garde toutes les
-/// données (guide, catégorie), même masquée par le filtre ; une chaîne qui
-/// n'y est plus reste affichée telle qu'enregistrée, pour pouvoir la retirer.
-/// Sans valeur pendant un rechargement ou après un échec (`whenData`) :
-/// jamais les favorites d'un compte complétées par le catalogue de l'ancien.
+/// l'ordre d'ajout) ; voir [_resolved]. Sans valeur pendant un rechargement
+/// ou après un échec (`whenData`) : jamais les favorites d'un compte
+/// complétées par le catalogue de l'ancien.
 final favoriteChannelsProvider =
     Provider.autoDispose<AsyncValue<List<Channel>>>((ref) {
       final saved = ref.watch(
         libraryProvider.select((l) => l.channelFavorites),
       );
-      return ref.watch(liveCatalogProvider).whenData((loaded) {
-        final channels = [
-          for (final channel in saved)
-            loaded.value.byId[channel.id] ?? channelOf(channel),
-        ];
-        return sortedByNumber(channels);
-      });
+      return ref
+          .watch(liveCatalogProvider)
+          .whenData((loaded) => sortedByNumber(_resolved(loaded.value, saved)));
     });
 
-/// Catégories de l'onglet TV : « Favorites » s'il y en a, puis les visibles.
+/// Chaînes récentes du compte, la plus récente en premier ; voir [_resolved].
+final recentChannelsProvider = Provider.autoDispose<AsyncValue<List<Channel>>>((
+  ref,
+) {
+  final saved = ref.watch(libraryProvider.select((l) => l.recentChannels));
+  return ref
+      .watch(liveCatalogProvider)
+      .whenData((loaded) => _resolved(loaded.value, saved));
+});
+
+/// Chaînes de `library.json` : une chaîne encore au catalogue en garde toutes
+/// les données (guide, catégorie), même masquée par le filtre ; une chaîne qui
+/// n'y est plus reste affichée telle qu'enregistrée (sans guide), pour pouvoir
+/// la lire ou la retirer.
+List<Channel> _resolved(LiveCatalog catalog, List<SavedChannel> saved) => [
+  for (final channel in saved)
+    catalog.byId[channel.id] ??
+        Channel(
+          id: channel.id,
+          name: channel.name,
+          number: channel.number,
+          logo: channel.logo,
+        ),
+];
+
+/// Catégories de l'onglet TV : « Favorites » puis « Récentes » s'il y en a,
+/// puis les visibles.
 final liveTabCategoriesProvider =
     Provider.autoDispose<AsyncValue<List<Category>>>((ref) {
       final hasFavorites = ref.watch(
         libraryProvider.select((l) => l.channelFavorites.isNotEmpty),
       );
+      final hasRecent = ref.watch(
+        libraryProvider.select((l) => l.recentChannels.isNotEmpty),
+      );
       return ref
           .watch(visibleLiveCategoriesProvider)
           .whenData(
-            (visible) => [if (hasFavorites) favoritesCategory, ...visible],
+            (visible) => [
+              if (hasFavorites) favoritesCategory,
+              if (hasRecent) recentCategory,
+              ...visible,
+            ],
           );
     });
-
-/// Une chaîne de `library.json`, de quoi l'afficher et la lire (sans guide).
-Channel channelOf(SavedChannel saved) => Channel(
-  id: saved.id,
-  name: saved.name,
-  number: saved.number,
-  logo: saved.logo,
-);
 
 /// Toutes les chaînes visibles, catégorie après catégorie : pour la
 /// recherche et le zapping.

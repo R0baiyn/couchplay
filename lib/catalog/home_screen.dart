@@ -12,18 +12,13 @@ import '../library/library.dart';
 import 'home_rows.dart';
 import '../library/library_store.dart';
 
-/// Premier onglet : « Continuer à regarder », les chaînes récentes, puis
-/// « Ma liste », en rangées.
+/// Premier onglet : « Continuer à regarder », puis « Ma liste », en rangées.
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key, this.headerActions, this.channelsRow});
+  const HomeScreen({super.key, this.headerActions});
 
   /// Boutons de fin d'en-tête posés par la coquille : les réglages sont
   /// au-dessus du catalogue (D-050).
   final Widget? headerActions;
-
-  /// « Chaînes récentes », sous « Continuer à regarder » : posée par la
-  /// composition, `catalog` n'importe pas le direct (D-084).
-  final Widget? channelsRow;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,7 +33,8 @@ class HomeScreen extends ConsumerWidget {
           (entry: entry, next: next),
     ];
     final favorites = library.favoritesByDate;
-    // Des chaînes récentes seules : l'historique permet aussi de les effacer.
+    // Des chaînes récentes (onglet TV) seules : l'historique permet aussi de
+    // les effacer.
     final hasHistory =
         library.progress.isNotEmpty || library.recentChannels.isNotEmpty;
     final seen = library.seen;
@@ -94,7 +90,6 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
           ],
-          ?channelsRow,
           header(
             'Ma liste',
             favorites.isEmpty

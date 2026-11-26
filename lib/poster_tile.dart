@@ -17,8 +17,6 @@ class PosterTile extends StatelessWidget {
     this.favorite = false,
     this.watched = false,
     this.downloaded = false,
-    this.imageFit = BoxFit.cover,
-    this.imageIcon = Icons.movie,
   });
 
   final String title;
@@ -37,10 +35,6 @@ class PosterTile extends StatelessWidget {
   final bool favorite;
   final bool watched;
   final bool downloaded;
-
-  /// Logo d'une chaîne : en entier, et une icône de télé sans image.
-  final BoxFit imageFit;
-  final IconData imageIcon;
 
   /// Place de l'anneau autour de l'affiche, vide sans focus.
   static final _border = focusRing.width;
@@ -102,21 +96,11 @@ class PosterTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(5),
                     child:
                         progress == null && !favorite && !watched && !downloaded
-                        ? PosterImage(
-                            url: imageUrl,
-                            icon: imageIcon,
-                            fit: imageFit,
-                            deferred: true,
-                          )
+                        ? PosterImage(url: imageUrl, deferred: true)
                         : Stack(
                             fit: StackFit.expand,
                             children: [
-                              PosterImage(
-                                url: imageUrl,
-                                icon: imageIcon,
-                                fit: imageFit,
-                                deferred: true,
-                              ),
+                              PosterImage(url: imageUrl, deferred: true),
                               if (progress != null)
                                 Align(
                                   alignment: Alignment.bottomCenter,

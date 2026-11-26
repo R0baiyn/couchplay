@@ -82,8 +82,8 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     final selected =
         visible.where((c) => c.id == _selectedId).firstOrNull ??
         visible.firstOrNull;
-    // Gardée : la première favorite ajoutée met « Favorites » en tête, sans
-    // changer la liste affichée.
+    // Gardée : la première favorite ou la première chaîne regardée ajoute
+    // une entrée en tête, sans changer la liste affichée.
     _selectedId = selected?.id ?? _selectedId;
     final actions = [
       IconButton(

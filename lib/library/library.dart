@@ -427,13 +427,6 @@ final class Library {
     ].take(maxRecentChannels).toList(),
   );
 
-  Library withoutRecentChannel(String id) => _copy(
-    recentChannels: [
-      for (final c in recentChannels)
-        if (c.id != id) c,
-    ],
-  );
-
   /// Historique : tout ce qui a été lu, retirés de « Continuer à regarder »
   /// et vus compris, du plus récent au plus ancien.
   List<Progress> get history =>
