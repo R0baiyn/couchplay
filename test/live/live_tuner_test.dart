@@ -280,6 +280,23 @@ void main() {
       });
     });
 
+    test('zapping depuis un message : le message part tout de suite, la '
+        'chaîne affichée s\'ouvre après l\'attente', () {
+      fakeAsync((async) {
+        fail = (channel) =>
+            channel.id == '9001' ? const PlaybackFailed() : null;
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        expect(t.error, isNotNull);
+        t.zap(1);
+        expect(t.error, isNull, reason: 'message de 9001 sous le nom de 9002');
+        expect(t.previewing, isTrue);
+        async.elapse(LiveTuner.zapDelay);
+        expect(opened, ['9001', '9002']);
+        expect(t.error, isNull);
+      });
+    });
+
     test('coupure pendant l\'aperçu : la chaîne affichée s\'ouvre à la fin '
         'de l\'attente, avec son droit à une reconnexion', () {
       fakeAsync((async) {

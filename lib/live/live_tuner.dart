@@ -99,6 +99,8 @@ final class LiveTuner extends ChangeNotifier {
     // reconnexion attendue n'a pas de chaîne qui joue (`_tuned` nul).
     if (!_playing) {
       _reconnect?.cancel();
+      // Le message est celui d'une autre chaîne que la chaîne affichée.
+      _error = null;
       _zap = Timer(zapDelay, _tuneChoice);
     }
     banner.show();
