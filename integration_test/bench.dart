@@ -311,8 +311,10 @@ final class FakeServer {
         '(un faux serveur oublié ?) avant de relancer.',
       );
     }
-    // Sans shell : `kill` atteint python lui-même, pas un cmd.exe.
-    final process = await Process.start('python', [
+    // Sans shell : `kill` atteint python lui-même, pas un cmd.exe. `pythonw` :
+    // sans console, donc aucune fenêtre ; sortie, entrée et code de retour
+    // passent par les mêmes tubes.
+    final process = await Process.start('pythonw', [
       '-I',
       inRepository('tools', 'faux-serveur.py'),
       '--port',
