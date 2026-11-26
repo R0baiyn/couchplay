@@ -187,7 +187,9 @@ class _LivePlayerScreenState extends ConsumerState<LivePlayerScreen> {
                   onToggleFill: () => setState(() => _fill = !_fill),
                   fullscreen: _mobile ? null : _fullscreen,
                   onToggleFullscreen: _toggleFullscreen,
-                  onExit: () => _fullscreen ? _setFullscreen(false) : _exit(),
+                  // La flèche retour quitte la chaîne, même en plein écran
+                  // (dispose en sort) ; Échap quitte d'abord le plein écran.
+                  onExit: _exit,
                 ),
                 if (_tuner.opening)
                   const IgnorePointer(

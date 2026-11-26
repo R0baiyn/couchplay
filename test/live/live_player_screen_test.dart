@@ -238,6 +238,50 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('plein écran : Échap le quitte, la flèche retour quitte la '
+      'chaîne', (tester) async {
+    final calls = <String>[];
+    const window = MethodChannel('com.alexmercerind/media_kit_video');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(window, (
+      call,
+    ) async {
+      calls.add(call.method);
+      return null;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        window,
+        null,
+      ),
+    );
+    await open(tester);
+    Future<void> fullscreen() async {
+      await tester.tap(byKey('live.player.video'));
+      await run(tester, const Duration(milliseconds: 400));
+      await tester.tap(byKey('live.player.fullscreen'));
+      await run(tester);
+    }
+
+    await fullscreen();
+    await key(tester, LogicalKeyboardKey.escape);
+    await run(tester);
+    expect(byKey('live.player'), findsOneWidget);
+    expect(calls, [
+      'Utils.EnterNativeFullscreen',
+      'Utils.ExitNativeFullscreen',
+    ]);
+
+    // Barres masquées d'abord : le toucher de l'image les rappelle.
+    await run(tester, const Duration(seconds: 4));
+    await fullscreen();
+    await tester.tap(byKey('player.back'));
+    await tester.pump();
+    await run(tester, const Duration(seconds: 1));
+    expect(byKey('live.player'), findsNothing);
+    expect(returned?.id, '9002');
+    expect(calls.last, 'Utils.ExitNativeFullscreen');
+  });
+
   testWidgets('↑ et CH− : chaîne précédente ; CH+ : suivante ; on boucle', (
     tester,
   ) async {
