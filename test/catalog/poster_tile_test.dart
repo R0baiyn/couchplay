@@ -54,6 +54,26 @@ void main() {
     expect((menus, taps), (0, 1));
   });
 
+  testWidgets('OK maintenu répété en appuis successifs : le menu une fois, '
+      'la fiche pas ; un appui court ensuite l’ouvre', (tester) async {
+    await pumpTile(tester, withMenu: true);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.select);
+    for (var i = 0; i < 3; i++) {
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+      await tester.pump(const Duration(milliseconds: 33));
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+    await tester.pump();
+    expect((menus, taps), (1, 0));
+
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pump();
+    expect((menus, taps), (1, 1));
+  });
+
   testWidgets('touche Menu : ouvre le menu', (tester) async {
     await pumpTile(tester, withMenu: true);
     await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
@@ -81,6 +101,7 @@ void main() {
       bool cancelFirst = false,
     }) async {
       answer = null;
+      taps = 0;
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(
@@ -90,7 +111,7 @@ void main() {
                 child: PosterTile(
                   title: 'Horizon',
                   imageUrl: null,
-                  onTap: () {},
+                  onTap: () => taps++,
                   onMenu: () async => answer = await confirm(
                     context,
                     title: 'Horizon',
@@ -147,6 +168,22 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(answer, isFalse);
+    });
+
+    testWidgets('le dialogue fermé, OK court ouvre la fiche aussitôt', (
+      tester,
+    ) async {
+      await pumpMenuTile(tester, cancelFirst: true);
+      await holdUntilMenu(tester);
+      // Le relâchement va au dialogue, pas à la tuile.
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(answer, isFalse);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(taps, 1);
     });
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -170,6 +172,10 @@ class PosterTile extends StatelessWidget {
 /// la touche ne sont plus des clics), OK appuyé ouvre la fiche au relâchement,
 /// la touche Menu ouvre le menu. Sans menu, OK reste un appui court et ses
 /// répétitions sont ignorées. Sert aussi aux rangées de chaînes.
+///
+/// Un clavier d'ordinateur (émulateur) peut répéter une touche tenue en
+/// paires relâchement et appui : un appui qui suit aussitôt un maintien
+/// n'ouvre pas la fiche.
 class RemoteKeys extends StatefulWidget {
   const RemoteKeys({
     super.key,
@@ -189,6 +195,28 @@ class RemoteKeys extends StatefulWidget {
 class _RemoteKeysState extends State<RemoteKeys> {
   /// OK enfoncé, ni relâché ni maintenu : la fiche s'ouvre au relâchement.
   var _pressed = false;
+
+  /// Cet appui fait partie d'un maintien : son relâchement n'ouvre rien.
+  var _held = false;
+
+  /// Court après le relâchement d'un maintien : un appui qui arrive pendant
+  /// en fait encore partie (sa répétition rouvre quand même le menu).
+  Timer? _release;
+  static const _releaseDelay = Duration(milliseconds: 150);
+
+  @override
+  void dispose() {
+    _release?.cancel();
+    super.dispose();
+  }
+
+  /// Focus parti (le menu a ouvert un dialogue) : la fin du maintien ira
+  /// ailleurs, le prochain appui ici est un nouveau.
+  void _onFocusChange(bool focused) {
+    if (focused) return;
+    _release?.cancel();
+    _pressed = _held = false;
+  }
 
   static bool _isOk(LogicalKeyboardKey key) =>
       key == LogicalKeyboardKey.select ||
@@ -214,17 +242,23 @@ class _RemoteKeysState extends State<RemoteKeys> {
     switch (event) {
       case KeyDownEvent():
         _pressed = true;
+        _held = _release?.isActive ?? false;
       case KeyRepeatEvent():
         // Maintenu : le menu s'ouvre sans attendre le relâchement. Son
         // dialogue avale la fin du maintien (voir `confirm`).
         if (_pressed) {
           _pressed = false;
+          _held = true;
           onMenu();
         }
       case KeyUpEvent():
-        final press = _pressed;
+        final tap = _pressed && !_held;
         _pressed = false;
-        if (press) widget.onTap();
+        if (_held) {
+          _release?.cancel();
+          _release = Timer(_releaseDelay, () {});
+        }
+        if (tap) widget.onTap();
     }
     return KeyEventResult.handled;
   }
@@ -234,6 +268,7 @@ class _RemoteKeysState extends State<RemoteKeys> {
     canRequestFocus: false,
     skipTraversal: true,
     onKeyEvent: _onKey,
+    onFocusChange: _onFocusChange,
     child: widget.child,
   );
 }
