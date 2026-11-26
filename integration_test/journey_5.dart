@@ -95,7 +95,7 @@ void main() {
     expect(journal, isNot(contains(benchPassword)));
 
     // 5. Retour : le focus sur la chaîne regardée ; cœur, favorites, puis
-    // les récentes de l'Accueil.
+    // les récentes.
     await _closePlayer(tester);
     await waitUntil(
       tester,
@@ -113,18 +113,16 @@ void main() {
     );
     expect(byKey('live.channel.9003'), findsOneWidget);
 
-    await tester.tap(byKey('shell.tabHome'));
-    await waitFor(tester, byKey('live.recentRow'));
-    expect(byKey('live.recentTile.9003'), findsOneWidget);
-    expect(byKey('live.recentTile.9001'), findsOneWidget);
-    expect(byKey('live.recentTile.9002'), findsNothing);
+    await tester.tap(byKey('live.categoryTile.recent'));
+    await waitFor(tester, byKey('live.channel.9001'));
+    expect(byKey('live.channel.9003'), findsOneWidget);
+    expect(byKey('live.channel.9002'), findsNothing);
 
     // 6. Guide : ouvert sur maintenant, OK sur le programme en cours → le
     // lecteur de la chaîne, sans détail.
-    await tester.tap(byKey('shell.tabLive'));
-    await waitFor(tester, byKey('live.categoryTile.104'));
     await tester.tap(byKey('live.categoryTile.104'));
-    await waitFor(tester, byKey('live.channel.9001'));
+    // La 9002 n'est ni favorite ni récente : la catégorie est bien là.
+    await waitFor(tester, byKey('live.channel.9002'));
     await tester.tap(byKey('live.guide.open'));
     await waitSettled(tester, byKey('live.guide'));
     final cell = byKeyPrefix('live.guide.9001.');
@@ -145,7 +143,7 @@ void main() {
     await _closePlayer(tester);
     await settledPageBack(tester);
 
-    // 7. Recherche : la section « Chaînes », puis le lecteur.
+    // 7. Recherche : la section « Chaînes », la puce « TV », puis le lecteur.
     await waitFor(tester, byKey('shell.tabSearch'));
     await waitUntil(
       tester,
@@ -156,7 +154,9 @@ void main() {
     await waitFor(tester, byKey('search.field'));
     await tester.enterText(byKey('search.field'), 'chaîne 3');
     await waitFor(tester, byKey('search.sectionChannels'));
+    await tester.tap(byKey('search.filter.live'));
     await waitFor(tester, byKey('live.channel.9003'));
+    expect(byKey('search.sectionMovies'), findsNothing);
     await tester.tap(byKey('live.channel.9003'));
     await waitSettled(tester, byKey('live.player'));
     await _waitLive(tester, player, 9003);
