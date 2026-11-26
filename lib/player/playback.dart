@@ -258,17 +258,24 @@ const playedProperties = [
 ];
 
 /// Ligne du journal à la fin d'une lecture de [played] : décodeur, cadence
-/// du flux et cadence en sortie du décodage, images perdues (D-090 : l'image
-/// ralentit parfois sur un PC, jamais sur le banc). Valeur absente ou
-/// illisible : `?`.
-String playedLine(Duration played, Map<String, String> values) {
+/// du flux et cadence en sortie du décodage, images perdues, puis [stalls]
+/// attentes du cache, [stalled] en tout (D-090 : l'image ralentit parfois
+/// sur un PC, jamais sur le banc). Valeur absente ou illisible : `?`.
+String playedLine(
+  Duration played,
+  Map<String, String> values, {
+  required int stalls,
+  required Duration stalled,
+}) {
   String text(String name) => switch (values[name]) {
     final v? when v.isNotEmpty => v,
     _ => '?',
   };
+  String decimal(double v, int digits) =>
+      v.toStringAsFixed(digits).replaceAll('.', ',');
   String number(String name, int digits) =>
       switch (double.tryParse(values[name] ?? '')) {
-        final v? => v.toStringAsFixed(digits).replaceAll('.', ','),
+        final v? => decimal(v, digits),
         null => '?',
       };
   final hwdec = text('hwdec-current');
@@ -278,7 +285,37 @@ String playedLine(Duration played, Map<String, String> values) {
       '(décodées ${number('estimated-vf-fps', 1)}), images perdues : '
       '${number('frame-drop-count', 0)} à l\'affichage, '
       '${number('decoder-frame-drop-count', 0)} au décodage, '
-      '${number('vo-delayed-frame-count', 0)} en retard';
+      '${number('vo-delayed-frame-count', 0)} en retard, attentes du cache : '
+      '$stalls (${decimal(stalled.inMilliseconds / 1000, 1)} s)';
+}
+
+/// Attentes du cache pendant une lecture : `paused-for-cache` de mpv, la
+/// lecture arrêtée faute de données reçues (réseau trop lent).
+final class CacheStalls {
+  CacheStalls([this._now = DateTime.now]);
+
+  final DateTime Function() _now;
+  var count = 0;
+  var _done = Duration.zero;
+  DateTime? _since;
+
+  /// Nouvelle valeur de `paused-for-cache` ; une valeur redite ne compte pas.
+  void update(bool paused) {
+    final since = _since;
+    if (paused && since == null) {
+      count++;
+      _since = _now();
+    } else if (!paused && since != null) {
+      _done += _now().difference(since);
+      _since = null;
+    }
+  }
+
+  /// Durée de toutes les attentes, celle en cours comprise.
+  Duration get total => switch (_since) {
+    final since? => _done + _now().difference(since),
+    null => _done,
+  };
 }
 
 /// Rendu vidéo : sur TV avec la lecture directe, MediaCodec affiche
@@ -308,6 +345,7 @@ final class Playback {
           logLevel: MPVLogLevel.error,
         ),
       ) {
+    final native = player.platform! as NativePlayer;
     if (Platform.isLinux) {
       // Sans interop de décodage matériel : libmpv chargerait VA-API en
       // créant le rendu OpenGL, et `vaInitialize` plante sans pilote VA
@@ -315,7 +353,6 @@ final class Playback {
       // OpenGL. Posé avant le contrôleur, qui attend la même initialisation
       // (`then` passe avant lui) ; `setProperty` attendrait sinon le
       // contrôleur, déjà attaché.
-      final native = player.platform! as NativePlayer;
       unawaited(
         native.waitForPlayerInitialization.then(
           (_) => native.setProperty(
@@ -326,6 +363,15 @@ final class Playback {
         ),
       );
     }
+    // Lu à chaque changement : compté seulement pendant une lecture démarrée.
+    unawaited(
+      native
+          .observeProperty(
+            'paused-for-cache',
+            (value) async => _stalls?.update(value == 'yes'),
+          )
+          .catchError((Object e) => log('Attentes du cache', error: e)),
+    );
     controller = VideoController(
       player,
       configuration: videoConfiguration(television: television, direct: direct),
@@ -348,6 +394,9 @@ final class Playback {
 
   /// Temps de lecture du flux démarré, jusqu'à son arrêt ([_logPlayed]).
   Stopwatch? _played;
+
+  /// Attentes du cache du flux démarré, comptées de son démarrage à son arrêt.
+  CacheStalls? _stalls;
 
   /// Ticket de l'ouverture en cours, à lire juste après l'appel à [open] :
   /// [stop] avec un ticket périmé ne fait rien. Ainsi l'arrêt tardif d'un
@@ -378,7 +427,10 @@ final class Playback {
         if (generation != _generation) throw const PlaybackAbandoned();
         await _start(media, request.secrets);
       });
-      if (generation == _generation) _played = Stopwatch()..start();
+      if (generation == _generation) {
+        _played = Stopwatch()..start();
+        _stalls = CacheStalls();
+      }
     } on Exception catch (e) {
       if (generation != _generation) throw const PlaybackAbandoned();
       // mpv peut encore être en train de se connecter : on coupe, pour ne
@@ -479,16 +531,25 @@ final class Playback {
   /// ([playedLine]) ; rien si aucun flux n'avait démarré.
   Future<void> _logPlayed() async {
     final played = _played;
+    final stalls = _stalls;
     _played = null;
+    _stalls = null;
     final native = player.platform;
-    if (played == null || native is! NativePlayer) return;
+    if (played == null || stalls == null || native is! NativePlayer) return;
     // Un diagnostic : son échec (lecteur déjà libéré) n'empêche pas l'arrêt.
     try {
       final values = {
         for (final name in playedProperties)
           name: await native.getProperty(name),
       };
-      log(playedLine(played.elapsed, values));
+      log(
+        playedLine(
+          played.elapsed,
+          values,
+          stalls: stalls.count,
+          stalled: stalls.total,
+        ),
+      );
     } on Object catch (e) {
       log('Fin de lecture', error: e);
     }
