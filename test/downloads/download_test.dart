@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/library/library.dart';
+import 'package:couchplay/logging.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _movie = PlayItem.movie(
@@ -32,7 +34,11 @@ void main() {
       Directory('${root.path}/videos')..createSync(),
     );
   });
-  tearDown(() => root.deleteSync(recursive: true));
+  tearDown(() async {
+    // Un chargement qui retire une entrée réécrit le manifeste.
+    await SerialFileWriter.flushAll();
+    root.deleteSync(recursive: true);
+  });
 
   final date = DateTime.utc(2026, 11, 16, 10);
 
@@ -224,6 +230,59 @@ void main() {
     expect(DownloadsStore(store.manifest, store.videos).load().keys, [
       'movie:12',
     ]);
+  });
+
+  test(
+    'fichier disparu : entrée retirée du manifeste, dite une fois',
+    () async {
+      final ready = Download(
+        item: _movie,
+        size: 3,
+        received: 3,
+        status: DownloadStatus.ready,
+        addedAt: date,
+      );
+      final gone = Download(
+        item: _episode,
+        status: DownloadStatus.ready,
+        addedAt: date,
+      );
+      store.fileOf(ready).writeAsStringSync('abc');
+      await store.save({ready.key: ready, gone.key: gone});
+      openJournal(File('${root.path}/couchplay.log'));
+      addTearDown(closeJournal);
+
+      DownloadsStore(store.manifest, store.videos).load();
+      await SerialFileWriter.flushAll();
+
+      final written = jsonDecode(store.manifest.readAsStringSync()) as Map;
+      expect(written['downloads'], {ready.key: ready.toJson()});
+
+      // Lancement suivant : plus rien à dire.
+      expect(DownloadsStore(store.manifest, store.videos).load().keys, [
+        ready.key,
+      ]);
+      expect(await readJournalTail(), [
+        endsWith('Téléchargement retiré : fichier disparu'),
+      ]);
+    },
+  );
+
+  test('dossier des vidéos absent : manifeste gardé', () async {
+    await store.save({
+      _movie.key: Download(
+        item: _movie,
+        status: DownloadStatus.ready,
+        addedAt: date,
+      ),
+    });
+    final written = store.manifest.readAsStringSync();
+    store.videos.deleteSync();
+
+    expect(DownloadsStore(store.manifest, store.videos).load(), isEmpty);
+    await SerialFileWriter.flushAll();
+
+    expect(store.manifest.readAsStringSync(), written);
   });
 
   test('id ou extension qui sortiraient du dossier : refusés', () {

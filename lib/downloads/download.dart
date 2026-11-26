@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -197,7 +198,8 @@ final class DownloadsStore {
   /// ignorée seule ; un fichier illisible donne une liste vide (voir
   /// [unreadable]) ; un fichier corrompu est mis de côté en
   /// `downloads.json.bak`. Une entrée prête dont le fichier a disparu est
-  /// retirée ; une entrée en cours repasse en attente.
+  /// retirée, et le manifeste réécrit (sinon elle revient à chaque
+  /// lancement) ; une entrée en cours repasse en attente.
   Map<String, Download> load() {
     // Une copie illisible mise de côté liste peut-être des vidéos : pas de
     // rangement tant qu'elle est là (effacée avec le compte).
@@ -240,6 +242,7 @@ final class DownloadsStore {
       return const {};
     }
     final entries = <String, Download>{};
+    var removed = false;
     for (final MapEntry(:key, :value) in asMap(
       asMap(json)['downloads'],
     ).entries) {
@@ -248,10 +251,14 @@ final class DownloadsStore {
       if (download.status == DownloadStatus.ready &&
           !fileOf(download).existsSync()) {
         log('Téléchargement retiré : fichier disparu');
+        removed = true;
         continue;
       }
       entries[key] = download;
     }
+    // Dossier entier absent (disque retiré, lien rompu) : les vidéos peuvent
+    // revenir, et le rangement les effacerait si elles n'étaient plus listées.
+    if (removed && videos.existsSync()) unawaited(save(entries));
     return entries;
   }
 
