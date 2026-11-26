@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -206,6 +207,24 @@ def direct_raccord(port, dossier):
     assert all(a < b for a, b in zip(dts, dts[1:])), 'horodatages continus'
 
 
+def arret_fin_entree():
+    """Un banc tué sans arrêter son serveur ne laisse pas le port pris."""
+    commande = [sys.executable, '-I', '-u', str(ICI / 'faux-serveur.py'),
+                '--port', '0', '--donnees', str(FIXTURES),
+                '--arret-fin-entree']
+    with subprocess.Popen(
+        commande, stdin=subprocess.PIPE, stdout=subprocess.PIPE
+    ) as serveur:
+        try:
+            ecoute = any(b'http://localhost:' in ligne
+                         for ligne in serveur.stdout)
+            assert ecoute and serveur.poll() is None, 'doit écouter'
+            serveur.stdin.close()
+            assert serveur.wait(timeout=10) == 0, 'doit s’arrêter'
+        finally:
+            serveur.kill()
+
+
 def principal():
     entrees = [{'category_id': c, 'n': i} for i, c in enumerate('aabaab')]
     assert faux.premiers_par_categorie(entrees, 2) == [
@@ -295,6 +314,7 @@ def principal():
         c2.close()
         # Le fil du 1er flux peut tenir la vidéo ouverte encore un instant.
         serveur.shutdown()
+    arret_fin_entree()
     print('Faux serveur : tout est bon')
 
 

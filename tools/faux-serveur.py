@@ -3,7 +3,7 @@
 Lancement : python -I tools/faux-serveur.py [--port 8080] [--donnees DIR]
             [--video FICHIER] [--video-hd FICHIER] [--max-par-categorie N]
             [--debit KIO_PAR_S] [--direct FICHIER] [--debit-direct KIO_PAR_S]
-            [--delai-coupure S]
+            [--delai-coupure S] [--arret-fin-entree]
 
 Dans l'app : hôte http://localhost:8080 (PC) ou http://<IP du PC>:8080
 (téléphone), mot de passe quelconque. Le nom d'utilisateur choisit le
@@ -37,6 +37,8 @@ coupé --delai-coupure secondes plus tard (14 par défaut).
 Le guide (xmltv.php, gzip) est calculé autour de l'heure courante pour les
 chaînes servies ; l'id « absente.test » n'y figure pas et
 « sansprogramme.test » y figure sans programme.
+--arret-fin-entree arrête le serveur quand son entrée standard se ferme : le
+banc des parcours meurt sans l'arrêter, le port est quand même libéré.
 """
 
 import argparse
@@ -435,6 +437,14 @@ def charger(donnees: Path, max_par_categorie: int | None = None):
     }
 
 
+def arreter_a_la_fin_de_l_entree():
+    """Attend que celui qui tient l'entrée standard la ferme ou meure."""
+    # os.read : sans le verrou de sys.stdin, qui gênerait les autres fils.
+    while os.read(0, 1024):
+        pass
+    os._exit(0)
+
+
 def principal():
     sondes = RACINE / 'probe'
     arguments = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -495,6 +505,11 @@ def principal():
         metavar='S',
         help="délai avant de couper l'ancien flux du direct d'un compte",
     )
+    arguments.add_argument(
+        '--arret-fin-entree',
+        action='store_true',
+        help="s'arrêter quand l'entrée standard se ferme",
+    )
     a = arguments.parse_args()
     charger(a.donnees, a.max_par_categorie)
     Requete.video = a.video
@@ -512,6 +527,10 @@ def principal():
     except OSError:
         raise SystemExit(f'Le port {a.port} est déjà pris : un faux serveur '
                          'tourne peut-être encore.')
+    if a.arret_fin_entree:
+        threading.Thread(
+            target=arreter_a_la_fin_de_l_entree, daemon=True
+        ).start()
 
     print(f'Catalogue : {a.donnees}')
     print(f'Vidéo : {a.video or "aucune, les flux répondent 404"}')
