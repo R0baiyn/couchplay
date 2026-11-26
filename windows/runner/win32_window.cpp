@@ -150,7 +150,11 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  // WS_EX_NOACTIVATE (fenêtre des parcours, main.cpp) : ne pas prendre le focus.
+  const bool no_activate =
+      GetWindowLongPtr(window_handle_, GWL_EXSTYLE) & WS_EX_NOACTIVATE;
+  return ShowWindow(window_handle_,
+                    no_activate ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
 }
 
 // static

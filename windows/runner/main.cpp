@@ -32,6 +32,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
+  // Parcours de test (integration_test) seulement : fenêtre hors de l'écran,
+  // sans focus ni bouton dans la barre des tâches. Ni masquée ni réduite :
+  // Flutter cesserait de dessiner. Un plein écran la ramènerait à l'écran.
+  if (::GetEnvironmentVariable(L"COUCHPLAY_TEST_HIDDEN", nullptr, 0) != 0) {
+    HWND handle = window.GetHandle();
+    ::SetWindowLongPtr(handle, GWL_EXSTYLE,
+                       ::GetWindowLongPtr(handle, GWL_EXSTYLE) |
+                           WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+    ::SetWindowPos(handle, nullptr, -32000, -32000, 0, 0,
+                   SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+  }
+
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
     ::TranslateMessage(&msg);
