@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:couchplay/accounts/account_files.dart';
 import 'package:couchplay/downloads/download.dart';
 import 'package:couchplay/library/library.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,7 +42,11 @@ void main() {
     manifest = File('${dir.path}${Platform.pathSeparator}downloads.json');
     store = DownloadsStore(manifest, Directory('${dir.path}/videos'));
   });
-  tearDown(() => dir.deleteSync(recursive: true));
+  tearDown(() async {
+    // Un chargement qui retire une entrée réécrit le manifeste.
+    await SerialFileWriter.flushAll();
+    dir.deleteSync(recursive: true);
+  });
 
   Map<String, Download> generated(Gen gen) {
     final entries = <String, Download>{};
@@ -221,7 +226,7 @@ void main() {
       expect(manifest.readAsStringSync(), isNot(contains('futur')));
     });
 
-    test('valeurs mutées au hasard : jamais d\'exception', () {
+    test('valeurs mutées au hasard : jamais d\'exception', () async {
       final gen = Gen(54);
       for (var i = 0; i < 100; i++) {
         final entries = generated(gen);
@@ -242,6 +247,9 @@ void main() {
         manifest.writeAsStringSync(text);
         final reader = DownloadsStore(manifest, store.videos);
         expect(reader.load, returnsNormally, reason: text);
+        // Sans attendre, la réécriture d'une entrée retirée serait rendue au
+        // tour suivant à la place du texte muté.
+        await SerialFileWriter.flushAll();
       }
     });
   });
