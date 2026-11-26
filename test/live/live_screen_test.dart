@@ -537,6 +537,87 @@ void main() {
         expect(opened(), [id]);
       });
     }
+
+    final removal = find.text('Retirer des chaînes récentes ?');
+    List<String> recent(WidgetTester tester) => [
+      for (final c in library(tester).recentChannels) c.id,
+    ];
+
+    for (final MapEntry(key: form, value: hold) in holds.entries) {
+      testWidgets('« Récentes », OK maintenu ($form) : retrait proposé, rien '
+          'de validé ni lancé ; « Retirer » retire', (tester) async {
+        await pump(tester);
+        await watched(tester, ['9001', '9003']);
+        await tap(tester, 'live.categoryTile.recent');
+        for (var i = 0; focused() == null; i++) {
+          if (i == 20) fail('aucune chaîne atteinte au clavier');
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        final id = focused()!;
+        final other = id == '9001' ? '9003' : '9001';
+
+        Future<void> holdThenWait() async {
+          await hold(tester);
+          await settle(tester);
+          await tester.pump(const Duration(milliseconds: 300));
+        }
+
+        await holdThenWait();
+        expect(removal, findsOneWidget);
+        expect(recent(tester), ['9003', '9001']);
+        expect(library(tester).channelFavorites, isEmpty);
+        expect(opened(), isEmpty);
+
+        // « Annuler » a le focus : un OK court ferme sans rien faire.
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await settle(tester);
+        expect(removal, findsNothing);
+        expect(recent(tester), ['9003', '9001']);
+        expect(focused(), id);
+
+        await holdThenWait();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await settle(tester);
+        expect(recent(tester), [other]);
+        expect(byKey('live.channel.$id'), findsNothing);
+        // La télécommande ne reste pas sans focus : la voisine le prend.
+        expect(focused(), other);
+        expect(opened(), isEmpty);
+      });
+    }
+
+    testWidgets('« Récentes » : appui long ou touche Menu proposent le '
+        'retrait ; ailleurs, ils gardent la favorite', (tester) async {
+      await pump(tester);
+      await watched(tester, ['9001']);
+      await tap(tester, 'live.categoryTile.recent');
+
+      await tester.longPress(byKey('live.channel.9001'));
+      await settle(tester);
+      expect(removal, findsOneWidget);
+      await tap(tester, 'confirm.cancel');
+      expect(recent(tester), ['9001']);
+
+      for (var i = 0; focused() == null; i++) {
+        if (i == 20) fail('aucune chaîne atteinte au clavier');
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+      await settle(tester);
+      expect(removal, findsOneWidget);
+      await tap(tester, 'confirm.action');
+      expect(recent(tester), isEmpty);
+      // La dernière retirée : l'entrée disparaît, la 1re catégorie revient.
+      expect(byKey('live.categoryTile.recent'), findsNothing);
+
+      await tester.longPress(byKey('live.channel.9002'));
+      await settle(tester);
+      expect(removal, findsNothing);
+      expect(library(tester).isChannelFavorite('9002'), isTrue);
+    });
   });
 
   group('guide des programmes', () {

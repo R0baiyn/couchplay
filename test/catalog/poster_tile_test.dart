@@ -1,5 +1,6 @@
 import 'package:couchplay/catalog/poster_grid.dart';
 import 'package:couchplay/confirm.dart';
+import 'package:couchplay/television.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -156,6 +157,7 @@ void main() {
       await pumpMenuTile(tester);
       await holdUntilMenu(tester);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.pump(heldKeyGap);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(answer, isTrue);
@@ -165,6 +167,7 @@ void main() {
       await pumpMenuTile(tester, cancelFirst: true);
       await holdUntilMenu(tester);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.pump(heldKeyGap);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(answer, isFalse);
@@ -177,6 +180,7 @@ void main() {
       await holdUntilMenu(tester);
       // Le relâchement va au dialogue, pas à la tuile.
       await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
+      await tester.pump(heldKeyGap);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(answer, isFalse);

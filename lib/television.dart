@@ -21,6 +21,11 @@ Future<bool> isTelevision() async {
   return await channel.invokeMethod<bool>('isTelevision') ?? false;
 }
 
+/// Écart sous lequel un appui qui suit un relâchement fait encore partie du
+/// même maintien : le clavier d'un ordinateur (émulateur) peut répéter une
+/// touche tenue en paires relâchement et appui.
+const heldKeyGap = Duration(milliseconds: 150);
+
 /// Sens d'un appui (ou d'une répétition) de flèche ; `null` pour une autre
 /// touche ou un relâchement.
 TraversalDirection? arrowDirection(KeyEvent event) => event is KeyUpEvent

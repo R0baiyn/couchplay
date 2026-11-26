@@ -498,6 +498,10 @@ void main() {
         '3',
       ]);
       expect(library.recentChannels.first.at, _t0.add(Duration(minutes: 20)));
+      expect(
+        library.withoutRecentChannel('12').recentChannels.map((c) => c.id),
+        isNot(contains('12')),
+      );
     });
 
     test("effacer l'historique efface les récentes, pas les favorites", () {

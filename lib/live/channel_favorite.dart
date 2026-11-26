@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../confirm.dart';
 import '../library/library_store.dart';
 import 'channel.dart';
 
@@ -30,6 +33,25 @@ void recordRecentChannel(WidgetRef ref, Channel channel) => ref
       number: channel.number,
       logo: channel.logo,
     );
+
+/// « Retirer des chaînes récentes ? », puis le retrait ; vrai si retirée.
+Future<bool> removeRecentChannelWithConfirm(
+  BuildContext context,
+  WidgetRef ref,
+  Channel channel,
+) async {
+  final library = ref.read(libraryProvider.notifier);
+  final remove = await confirm(
+    context,
+    title: channel.name,
+    content: 'Retirer des chaînes récentes ?',
+    action: 'Retirer',
+    focusCancel: true,
+  );
+  // Sans attendre l'écriture du fichier : la liste change tout de suite.
+  if (remove) unawaited(library.removeRecentChannel(channel.id));
+  return remove;
+}
 
 /// OK maintenu ou appui long sur une rangée : la favorite change, et un
 /// message le dit (rien d'autre ne se voit de loin, sur une TV).

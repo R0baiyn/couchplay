@@ -1,13 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'television.dart';
 
 /// Demande confirmation : « Annuler » ou [action]. Vrai seulement si
 /// [action] est choisie. Le focus va d'abord sur « Annuler » avec
 /// [focusCancel], sur [action] avec [focusAction].
 ///
 /// Ouverte pendant qu'OK ou Entrée est maintenu (maintien sur une tuile à la
-/// télécommande), la boîte ignore cette touche jusqu'à son relâchement : les
-/// répétitions ne valident rien, seul un nouvel appui agit.
+/// télécommande), la boîte ignore cette touche jusqu'à la fin du maintien (un
+/// relâchement que rien ne suit aussitôt, [heldKeyGap]) : les répétitions ne
+/// valident rien, seul un nouvel appui agit.
 Future<bool> confirm(
   BuildContext context, {
   required String title,
@@ -56,13 +61,36 @@ class _IgnoreHeldOkState extends State<_IgnoreHeldOk> {
       key == LogicalKeyboardKey.enter ||
       key == LogicalKeyboardKey.numpadEnter;
 
-  /// OK déjà enfoncé à l'ouverture : tant qu'il n'est pas relâché, ses
-  /// évènements (répétitions, relâchement) sont avalés.
-  late var _held = HardwareKeyboard.instance.logicalKeysPressed.any(_isOk);
+  /// OK enfoncé et à avaler : celui de l'ouverture, ou un appui qui suit
+  /// aussitôt son relâchement.
+  var _held = false;
+
+  /// Court après chaque relâchement avalé.
+  Timer? _release;
+
+  @override
+  void initState() {
+    super.initState();
+    // Lu à l'ouverture : au premier évènement reçu, la touche peut déjà être
+    // relâchée.
+    _held = HardwareKeyboard.instance.logicalKeysPressed.any(_isOk);
+  }
+
+  @override
+  void dispose() {
+    _release?.cancel();
+    super.dispose();
+  }
 
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
-    if (!_held || !_isOk(event.logicalKey)) return KeyEventResult.ignored;
-    if (event is KeyUpEvent) _held = false;
+    if (!_isOk(event.logicalKey)) return KeyEventResult.ignored;
+    if (event is KeyDownEvent && (_release?.isActive ?? false)) _held = true;
+    if (!_held) return KeyEventResult.ignored;
+    if (event is KeyUpEvent) {
+      _held = false;
+      _release?.cancel();
+      _release = Timer(heldKeyGap, () {});
+    }
     return KeyEventResult.handled;
   }
 

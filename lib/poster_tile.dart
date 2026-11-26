@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'focus_ring.dart';
 import 'poster_image.dart';
+import 'television.dart';
 
 /// Une affiche et son titre ; l'anneau autour de l'affiche quand elle a le
 /// focus (clavier, télécommande).
@@ -202,7 +203,6 @@ class _RemoteKeysState extends State<RemoteKeys> {
   /// Court après le relâchement d'un maintien : un appui qui arrive pendant
   /// en fait encore partie (sa répétition rouvre quand même le menu).
   Timer? _release;
-  static const _releaseDelay = Duration(milliseconds: 150);
 
   @override
   void dispose() {
@@ -256,7 +256,7 @@ class _RemoteKeysState extends State<RemoteKeys> {
         _pressed = false;
         if (_held) {
           _release?.cancel();
-          _release = Timer(_releaseDelay, () {});
+          _release = Timer(heldKeyGap, () {});
         }
         if (tap) widget.onTap();
     }

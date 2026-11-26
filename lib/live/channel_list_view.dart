@@ -83,8 +83,23 @@ class _ChannelListState extends ConsumerState<ChannelList> {
     });
   }
 
+  /// Récente retirée : sa voisine prend le focus, que la rangée disparue
+  /// emporterait (télécommande).
+  Future<void> _removeRecent(List<Channel> channels, int index) async {
+    final next =
+        channels.elementAtOrNull(index + 1) ??
+        (index > 0 ? channels[index - 1] : null);
+    final removed = await removeRecentChannelWithConfirm(
+      context,
+      ref,
+      channels[index],
+    );
+    if (removed && mounted && next != null) _reveal(next.id);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final recent = widget.categoryId == recentCategory.id;
     final loaded = ref.watch(liveCatalogProvider).value;
     final channels =
         ref.watch(liveChannelsProvider(widget.categoryId)).value ??
@@ -128,6 +143,7 @@ class _ChannelListState extends ConsumerState<ChannelList> {
                     channel: channels[i],
                     tiles: _tiles,
                     onOpen: () => widget.onOpen(channels[i], channels),
+                    onRemove: recent ? () => _removeRecent(channels, i) : null,
                   ),
                 ),
               ),
@@ -140,20 +156,22 @@ class _ChannelListState extends ConsumerState<ChannelList> {
 
 /// Numéro, logo (ou icône de repli) et nom d'une chaîne, puis ce qu'elle
 /// passe si le guide le dit, et son cœur. OK maintenu, appui long ou touche
-/// Menu : favorite ajoutée ou retirée. Son nœud de focus est inscrit dans
-/// [tiles] tant qu'elle est construite.
+/// Menu : [onRemove] (dans les récentes), sinon favorite ajoutée ou retirée.
+/// Son nœud de focus est inscrit dans [tiles] tant qu'elle est construite.
 class ChannelTile extends ConsumerStatefulWidget {
   const ChannelTile({
     super.key,
     required this.channel,
     this.tiles,
     required this.onOpen,
+    this.onRemove,
     this.guide = true,
   });
 
   final Channel channel;
   final Map<String, FocusNode>? tiles;
   final VoidCallback onOpen;
+  final VoidCallback? onRemove;
 
   /// Faux dans la recherche : pas de « en cours », qui chargerait le guide
   /// (plusieurs Mo) à chaque fois que la section des chaînes apparaît.
@@ -194,10 +212,12 @@ class _ChannelTileState extends ConsumerState<ChannelTile> {
       final id? when widget.guide => ref.watch(onAirProvider(id)),
       _ => null,
     };
-    void toggle() => toggleChannelFavoriteWithMessage(context, ref, channel);
+    final menu =
+        widget.onRemove ??
+        () => toggleChannelFavoriteWithMessage(context, ref, channel);
     return RemoteKeys(
       onTap: widget.onOpen,
-      onMenu: toggle,
+      onMenu: menu,
       child: ListTile(
         key: ValueKey('live.channel.${channel.id}'),
         focusNode: _focus,
@@ -236,7 +256,7 @@ class _ChannelTileState extends ConsumerState<ChannelTile> {
         subtitle: onAir == null ? null : OnAirView(onAir: onAir),
         trailing: ChannelFavoriteButton(channel: channel, focusable: false),
         onTap: widget.onOpen,
-        onLongPress: toggle,
+        onLongPress: menu,
       ),
     );
   }
