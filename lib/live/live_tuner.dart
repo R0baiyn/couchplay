@@ -48,6 +48,12 @@ final class LiveTuner extends ChangeNotifier {
       'La chaîne s\'est coupée : le réseau a lâché, ou un autre appareil '
       'utilise peut-être ton abonnement.';
 
+  /// Chaîne refusée à l'ouverture : plus souvent en panne chez le fournisseur
+  /// qu'un autre appareil, le message des films tromperait.
+  static const refusedMessage =
+      'Le serveur refuse cette chaîne : elle est peut-être indisponible en '
+      'ce moment, ou un autre appareil utilise ton abonnement.';
+
   /// Ouvre le flux de la chaîne. Après chaque attente (adresse à résoudre),
   /// `current()` faux : un zapping ou un arrêt est passé, ne rien ouvrir
   /// (lever `PlaybackAbandoned`).
@@ -181,6 +187,12 @@ final class LiveTuner extends ChangeNotifier {
     } on Exception catch (e) {
       if (!current()) return;
       _failed(switch (e) {
+        PlaybackFailed(
+          unreadable: false,
+          network: false,
+          decoderRefused: false,
+        ) =>
+          refusedMessage,
         PlaybackFailed() => e.message,
         NameNotResolved() => e.message,
         _ => const PlaybackFailed().message,

@@ -381,7 +381,7 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('refus du serveur : message des films, aucun essai du direct '
+  testWidgets('refus du serveur : message du direct, aucun essai du direct '
       'en plus', (tester) async {
     await open(tester, refuse: true);
     // Les nouvelles tentatives de `Playback.open` (une par seconde).
@@ -392,10 +392,7 @@ void main() {
 
     expect(tries, 3);
     expect(player.urls, hasLength(tries));
-    expect(
-      find.textContaining('un autre appareil utilise peut-être'),
-      findsOneWidget,
-    );
+    expect(find.textContaining(LiveTuner.refusedMessage), findsOneWidget);
     // Depuis le message, ↓ zappe (pas de touches CH sur bien des
     // télécommandes).
     player.refuse = false;

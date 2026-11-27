@@ -389,6 +389,38 @@ void main() {
     });
   });
 
+  group('message d\'échec', () {
+    String? shown(PlaybackFailed failure) {
+      String? message;
+      fakeAsync((async) {
+        fail = (_) => failure;
+        final t = tuner(twelve, twelve[0]);
+        async.flushMicrotasks();
+        message = t.error;
+      });
+      return message;
+    }
+
+    test('chaîne refusée : peut-être indisponible, pas seulement un autre '
+        'appareil', () {
+      expect(
+        shown(PlaybackFailed.fromMpv('cplayer: Failed to open segment')),
+        'Le serveur refuse cette chaîne : elle est peut-être indisponible en '
+        'ce moment, ou un autre appareil utilise ton abonnement.',
+      );
+    });
+
+    test('réseau, format et décodeur : les mêmes messages qu\'un film', () {
+      for (final failure in const [
+        PlaybackFailed(network: true),
+        PlaybackFailed(unreadable: true),
+        PlaybackFailed(unreadable: true, decoderRefused: true),
+      ]) {
+        expect(shown(failure), failure.message);
+      }
+    });
+  });
+
   group('reconnexion', () {
     test('coupure : une nouvelle ouverture de la même chaîne après 1 s', () {
       fakeAsync((async) {
@@ -429,7 +461,7 @@ void main() {
         async.flushMicrotasks();
         async.elapse(const Duration(minutes: 1));
         expect(opened, ['9001']);
-        expect(t.error, const PlaybackFailed().message);
+        expect(t.error, LiveTuner.refusedMessage);
         expect(watched, isEmpty);
         // Une fin de flux signalée après l'échec ne relance rien.
         t.lost();
@@ -446,7 +478,7 @@ void main() {
         t.lost();
         async.elapse(const Duration(minutes: 1));
         expect(opened, ['9001', '9001']);
-        expect(t.error, const PlaybackFailed().message);
+        expect(t.error, LiveTuner.refusedMessage);
       });
     });
 
