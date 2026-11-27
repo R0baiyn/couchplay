@@ -482,6 +482,8 @@ void main() {
     await open(tester);
     tester.view.physicalSize = const Size(800, 360);
     await showBars(tester);
+    // Fondu fini : un débordement n'est signalé que si la rangée est peinte.
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(byKey('player.volume'), findsOneWidget);
     expect(tester.takeException(), isNull);
