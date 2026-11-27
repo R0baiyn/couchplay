@@ -190,7 +190,7 @@ void main() {
     // Le bandeau suit chaque appui ; le flux en cours joue toujours, ni
     // arrêté ni rouvert.
     expect(banner('5 · Chaîne 5'), findsOneWidget);
-    await run(tester, const Duration(milliseconds: 1500));
+    await run(tester, LiveTuner.zapDelay - const Duration(milliseconds: 500));
     expect(player.urls, [_url('9002')]);
     expect(player.stops, stops);
 

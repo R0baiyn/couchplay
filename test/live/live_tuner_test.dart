@@ -177,8 +177,8 @@ void main() {
   });
 
   group('aperçu', () {
-    test('5 appuis ↓ rapides : une seule ouverture, 2 s après le dernier, '
-        'sans toucher au flux en cours avant', () {
+    test('5 appuis ↓ rapides : une seule ouverture, après l\'attente comptée '
+        'du dernier, sans toucher au flux en cours avant', () {
       fakeAsync((async) {
         final t = tuner(twelve, twelve[0]);
         async.flushMicrotasks();
@@ -190,7 +190,7 @@ void main() {
         expect(t.channel.id, '9006');
         // Pendant l'aperçu, le flux en cours n'est ni rouvert ni remplacé.
         async.elapse(
-          const Duration(seconds: 2) -
+          LiveTuner.zapDelay -
               const Duration(milliseconds: 300) -
               const Duration(milliseconds: 1),
         );
@@ -244,7 +244,10 @@ void main() {
         t
           ..zap(1)
           ..lost();
-        async.elapse(const Duration(seconds: 1));
+        // `opening` : une reconnexion programmée le met aussitôt, même si
+        // son attente est aussi longue que celle de l'aperçu.
+        expect(t.opening, isFalse);
+        async.elapse(LiveTuner.zapDelay - const Duration(milliseconds: 1));
         expect(opened, [
           '9001',
         ], reason: 'aucune reconnexion pendant l\'aperçu');

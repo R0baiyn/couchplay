@@ -36,7 +36,7 @@ final class LiveTuner extends ChangeNotifier {
 
   /// Attente sans nouvel appui avant d'ouvrir la chaîne choisie : de quoi
   /// parcourir les chaînes au bandeau sans ouvrir chacune (D-090).
-  static const zapDelay = Duration(seconds: 2);
+  static const zapDelay = Duration(seconds: 1);
 
   /// Durée d'affichage du bandeau de la chaîne.
   static const bannerFor = Duration(seconds: 4);
