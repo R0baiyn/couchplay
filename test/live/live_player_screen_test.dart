@@ -409,4 +409,82 @@ void main() {
     expect(player.urls.last, _url('9004'));
     await close(tester);
   });
+
+  /// Barres rappelées par un toucher de l'image.
+  Future<void> showBars(WidgetTester tester) async {
+    await tester.tap(byKey('live.player.video'));
+    await run(tester, const Duration(milliseconds: 400));
+  }
+
+  double slider(WidgetTester tester) =>
+      tester.widget<Slider>(byKey('player.volume')).value;
+
+  testWidgets('volume (hors TV) : la barre le règle, le bouton coupe puis '
+      'remet le son', (tester) async {
+    await open(tester);
+    await showBars(tester);
+
+    await tester.tap(byKey('player.volume'));
+    await run(tester);
+    final chosen = player.volume;
+    expect(chosen, closeTo(50, 5));
+    expect(slider(tester), chosen);
+
+    await tester.tap(byKey('player.mute'));
+    await run(tester);
+    expect(player.volume, 0);
+    await tester.tap(byKey('player.mute'));
+    await run(tester);
+    expect(player.volume, chosen);
+    await close(tester);
+  });
+
+  testWidgets('volume gardé d\'une chaîne à l\'autre, son coupé compris', (
+    tester,
+  ) async {
+    await open(tester);
+    await showBars(tester);
+    await tester.tap(byKey('player.volume'));
+    await run(tester);
+    final chosen = player.volume;
+    await tester.tap(byKey('player.mute'));
+    await run(tester);
+
+    await key(tester, LogicalKeyboardKey.channelUp);
+    await afterZap(tester);
+
+    expect(player.urls.last, _url('9003'));
+    // Le zapping n'a rien demandé au volume.
+    expect(player.volumes, [chosen, 0]);
+    // Barres masquées entre-temps : le volume d'avant reste connu.
+    await run(tester, const Duration(seconds: 4));
+    await showBars(tester);
+    expect(slider(tester), 0);
+    await tester.tap(byKey('player.mute'));
+    await run(tester);
+    expect(player.volume, chosen);
+    await close(tester);
+  });
+
+  testWidgets('TV : ni bouton ni barre de volume (la télécommande règle '
+      'celui de l\'appareil)', (tester) async {
+    await open(tester, television: true);
+    await key(tester, LogicalKeyboardKey.select);
+
+    expect(byKey('live.player.playPause'), findsOneWidget);
+    expect(byKey('player.mute'), findsNothing);
+    expect(byKey('player.volume'), findsNothing);
+    await close(tester);
+  });
+
+  testWidgets('téléphone en paysage (800 × 360) : la rangée avec le volume '
+      'ne déborde pas', (tester) async {
+    await open(tester);
+    tester.view.physicalSize = const Size(800, 360);
+    await showBars(tester);
+
+    expect(byKey('player.volume'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await close(tester);
+  });
 }

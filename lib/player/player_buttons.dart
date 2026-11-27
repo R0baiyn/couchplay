@@ -71,7 +71,7 @@ class PlayerButtons extends StatelessWidget {
             icon: const Icon(Icons.forward_10),
             onPressed: onForward,
           ),
-          if (volume) _VolumeButton(player: player, onChanged: onActivity),
+          if (volume) VolumeButton(player: player, onChanged: onActivity),
           const Spacer(),
           TracksMenu(player: player, onOpened: onActivity),
           IconButton(
@@ -96,17 +96,22 @@ class PlayerButtons extends StatelessWidget {
   }
 }
 
-class _VolumeButton extends StatefulWidget {
-  const _VolumeButton({required this.player, required this.onChanged});
+/// Couper / remettre le son et barre de volume, des films et du direct.
+class VolumeButton extends StatefulWidget {
+  const VolumeButton({
+    super.key,
+    required this.player,
+    required this.onChanged,
+  });
 
   final Player player;
   final VoidCallback onChanged;
 
   @override
-  State<_VolumeButton> createState() => _VolumeButtonState();
+  State<VolumeButton> createState() => _VolumeButtonState();
 }
 
-class _VolumeButtonState extends State<_VolumeButton> {
+class _VolumeButtonState extends State<VolumeButton> {
   // Volume rendu quand on remet le son.
   double _beforeMute = 100;
 

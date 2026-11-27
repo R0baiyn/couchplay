@@ -24,7 +24,20 @@ final class FakePlayer implements Player {
   PlayerStream get stream => _streams;
 
   @override
-  final state = const PlayerState();
+  PlayerState get state => PlayerState(volume: volume);
+
+  /// Volume du lecteur, gardé d'un flux à l'autre comme dans libmpv.
+  var volume = 100.0;
+
+  /// Volumes demandés, dans l'ordre.
+  final volumes = <double>[];
+
+  @override
+  Future<void> setVolume(double volume) async {
+    this.volume = volume;
+    volumes.add(volume);
+    _streams.volumes.add(volume);
+  }
 
   @override
   PlatformPlayer? get platform => null;
@@ -68,6 +81,7 @@ final class FakePlayerStream implements PlayerStream {
   final durations = StreamController<Duration>.broadcast();
   final completions = StreamController<bool>.broadcast();
   final errors = StreamController<String>.broadcast();
+  final volumes = StreamController<double>.broadcast();
 
   @override
   Stream<Duration> get duration => durations.stream;
@@ -75,6 +89,8 @@ final class FakePlayerStream implements PlayerStream {
   Stream<bool> get completed => completions.stream;
   @override
   Stream<String> get error => errors.stream;
+  @override
+  Stream<double> get volume => volumes.stream;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => const Stream<Never>.empty();

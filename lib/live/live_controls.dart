@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../player/player_bars.dart';
+import '../player/player_buttons.dart';
 import '../player/player_tracks.dart';
 import 'channel.dart';
 import 'channel_favorite.dart';
@@ -258,6 +259,9 @@ class _LiveControlsState extends State<LiveControls> {
             },
           ),
           ChannelFavoriteButton(channel: _tuner.channel, onPressed: _bars.show),
+          // Sur TV, la télécommande règle le volume de l'appareil.
+          if (!widget.television)
+            VolumeButton(player: widget.player, onChanged: _bars.show),
           const Spacer(),
           TracksMenu(player: widget.player, onOpened: _bars.show),
           IconButton(
