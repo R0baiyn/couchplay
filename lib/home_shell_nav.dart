@@ -237,7 +237,18 @@ class ShellZones {
       }
       return KeyEventResult.handled;
     }
-    if (direction != TraversalDirection.left) return KeyEventResult.ignored;
+    final left = direction == TraversalDirection.left;
+    if (!left && direction != TraversalDirection.right) {
+      return KeyEventResult.ignored;
+    }
+    // Flutter garde l'historique des flèches par groupe de focus : après un
+    // passage d'un groupe à l'autre (catégories, chaînes de la TV), il
+    // rejouerait un ancien aller, et ← n'irait plus au rail.
+    if (focused != null) {
+      FocusTraversalGroup.maybeOfNode(focused)
+          ?.invalidateScopeData(focused.nearestScope!);
+    }
+    if (!left) return KeyEventResult.ignored;
     if (focused == null || !focused.focusInDirection(TraversalDirection.left)) {
       focusTab();
     }
