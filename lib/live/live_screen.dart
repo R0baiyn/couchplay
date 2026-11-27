@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../catalog/category_view.dart';
 import '../server/models.dart';
 import '../server/status_views.dart';
+import '../television.dart';
 import 'channel.dart';
 import 'channel_list_view.dart';
 import 'guide_screen.dart';
@@ -13,8 +14,8 @@ import 'live_player_screen.dart';
 import 'live_providers.dart';
 
 /// Onglet TV : catégories de chaînes visibles, puis les chaînes de celle
-/// choisie. Même disposition que Films et Séries : catégories en panneau
-/// latéral sur grand écran, sinon un bouton dans un en-tête repliable.
+/// choisie. Catégories en panneau latéral sur grand écran et sur télévision,
+/// sinon un bouton dans un en-tête repliable.
 class LiveScreen extends ConsumerStatefulWidget {
   const LiveScreen({super.key, this.headerActions});
 
@@ -59,6 +60,21 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     }
   }
 
+  /// Flutter garde l'historique des flèches par groupe de focus : passé des
+  /// chaînes aux catégories, ← rejouerait un ancien → au lieu de rejoindre le
+  /// rail, et → ramènerait sur une ancienne chaîne. Oublié avant chaque ← →.
+  static KeyEventResult _forgetArrows(FocusNode _, KeyEvent event) {
+    final direction = arrowDirection(event);
+    final focused = FocusManager.instance.primaryFocus;
+    if (focused != null &&
+        (direction == TraversalDirection.left ||
+            direction == TraversalDirection.right)) {
+      FocusTraversalGroup.maybeOfNode(focused)
+          ?.invalidateScopeData(focused.nearestScope!);
+    }
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _pickCategory(
     List<Category> categories,
     String selectedId,
@@ -75,6 +91,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
   @override
   Widget build(BuildContext context) {
     final catalog = ref.watch(liveCatalogProvider);
+    final television = ref.watch(televisionProvider);
     final visible =
         ref.watch(liveTabCategoriesProvider).value ?? const <Category>[];
     // Après un changement de compte ou de filtre, l'ancienne sélection peut
@@ -157,23 +174,30 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
       AsyncData() => LayoutBuilder(
         builder: (context, constraints) {
           final current = selected!;
-          // Mêmes seuils que Films et Séries.
-          if (constraints.maxWidth >= 1000) {
+          // Le seuil de Films et Séries ; une télé Full HD (960 de large)
+          // prend aussi la disposition du PC (D-095).
+          if (television || constraints.maxWidth >= 1000) {
             return plain(
-              Row(
-                children: [
-                  SizedBox(
-                    width: 260,
-                    child: CategoryList(
-                      categories: visible,
-                      selectedId: current.id,
-                      onSelect: _select,
-                      tileKey: (id) => ValueKey('live.categoryTile.$id'),
+              // Voit passer les flèches des deux listes, sans être un arrêt.
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onKeyEvent: _forgetArrows,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 260,
+                      child: CategoryList(
+                        categories: visible,
+                        selectedId: current.id,
+                        onSelect: _select,
+                        tileKey: (id) => ValueKey('live.categoryTile.$id'),
+                      ),
                     ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: list(current)),
-                ],
+                    const VerticalDivider(width: 1),
+                    Expanded(child: list(current)),
+                  ],
+                ),
               ),
             );
           }

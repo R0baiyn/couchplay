@@ -16,6 +16,7 @@ import 'package:couchplay/live/live_screen.dart';
 import 'package:couchplay/live/live_tuner.dart';
 import 'package:couchplay/player/playback.dart';
 import 'package:couchplay/server/server_client.dart';
+import 'package:couchplay/television.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,6 +25,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/catalog_app.dart' as shell;
 import '../support/fake_downloads.dart';
 import '../support/fake_playback.dart';
 import '../support/fake_server.dart';
@@ -171,6 +173,95 @@ void main() {
     await tap(tester, 'live.categorySheetTile.1');
     expect(byKey('live.channel.9006'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  for (final (television, name) in [
+    (true, 'télévision : catégories à gauche, comme sur PC'),
+    (false, 'sinon : la catégorie se choisit dans le panneau'),
+  ]) {
+    testWidgets('960 de large, $name', (tester) async {
+      await pump(
+        tester,
+        size: const Size(960, 540),
+        overrides: [televisionProvider.overrideWithValue(television)],
+      );
+      expect(
+        byKey('live.categoryTile.104'),
+        television ? findsOneWidget : findsNothing,
+      );
+      expect(
+        byKey('live.categoryPicker'),
+        television ? findsNothing : findsOneWidget,
+      );
+      expect(byKey('live.channel.9001'), findsOneWidget);
+    });
+  }
+
+  group('télécommande dans l\'accueil', () {
+    shell.setUpCatalogApp();
+
+    /// Ce qui a le focus : « rail », ou la Key de la rangée.
+    String where() {
+      final context = FocusManager.instance.primaryFocus!.context!;
+      if (context.findAncestorWidgetOfExactType<NavigationRail>() != null) {
+        return 'rail';
+      }
+      final key = context.findAncestorWidgetOfExactType<ListTile>()?.key;
+      return key is ValueKey<String> ? key.value : '?';
+    }
+
+    testWidgets('télévision : ← depuis une chaîne va aux catégories, → '
+        'revient aux chaînes, le rail reste atteignable', (tester) async {
+      await shell.pumpApp(
+        tester,
+        size: const Size(960, 540),
+        openMovies: false,
+        overrides: [televisionProvider.overrideWithValue(true)],
+      );
+      Future<void> press(LogicalKeyboardKey key) async {
+        await tester.sendKeyEvent(key);
+        await settle(tester);
+      }
+
+      // Le focus part du rail, sur l'Accueil : descendre jusqu'à « TV ».
+      for (var i = 0; i < 3; i++) {
+        await press(LogicalKeyboardKey.arrowDown);
+      }
+      await press(LogicalKeyboardKey.select);
+      expect(byKey('live.categoryTile.104'), findsOneWidget);
+
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(where(), 'live.categoryTile.104');
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(where(), startsWith('live.channel.'));
+      await press(LogicalKeyboardKey.arrowDown);
+      final channel = where();
+      expect(channel, startsWith('live.channel.'));
+
+      await press(LogicalKeyboardKey.arrowLeft);
+      expect(where(), startsWith('live.categoryTile.'));
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(where(), channel);
+
+      // Retour par une autre ligne : → sur une chaîne n'y rejoue pas
+      // l'ancien ← (historique des flèches de Flutter).
+      await press(LogicalKeyboardKey.arrowLeft);
+      await press(LogicalKeyboardKey.arrowDown);
+      await press(LogicalKeyboardKey.arrowRight);
+      final other = where();
+      expect(other, startsWith('live.channel.'));
+      expect(other, isNot(channel));
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(where(), other);
+
+      // Après des allers-retours, un seul ← par zone.
+      await press(LogicalKeyboardKey.arrowLeft);
+      expect(where(), startsWith('live.categoryTile.'));
+      await press(LogicalKeyboardKey.arrowLeft);
+      expect(where(), 'rail');
+      await press(LogicalKeyboardKey.arrowRight);
+      expect(where(), startsWith('live.categoryTile.'));
+    });
   });
 
   /// Chaînes dont le flux a été ouvert, dans l'ordre.
