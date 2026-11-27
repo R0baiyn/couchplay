@@ -60,6 +60,21 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
     }
   }
 
+  /// Flutter garde l'historique des flèches par groupe de focus : passé des
+  /// chaînes aux catégories, ← rejouerait un ancien → au lieu de rejoindre le
+  /// rail, et → ramènerait sur une ancienne chaîne. Oublié avant chaque ← →.
+  static KeyEventResult _forgetArrows(FocusNode _, KeyEvent event) {
+    final direction = arrowDirection(event);
+    final focused = FocusManager.instance.primaryFocus;
+    if (focused != null &&
+        (direction == TraversalDirection.left ||
+            direction == TraversalDirection.right)) {
+      FocusTraversalGroup.maybeOfNode(focused)
+          ?.invalidateScopeData(focused.nearestScope!);
+    }
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _pickCategory(
     List<Category> categories,
     String selectedId,
@@ -163,20 +178,26 @@ class _LiveScreenState extends ConsumerState<LiveScreen> {
           // prend aussi la disposition du PC (D-095).
           if (television || constraints.maxWidth >= 1000) {
             return plain(
-              Row(
-                children: [
-                  SizedBox(
-                    width: 260,
-                    child: CategoryList(
-                      categories: visible,
-                      selectedId: current.id,
-                      onSelect: _select,
-                      tileKey: (id) => ValueKey('live.categoryTile.$id'),
+              // Voit passer les flèches des deux listes, sans être un arrêt.
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onKeyEvent: _forgetArrows,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 260,
+                      child: CategoryList(
+                        categories: visible,
+                        selectedId: current.id,
+                        onSelect: _select,
+                        tileKey: (id) => ValueKey('live.categoryTile.$id'),
+                      ),
                     ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: list(current)),
-                ],
+                    const VerticalDivider(width: 1),
+                    Expanded(child: list(current)),
+                  ],
+                ),
               ),
             );
           }
